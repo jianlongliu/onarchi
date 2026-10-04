@@ -119,9 +119,10 @@ cp "$REPO/niri-config/shell.json" ~/.config/omarchy/shell.json
 ```
 
 That file is **upstream's stock layout** (a neutral starting point). The porting machine's actual bar is
-a different, opinionated one — `bar.id = charlieras262.floating-bar` plus five third-party widgets — and
+a different, opinionated one — `bar.id = omarchy.bar` (the floating implementation lives in
+`shell/plugins/bar/` and ships with `niri.patch`, not as a plugin) plus four third-party widgets — and
 lives in `local-config/omarchy/{shell.json,shell.toml,extensions/omarchy-menu.jsonc}`. Use that set only
-if you are also installing those five plugins from the Omarchy plugin store; `shell.toml` (font size,
+if you are also installing those four plugins from the Omarchy plugin store; `shell.toml` (font size,
 frosting alphas) is worth copying either way.
 
 **4b. The machine's `~/.config` layer (`local-config/`)** — what this machine runs on top of the upstream

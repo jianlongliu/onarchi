@@ -654,99 +654,373 @@ index dea93a4c..96b26b69 100644
              root.incomingBackground = ""
              root.oldBackground = ""
 diff --git a/shell/plugins/bar/Bar.qml b/shell/plugins/bar/Bar.qml
-index be9fece4..dee17ed6 100644
+index be9fece4..415fb273 100644
 --- a/shell/plugins/bar/Bar.qml
 +++ b/shell/plugins/bar/Bar.qml
-@@ -1,5 +1,4 @@
+@@ -1,7 +1,7 @@
  import Quickshell
 -import Quickshell.Hyprland
  import Quickshell.Io
  import Quickshell.Wayland
++import Quickshell.Wayland._BackgroundEffect
  import QtQuick
-@@ -40,6 +39,81 @@ Item {
+ import QtQuick.Layouts
+ import qs.Commons
+@@ -12,29 +12,29 @@ Item {
+   id: root
+ 
+   // The omarchy-shell host injects omarchyPath from OMARCHY_PATH.
+-  property string omarchyPath: Quickshell.env("OMARCHY_PATH")
++  //
++  // NOT `required`: a cloned bar loads via Loader.source (a URL), which
++  // can't supply initial property values at construction the way the
++  // built-in bar's sourceComponent can. configureBar() in shell.qml sets
++  // these three immediately after construction instead. Workaround for
++  // https://github.com/basecamp/omarchy/issues/8007, reported upstream as
++  // fixed (properly, via Loader initialProperties) by
++  // https://github.com/basecamp/omarchy/pull/8146. Once that PR ships in a
++  // stable release, drop this comment and restore `required` on all three.
++  property string omarchyPath: ""
+   // Injected by the host shell so bar slots can resolve enabled widgets.
+-  property var barWidgetRegistry: fallbackBarWidgetRegistry
+-  // Read-only registry view for third-party full bars; the built-in bar does
+-  // not otherwise need it, but declaring it keeps clone construction atomic.
+-  property var pluginRegistry: null
++  property var barWidgetRegistry: null
+   // Injected by the host shell every time shell.json is reloaded. Holds the
+   // `bar:` subtree: position, centerAnchor, layout. The host owns file IO;
+   // the bar just renders whatever it's handed. The bar font follows the
+   // OS-level fontconfig monospace binding — it is not stored in shell.json.
+-  property var barConfig: ({})
++  property var barConfig: null
+   // Injected by the host shell. Used for shell-wide actions such as opening
+   // settings and persisting inline widget state.
+   property var shell: null
+   // Manifest for the active bar option. Present for custom bars and useful for
+   // diagnostics; the built-in bar does not otherwise need it.
+   property var manifest: null
+-  QtObject {
+-    id: fallbackBarWidgetRegistry
+-    property var widgets: ({})
+-    property int revision: 0
+-    function metadataFor(id) { return null }
+-  }
+   // Mirrors the on-disk `bar-off` flag so the user can hide the bar without
+   // killing the entire shell. Hidden panels stay mapped but park off-screen
    // without an exclusion zone; updated by the FileView watcher further down.
-   property bool barHidden: false
-   property string home: Quickshell.env("HOME")
+@@ -79,6 +79,63 @@ Item {
+   property bool foregroundAnimationEnabled: true
+   property color background: Color.bar.background
+   property color urgent: Color.bar.active
++  // Gap (px) between the bar surface and the screen edges/monitor sides it
++  // floats away from, and the corner radius (px) of the floating bar shape.
++  // Configurable via shell.json's `bar:` entry (floatGap / cornerRadius).
++  // When floatGap isn't set explicitly, it's auto-detected from Hyprland's
++  // own `general:gaps_out` (see gapsOutProbe below), so the bar's floating
++  // margin matches the gap already used between windows and the screen
++  // edge instead of an arbitrary constant. See applyBarConfig().
++  property real configuredFloatGap: -1
++  property real autoDetectedGap: 8
++  readonly property real floatGap: configuredFloatGap >= 0 ? configuredFloatGap : autoDetectedGap
++  // Falls back to the shell's own Style.cornerRadius (which already mirrors
++  // Hyprland's decoration:rounding live -- see Commons/Style.qml) instead of
++  // a fixed constant, so the floating bar's corners match whatever rounding
++  // the rest of the shell -- and any window -- is currently using, including
++  // a live change from a plugin like Omablur, with no polling of our own.
++  property real configuredCornerRadius: -1
++  readonly property real barCornerRadius: configuredCornerRadius >= 0 ? configuredCornerRadius : Style.cornerRadius
++  // When true (default), a zero gap -- e.g. Omarchy's "no gaps" toggle --
++  // squares the bar off instead of leaving it rounded while flush against
++  // the screen edge. Set false to always use barCornerRadius regardless of
++  // the current gap.
++  property bool noRoundedOnNoGaps: true
++  readonly property real effectiveCornerRadius: (noRoundedOnNoGaps && floatGap <= 0) ? 0 : barCornerRadius
++  property string gapsOutProbeBuffer: ""
 +
-+  // Boot reveal. The host shell arms this only for a real login (the session
-+  // wrapper drops a marker and shell.qml consumes it), so restarting the shell
-+  // while working never moves the bar. At 0 the bar is parked past the screen
-+  // edge and see-through; it falls into place at 1. See BarPanel.
-+  // The host pushes this (see shell.qml pushBootReveal), so a bar never has to
-+  // know whether it is the built-in one or a third-party plugin -- a plugin's
-+  // `shell` is a restricted API that cannot see the marker.
-+  property bool bootRevealArmed: false
-+  onBootRevealArmedChanged: if (bootRevealArmed) root.armBootReveal()
-+
-+  property bool bootRevealStarted: false
-+  property real bootReveal: 1
-+  readonly property int bootHoldMs: 1400
-+  readonly property int bootSlideMs: 1000
-+  property double bootSlideStart: 0
-+
-+  function armBootReveal() {
-+    if (root.bootRevealStarted) return
-+    root.bootRevealStarted = true
-+    root.bootReveal = 0
-+    bootHoldTimer.start()
++  // Reads Hyprland's configured outer gap at startup, and again on every
++  // config reload -- e.g. Omarchy's "no gaps" toggle
++  // (omarchy-hyprland-window-gaps-toggle) just swaps a Lua flag file and
++  // runs `hyprctl reload`, which changes general:gaps_out without
++  // restarting the shell. hyprctl reports the gap as a CSS-style shorthand
++  // ("top right bottom left"); Omarchy/Hyprland setups almost always set
++  // all four to the same value, so the first number is used. Falls back to
++  // autoDetectedGap's previous value if a probe fails for any reason
++  // (hyprctl missing, unexpected output, etc.).
++  function refreshGapsOut() {
++    if (gapsOutProbe.running) return
++    gapsOutProbeBuffer = ""
++    gapsOutProbe.running = true
 +  }
 +
-+  // Both ends gentle: it has to read as the bar floating down, not snapping.
-+  function bootEase(t) {
-+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
-+  }
-+
-+  // The hold is a plain timer, not an animation, and for a reason worth
-+  // remembering: while the bar is parked its surface is not on screen, and an
-+  // animation scheduled there is not "slow", it is invisible -- the clock runs,
-+  // the frames do not, and the bar lands in one step (measured: a nominal
-+  // 1800 + 1400 animation showed the bar at +0.9s). A timer has no such clock.
-+  Timer {
-+    id: bootHoldTimer
-+    interval: root.bootHoldMs
-+    onTriggered: {
-+      root.bootSlideStart = Date.now()
-+      bootSlideClock.start()
-+    }
-+  }
-+
-+  // The slide keeps its own clock for the same reason: every tick works the
-+  // progress out from wall time, so a busy main thread can cost frames but
-+  // never the duration.
-+  Timer {
-+    id: bootSlideClock
-+    interval: 16
-+    repeat: true
-+    onTriggered: {
-+      const t = (Date.now() - root.bootSlideStart) / root.bootSlideMs
-+      if (t >= 1) {
-+        bootSlideClock.stop()
-+        root.bootReveal = 1
-+      } else {
-+        root.bootReveal = root.bootEase(t)
++  // niri port: no Hyprland configreloaded event here. The probe runs once at
++  // startup and the float gap comes from shell.json's explicit `floatGap`.
++  Process {
++    id: gapsOutProbe
++    command: ["hyprctl", "-j", "getoption", "general:gaps_out"]
++    stdout: SplitParser { onRead: function(line) { root.gapsOutProbeBuffer += line } }
++    onExited: {
++      try {
++        var parsed = JSON.parse(root.gapsOutProbeBuffer)
++        var firstValue = parseFloat(String(parsed.css || "").trim().split(/\s+/)[0])
++        if (!isNaN(firstValue)) root.autoDetectedGap = firstValue
++      } catch (e) {
++        // Keep the previous value; a broken probe shouldn't break the bar.
 +      }
 +    }
++    Component.onCompleted: root.refreshGapsOut()
 +  }
-+
-+  // Safety net: whatever happens above, the bar must never stay parked.
-+  Timer {
-+    interval: root.bootHoldMs + root.bootSlideMs + 400
-+    running: root.bootRevealStarted
-+    onTriggered: {
-+      bootSlideClock.stop()
-+      root.bootReveal = 1
-+    }
-+  }
-+
-+  // The arming arrives as a property the host sets, so it can land before or
-+  // after this component is born; onBootRevealArmedChanged above catches it.
-+
-+
-   property string stateHome: home + "/.local/state"
-   property string omarchyConfigDir: home + "/.config/omarchy"
-   property var fallbackBarConfig: ({
-@@ -714,7 +788,7 @@ Item {
-   // belongs. Empty until Hyprland reports one, which leaves panel routing on
+ 
+   Behavior on barForeground { enabled: root.foregroundAnimationEnabled; ColorAnimation { duration: 420; easing.type: Easing.InOutCubic } }
+   Behavior on background { ColorAnimation { duration: 420; easing.type: Easing.InOutCubic } }
+@@ -109,223 +166,6 @@ Item {
+   property var barMoveScreen: null
+   property var clickTargets: []
+   property var moduleSlots: []
+-  property var pluginBarApis: ({})
+-  property var pluginObjectOwners: []
+-
+-  Component {
+-    id: pluginBarApiComponent
+-    PluginBarApi { }
+-  }
+-
+-  function publicLayoutConfig() {
+-    return JSON.parse(JSON.stringify(root.layoutConfig || {}))
+-  }
+-
+-  function bindPluginBarApi(api) {
+-    if (!api) return
+-    api.foreground = Qt.binding(function() { return root.foreground })
+-    api.barForeground = Qt.binding(function() { return root.barForeground })
+-    api.background = Qt.binding(function() { return root.background })
+-    api.urgent = Qt.binding(function() { return root.urgent })
+-    api.fontFamily = Qt.binding(function() { return root.fontFamily })
+-    api.position = Qt.binding(function() { return root.position })
+-    api.vertical = Qt.binding(function() { return root.vertical })
+-    api.barSize = Qt.binding(function() { return root.barSize })
+-    api.transparent = Qt.binding(function() { return root.transparent })
+-    api.foregroundAnimationEnabled = Qt.binding(function() { return root.foregroundAnimationEnabled })
+-    api.centerSectionRevealHeld = Qt.binding(function() { return root.centerSectionRevealHeld })
+-    api._centerHoverRevealSuppressed = Qt.binding(function() { return root.centerHoverRevealSuppressed })
+-    root.syncPluginBarApiObjects(api)
+-  }
+-
+-  function syncPluginBarApiObjects(api) {
+-    if (!api) return
+-    api.activePopout = root.pluginOwnsBarObject(api.pluginId, root.activePopout)
+-      ? root.activePopout : (root.activePopout ? api.foreignPopoutMarker : null)
+-    api.clickTargets = root.pluginClickTargets(api.pluginId)
+-    api.layoutConfig = root.publicLayoutConfig()
+-  }
+-
+-  function pluginObjectRecord(target) {
+-    for (var i = 0; i < pluginObjectOwners.length; i++) {
+-      var record = pluginObjectOwners[i]
+-      if (record && record.target === target) return record
+-    }
+-    return null
+-  }
+-
+-  function markPluginObject(pluginId, target, role) {
+-    var key = String(pluginId || "")
+-    if (!key || !target) return false
+-    var record = root.pluginObjectRecord(target)
+-    if (record && record.pluginId !== key) return false
+-    var next = []
+-    for (var i = 0; i < pluginObjectOwners.length; i++) {
+-      var existing = pluginObjectOwners[i]
+-      if (!existing || existing.target !== target) next.push(existing)
+-    }
+-    var updated = record || { target: target, pluginId: key, clickTarget: false, popout: false }
+-    updated[role] = true
+-    next.push(updated)
+-    pluginObjectOwners = next
+-    return true
+-  }
+-
+-  function unmarkPluginObject(pluginId, target, role) {
+-    var key = String(pluginId || "")
+-    var next = []
+-    for (var i = 0; i < pluginObjectOwners.length; i++) {
+-      var record = pluginObjectOwners[i]
+-      if (!record || record.target !== target || record.pluginId !== key) {
+-        next.push(record)
+-        continue
+-      }
+-      record[role] = false
+-      if (record.clickTarget || record.popout) next.push(record)
+-    }
+-    pluginObjectOwners = next
+-  }
+-
+-  function pluginOwnsBarObject(pluginId, target) {
+-    var record = target ? root.pluginObjectRecord(target) : null
+-    return !!record && record.pluginId === String(pluginId || "")
+-  }
+-
+-  function pluginClickTargets(pluginId) {
+-    var out = []
+-    for (var i = 0; i < root.clickTargets.length; i++) {
+-      var target = root.clickTargets[i]
+-      if (root.pluginOwnsBarObject(pluginId, target)) out.push(target)
+-    }
+-    return out
+-  }
+-
+-  function syncAllPluginBarApiObjects() {
+-    for (var id in pluginBarApis) root.syncPluginBarApiObjects(pluginBarApis[id])
+-  }
+-
+-  function registerPluginClickTarget(pluginId, target) {
+-    if (!root.markPluginObject(pluginId, target, "clickTarget")) return
+-    root.registerClickTarget(target)
+-  }
+-
+-  function unregisterPluginClickTarget(pluginId, target) {
+-    if (!root.pluginOwnsBarObject(pluginId, target)) return
+-    root.unregisterClickTarget(target)
+-    root.unmarkPluginObject(pluginId, target, "clickTarget")
+-  }
+-
+-  function requestPluginPopout(pluginId, owner) {
+-    if (!root.markPluginObject(pluginId, owner, "popout")) return
+-    root.requestPopout(owner)
+-  }
+-
+-  function releasePluginPopout(pluginId, owner) {
+-    if (!root.pluginOwnsBarObject(pluginId, owner)) return
+-    root.releasePopout(owner)
+-    root.unmarkPluginObject(pluginId, owner, "popout")
+-  }
+-
+-  function pluginBarApiFor(pluginId, moduleName, registered) {
+-    var key = String(pluginId || "")
+-    if (!key) return null
+-
+-    var pluginShell = null
+-    if (registered && root.shell && typeof root.shell.pluginShellForId === "function") {
+-      // Only the trusted built-in bar receives ShellRoot and can request a
+-      // service-capable facade for the widget it is instantiating.
+-      pluginShell = root.shell.pluginShellForId(moduleName)
+-    } else if (root.shell && typeof root.shell.pluginShellForBarEntry === "function") {
+-      // Replacement bars receive a service-less entry facade. Giving an
+-      // untrusted bar a generic facade factory would let it retrieve another
+-      // third-party plugin's live service object.
+-      pluginShell = root.shell.pluginShellForBarEntry(key, moduleName)
+-    }
+-
+-    if (pluginBarApis[key]) {
+-      pluginBarApis[key].shell = pluginShell
+-      return pluginBarApis[key]
+-    }
+-
+-    var api = pluginBarApiComponent.createObject(null, {
+-      pluginId: key,
+-      moduleName: String(moduleName || ""),
+-      shell: pluginShell,
+-      _showTooltip: function(target, text) { root.showTooltip(target, text) },
+-      _hideTooltip: function(target) { root.hideTooltip(target) },
+-      _registerClickTarget: function(target) { root.registerPluginClickTarget(key, target) },
+-      _unregisterClickTarget: function(target) { root.unregisterPluginClickTarget(key, target) },
+-      _requestPopout: function(owner) { root.requestPluginPopout(key, owner) },
+-      _releasePopout: function(owner) { root.releasePluginPopout(key, owner) },
+-      _switchPanelFrom: function(owner, direction) { return root.switchPanelFrom(owner, direction) },
+-      _targetBelongsToWindow: function(target, window) { return root.targetBelongsToWindow(target, window) },
+-      _moduleWidgets: function(requestedId) {
+-        return String(requestedId || "") === String(moduleName || "")
+-          ? root.moduleWidgets(moduleName) : []
+-      },
+-      _run: function(command) { root.run(command) },
+-      _setCenterHoverRevealSuppressed: function(value) {
+-        root.centerHoverRevealSuppressed = !!value
+-      }
+-    })
+-    if (!api) return null
+-    root.bindPluginBarApi(api)
+-
+-    var next = ({})
+-    for (var id in pluginBarApis) next[id] = pluginBarApis[id]
+-    next[key] = api
+-    pluginBarApis = next
+-    return api
+-  }
+-
+-  function pluginBarApiUsed(pluginId) {
+-    for (var i = 0; i < moduleSlots.length; i++) {
+-      var slot = moduleSlots[i]
+-      if (slot && slot.pluginApiId === pluginId) return true
+-    }
+-    return false
+-  }
+-
+-  function releasePluginObjects(pluginId) {
+-    var owned = pluginObjectOwners.slice()
+-    for (var i = 0; i < owned.length; i++) {
+-      var record = owned[i]
+-      if (!record || record.pluginId !== pluginId) continue
+-      if (record.clickTarget) root.unregisterClickTarget(record.target)
+-      if (record.popout && root.activePopout === record.target) root.releasePopout(record.target)
+-    }
+-    pluginObjectOwners = pluginObjectOwners.filter(function(record) {
+-      return record && record.pluginId !== pluginId
+-    })
+-  }
+-
+-  function prunePluginBarApis() {
+-    var next = ({})
+-    for (var id in pluginBarApis) {
+-      var api = pluginBarApis[id]
+-      if (root.pluginBarApiUsed(id)) {
+-        next[id] = api
+-        continue
+-      }
+-      root.releasePluginObjects(id)
+-      if (api && typeof api.destroy === "function") api.destroy()
+-    }
+-    pluginBarApis = next
+-  }
+-
+-  onActivePopoutChanged: syncAllPluginBarApiObjects()
+-  onClickTargetsChanged: syncAllPluginBarApiObjects()
+-  onLayoutConfigChanged: syncAllPluginBarApiObjects()
+-  onModuleSlotsChanged: Qt.callLater(prunePluginBarApis)
+-
+-  Component.onDestruction: {
+-    for (var id in pluginBarApis) {
+-      root.releasePluginObjects(id)
+-      if (pluginBarApis[id] && typeof pluginBarApis[id].destroy === "function")
+-        pluginBarApis[id].destroy()
+-    }
+-    pluginBarApis = ({})
+-  }
+ 
+   function registerClickTarget(target) {
+     if (!target || clickTargets.indexOf(target) !== -1) return
+@@ -584,6 +424,16 @@ Item {
+     position = normalizePosition(config.position)
+     setRequestedTransparency(config.transparent === true)
+     centerAnchor = Util.canonicalWidgetId(config.centerAnchor || "")
++    // Clamped: shell.json is user-editable, and these feed straight into
++    // layer-shell margins / a Rectangle radius. Not an unbounded-allocation
++    // risk the way a Repeater count is, but an extreme value (a stray extra
++    // zero) can still push the bar off-screen or into a degenerate shape,
++    // so bound them to a sane range rather than trusting either verbatim.
++    configuredFloatGap = typeof config.floatGap === "number"
++      ? Math.max(0, Math.min(200, config.floatGap)) : -1
++    configuredCornerRadius = typeof config.cornerRadius === "number"
++      ? Math.max(0, Math.min(200, config.cornerRadius)) : -1
++    noRoundedOnNoGaps = config.noRoundedOnNoGaps !== false
+ 
+     // layoutEntries feeds plain JS arrays to the module Repeaters, and QML
+     // cannot diff those: reassigning layoutConfig rebuilds every widget on
+@@ -710,11 +560,11 @@ Item {
+     return window && window.screen ? String(window.screen.name || "") : ""
+   }
+ 
+-  // The output Hyprland has focused, which is where a keyboard-summoned panel
+-  // belongs. Empty until Hyprland reports one, which leaves panel routing on
++  // The output the compositor has focused, which is where a keyboard-summoned
++  // panel belongs. Empty until there is one, which leaves panel routing on
    // its per-monitor fallback rather than guessing at an output.
    function focusedScreenName() {
 -    var monitor = Hyprland.focusedMonitor
@@ -754,63 +1028,1036 @@ index be9fece4..dee17ed6 100644
      return monitor ? String(monitor.name || "") : ""
    }
  
-@@ -805,7 +879,10 @@ Item {
-     return source ? Util.fileUrl(source) : ""
-   }
+@@ -807,6 +657,224 @@ Item {
  
--  Component.onCompleted: applyBarConfig()
-+  Component.onCompleted: {
-+    applyBarConfig()
-+    if (root.shell && root.shell.bootRevealArmed) root.armBootReveal()
+   Component.onCompleted: applyBarConfig()
+ 
++  // ---- boot reveal -------------------------------------------------------
++  //
++  // A real login starts the shell on a wallpaper that is already there, and the
++  // bar's own first ~1s is nothing anyone wants to watch: glyphs shape, icons
++  // load, the frosted fill pops in mid-layout. So the bar's surface stays off
++  // the screen for that moment, then appears whole.
++  //
++  // Whole, and deliberately not floated in. niri paints the blur for the region
++  // it was handed by itself: the frost is a compositor effect, not the client's
++  // pixels, so it shows even where the surface draws nothing at all. A bar that
++  // slides into place therefore lands as an empty frosted rectangle with the
++  // bar chasing it down -- two bars, and the second one is the ugly half. Nor
++  // can the region follow the slide (measured: a region bound to the moved item
++  // left the screen with it and the frost never came back). A surface that
++  // appears in one piece has neither problem.
++  //
++  // Only a real login arms this. The session wrapper drops a marker in the
++  // runtime directory, the host shell reads it there and pushes the flag down
++  // onto whichever bar is configured -- this plugin sees only a restricted
++  // shell API, so it cannot reach the marker itself -- and the host removes the
++  // marker as it reads it, so restarting the shell while working on it never
++  // hides the bar.
++  property bool bootRevealArmed: false
++  onBootRevealArmedChanged: if (bootRevealArmed) root.armBootReveal()
++
++  // Whether the bar may be on screen at all. True from the start unless a real
++  // login armed the reveal, so an ordinary restart changes nothing.
++  property bool bootRevealShown: true
++
++  // A fixed hold was always wrong by some amount: the shell assembles itself at
++  // whatever speed the machine feels like, and the slowest part is not the bar
++  // or a widget but the wallpaper, which the background service decodes
++  // asynchronously and paints well after every layer exists. So hold until that
++  // service says a wallpaper frame is up, with a floor so a fast machine does
++  // not blink the card, and a ceiling so a broken one cannot hide the bar
++  // forever.
++  readonly property int bootHoldMs: 600
++  readonly property int bootHoldMaxMs: 6000
++  // Pushed by the host, which owns the handle to the background service -- a
++  // plugin bar only ever sees a restricted shell API and cannot look it up
++  // itself. Defaults to true so the plugin still behaves sensibly if some other
++  // host loads it without pushing anything.
++  property bool bootRevealPainted: true
++  readonly property bool wallpaperPainted: root.bootRevealPainted
++
++  // A small timer, not an animation: nothing of ours is on screen to drive
++  // frames while it runs.
++  function armBootReveal() {
++    root.bootRevealShown = false
++    bootHoldTimer.start()
 +  }
- 
++
++  function finishBootReveal() {
++    if (!root.wallpaperPainted) return
++    bootHoldTimer.stop()
++    bootHoldPoll.stop()
++    root.bootRevealShown = true
++  }
++
++  Timer {
++    id: bootHoldTimer
++    interval: root.bootHoldMs
++    onTriggered: {
++      bootHoldPoll.start()
++      root.finishBootReveal()
++    }
++  }
++
++  Timer {
++    id: bootHoldPoll
++    interval: 100
++    repeat: true
++    onTriggered: root.finishBootReveal()
++  }
++
++  // Safety net: whatever happens above, the bar must never stay off screen.
++  Timer {
++    interval: root.bootHoldMaxMs
++    running: !root.bootRevealShown
++    onTriggered: {
++      bootHoldPoll.stop()
++      root.bootRevealShown = true
++    }
++  }
++
++  // While the bar is held back the desktop is wallpaper and nothing else, which
++  // reads as "nothing is happening" -- so say something. Same shape as the
++  // shutdown toast, with the brain the menu uses for its Learn entry. It lives
++  // here instead of going through the host's osd plugin: that plugin pays about
++  // a second to load on the first show of a session, which lands the toast
++  // after the bar instead of before it.
++  Variants {
++    model: Quickshell.screens
++
++    delegate: Component {
++      BootBannerPanel {
++        required property var modelData
++
++        screen: modelData
++      }
++    }
++  }
++
++  component BootBannerPanel: PanelWindow {
++    id: bootBannerPanel
++
++    readonly property bool bannerUp: root.bootRevealArmed && !root.bootRevealShown
++    // These are the osd plugin's own numbers (plugins/osd/Osd.qml, the card its
++    // shutdown toast is drawn in), so the two come out the same size: pad 16 on
++    // every side, two thirds of that between glyph and message, card 67 off the
++    // bottom edge. Note Style.space(px) is a scaled pixel value, not a step
++    // index -- space(16) is not the 16th step.
++    readonly property int bannerPad: Style.space(16)
++    readonly property int bannerGap: Math.round(Style.space(16) * 2 / 3)
++    readonly property int bannerRowHeight: Style.font.displayLarge
++    // Nerd Font glyphs draw well outside their monospace cell, so that card
++    // measures its icon column by ink rather than by advance width. Measuring
++    // by the cell instead is worth about 10px of extra card.
++    readonly property int bannerInk: Math.ceil(bannerIconMetrics.tightBoundingRect.width)
++    readonly property int bannerMessageWidth: Math.ceil(bannerMessageMetrics.advanceWidth)
++    readonly property int bannerScreenWidth: bootBannerPanel.modelData ? bootBannerPanel.modelData.width : 0
++
++    TextMetrics {
++      id: bannerIconMetrics
++
++      font.family: Style.font.family
++      font.pixelSize: Style.font.displayLarge
++      text: "󰧑"
++    }
++
++    TextMetrics {
++      id: bannerMessageMetrics
++
++      font.family: Style.font.family
++      font.bold: true
++      font.pixelSize: Style.font.title
++      text: "Thinking…"
++    }
++
++    // Parked just below the screen edge while idle, and always mapped: the
++    // first show then costs a margin change (~20ms) instead of building a layer
++    // surface and shaping the glyph, which measured ~1s here -- long enough to
++    // land the card after the bar rather than before it. The bar parks for the
++    // same reason.
++    //
++    // The surface is card-sized rather than a full-width strip because this
++    // card borrows the osd card's `blur true` layer rule (effects.kdl) so the
++    // two are frosted alike, and niri frosts the whole surface a rule matches:
++    // a full-width strip under that rule would frost the entire display. That
++    // is why the card is centred with side margins instead of anchored edge to
++    // edge.
++    visible: true
++    color: "transparent"
++    exclusionMode: ExclusionMode.Ignore
++    WlrLayershell.namespace: "omarchy-boot-banner"
++    WlrLayershell.layer: WlrLayer.Overlay
++    WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
++    mask: Region {}
++
++    anchors {
++      bottom: true
++      left: true
++      right: true
++    }
++
++    implicitHeight: bannerPill.height
++    margins {
++      left: Math.max(0, Math.round((bannerScreenWidth - bannerPill.width) / 2))
++      right: Math.max(0, Math.round((bannerScreenWidth - bannerPill.width) / 2))
++      bottom: bannerUp ? Style.space(67) : -(bannerPill.height + Style.space(67) + 40)
++    }
++
++    BorderSurface {
++      id: bannerPill
++      width: bannerPill.borderLeft + bannerPad + bannerInk + bannerGap + bannerMessageWidth + bannerPad + bannerPill.borderRight
++      height: bannerPill.borderTop + bannerPad + bannerRowHeight + bannerPad + bannerPill.borderBottom
++      // The osd card's own fill, alpha and all: the layer rule for this
++      // namespace frosts it exactly like that card.
++      color: Color.menu.background
++      borderSpec: Border.surfaceSpec("popups", "border", Color.popups.border, Math.max(1, Style.space(2)))
++      radius: Style.cornerRadius
++
++      Row {
++        id: bannerRow
++        anchors.fill: parent
++        anchors.topMargin: bannerPill.borderTop + bannerPad
++        anchors.rightMargin: bannerPill.borderRight + bannerPad
++        anchors.bottomMargin: bannerPill.borderBottom + bannerPad
++        anchors.leftMargin: bannerPill.borderLeft + bannerPad
++        spacing: bannerGap
++
++        Item {
++          width: bannerInk
++          height: parent.height
++
++          Text {
++            textFormat: Text.PlainText
++            // Sit the glyph's ink flush in the column, like the osd card does.
++            x: Math.round((bannerInk - bannerIconMetrics.tightBoundingRect.width) / 2 - bannerIconMetrics.tightBoundingRect.x)
++            anchors.verticalCenter: parent.verticalCenter
++            text: "󰧑"
++            font: bannerIconMetrics.font
++            color: Color.popups.text
++          }
++        }
++
++        Text {
++          textFormat: Text.PlainText
++          width: bannerMessageWidth
++          anchors.verticalCenter: parent.verticalCenter
++          text: "Thinking…"
++          font: bannerMessageMetrics.font
++          color: Color.popups.text
++        }
++      }
++    }
++  }
++
    // Revealing the indicators widens their section, which can slide a neighbour
    // under a stationary pointer. Collapsing on that un-hover would move it back
-@@ -1248,12 +1325,20 @@ Item {
+   // out and re-open the peek, so hold until the pointer leaves the bar.
+@@ -825,10 +893,6 @@ Item {
+     if (barHoverCount === 0) centerSectionRevealTimer.restart()
+   }
+ 
+-  function setCenterHoverRevealSuppressed(value) {
+-    centerHoverRevealSuppressed = !!value
+-  }
+-
+   Timer {
+     id: centerSectionRevealTimer
+     interval: 120
+@@ -1103,6 +1167,13 @@ Item {
+   FileView {
+     path: root.stateHome + "/omarchy/current"
+     watchChanges: true
++    // Only the change notification matters here -- scheduleTransparent-
++    // ForegroundRefresh() recomputes via a separate Process, never this
++    // view's own text/data. This path is user-writable and predictable, so
++    // without preload: false, replacing it (or symlinking it) with an
++    // arbitrarily large regular file would make the shell load the whole
++    // thing into memory with no size ceiling.
++    preload: false
+     printErrors: false
+     onFileChanged: root.scheduleTransparentForegroundRefresh()
+   }
+@@ -1174,25 +1245,15 @@ Item {
+   FileView {
+     path: root.home + "/.local/state/omarchy/toggles"
+     watchChanges: true
++    // Same reasoning as the /omarchy/current watcher above: only the change
++    // notification is used (it re-runs barHiddenProbe, a separate Process,
++    // to check for the bar-off flag), so this view never needs to load
++    // whatever's actually at this user-writable, predictable path.
++    preload: false
+     printErrors: false
+     onFileChanged: barHiddenProbe.running = true
+   }
+ 
+-  // The directory watch can permanently stop delivering events after flag
+-  // changes land in quick succession, stranding the bar off screen until the
+-  // shell restarts. `omarchy-toggle-bar` nudges this after flipping the flag
+-  // so the probe re-reads it even when the watch has gone quiet.
+-  IpcHandler {
+-    target: "omarchy.bar"
+-
+-    // Start rather than restart: a probe already in flight was launched by the
+-    // directory watch after the flag flipped, so its answer is current, and
+-    // killing it here can swallow the result entirely.
+-    function syncHidden(): void {
+-      barHiddenProbe.running = true
+-    }
+-  }
+-
+   Variants {
+     model: Quickshell.screens
+ 
+@@ -1239,7 +1300,9 @@ Item {
+     // reveal has to rebuild them — new surface, re-shaped glyphs, re-uploaded
+     // textures — which measures ~150ms against ~20ms to tear down. Parking
+     // keeps the surface alive, so showing is only a margin change.
+-    visible: !remapGuard.remapping
++    // The bar's own remap guard and the boot reveal both want the surface
++    // gone, and QML refuses an object that sets the same property twice, so
++    // they share one binding here.
+     exclusionMode: root.barHidden ? ExclusionMode.Ignore : ExclusionMode.Auto
+ 
+     ScreenMoveRemap {
+@@ -1247,11 +1310,27 @@ Item {
+       window: barWindow
      }
  
++    // The edge the bar is anchored to (its `position`) and the two
++    // perpendicular edges get the gap -- those all border open desktop or
++    // screen edge. The edge opposite `position` gets none: that's the side
++    // facing the tiled windows, which already have their own Hyprland gap
++    // right up against the bar's exclusion zone, so adding floatGap there
++    // on top of it just makes that side look bigger than the other three.
++    function innerEdge() {
++      if (root.position === "top") return "bottom"
++      if (root.position === "bottom") return "top"
++      if (root.position === "left") return "right"
++      return "left"
++    }
++    function marginFor(edge) {
++      return edge === innerEdge() ? 0 : root.floatGap
++    }
++
      margins {
 -      top: root.barHidden && root.position === "top" ? -root.barSize : 0
 -      bottom: root.barHidden && root.position === "bottom" ? -root.barSize : 0
 -      left: root.barHidden && root.position === "left" ? -root.barSize : 0
 -      right: root.barHidden && root.position === "right" ? -root.barSize : 0
-+      top: (root.barHidden && root.position === "top" ? -root.barSize : 0)
-+           - (root.position === "top" ? bootPark : 0)
-+      bottom: (root.barHidden && root.position === "bottom" ? -root.barSize : 0)
-+              - (root.position === "bottom" ? bootPark : 0)
-+      left: (root.barHidden && root.position === "left" ? -root.barSize : 0)
-+            - (root.position === "left" ? bootPark : 0)
-+      right: (root.barHidden && root.position === "right" ? -root.barSize : 0)
-+             - (root.position === "right" ? bootPark : 0)
++      top: marginFor("top") + (root.barHidden && root.position === "top" ? -root.barSize : 0)
++      bottom: marginFor("bottom") + (root.barHidden && root.position === "bottom" ? -root.barSize : 0)
++      left: marginFor("left") + (root.barHidden && root.position === "left" ? -root.barSize : 0)
++      right: marginFor("right") + (root.barHidden && root.position === "right" ? -root.barSize : 0)
      }
  
-+    // Boot reveal: same parked-margin trick as hiding, so the bar slides in
-+    // from behind the screen edge rather than fading in place.
-+    readonly property real bootPark: root.barSize * (1 - root.bootReveal)
-+
      anchors {
-       top: root.position === "top" || root.vertical
-       bottom: root.position === "bottom" || root.vertical
-@@ -1263,7 +1348,10 @@ Item {
+@@ -1263,11 +1342,76 @@ Item {
  
      implicitWidth: root.vertical ? root.barSize : 0
      implicitHeight: root.vertical ? 0 : root.barSize
 -    color: root.transparent ? "transparent" : root.background
-+    // See-through while parked so the drop-in reads as one motion. At
-+    // bootReveal 1 this is exactly root.background again.
-+    color: root.transparent ? "transparent"
-+      : Util.alpha(root.background, root.background.a * root.bootReveal)
++    // The surface itself stays fully transparent; barBackground below draws
++    // the actual (roundable) fill, so the corners cut outside its radius
++    // show through to the desktop instead of being a square window.
++    color: "transparent"
      surfaceFormat.opaque: false
      WlrLayershell.namespace: "omarchy-bar"
      WlrLayershell.layer: WlrLayer.Top
-@@ -1271,6 +1359,7 @@ Item {
+ 
++    // The whole reveal: off the screen, then on it. Nothing moves -- see
++    // the boot reveal notes above for why a slide cannot work.
++    visible: root.bootRevealShown && !remapGuard.remapping
++
++    // niri port: hand niri the bar's own rounded rect as the blur region, so the
++    // frost follows the rounded shape instead of the full surface rectangle --
++    // blurring that rectangle smears the bar's fill out through its transparent
++    // corners into a halo (niri samples the composited scene; Hyprland fixes the
++    // same thing with `ignore_alpha` and niri has no equivalent).
++    // The blur region must not move, so it tracks a stationary stand-in instead
++    // of the sliding visual: niri blurs the rectangle it is handed, and the bar
++    // begins the reveal parked above the top edge -- a region sampled there is
++    // off-screen, and it takes the frost with it. Same geometry as the bar at
++    // rest (the bar fills the surface); only ever a shape, never a colour.
++    Rectangle {
++      id: barBlurAnchor
++      anchors.fill: parent
++      // niri port (2026-10-04): the frost region the compositor masks out is a
++      // HARD edge -- niri's background-effect region has no antialiasing, and
++      // because the fill under it is only ~46% alpha that hard cut is what the
++      // eye sees, no matter what the fill does. Inset the frost 2px so the
++      // fill's own (antialiased) rounded edge is the visible silhouette and the
++      // compositor's staircase sits inside it -- see docs/visual.md.
++      anchors.margins: 2
++      radius: Math.max(0, root.effectiveCornerRadius - 2)
++      color: "transparent"
++    }
++
++    BackgroundEffect.blurRegion: Region { item: barBlurAnchor; radius: root.effectiveCornerRadius }
++
++
++
++    Rectangle {
++      id: barBackground
++      anchors.fill: parent
++      antialiasing: true
++      radius: root.effectiveCornerRadius
++      // The theme's own background color can carry its own baked-in alpha
++      // (shell.toml's [bar] background-alpha); forcing it to 1 here first
++      // means Style.shellOpacity below is an absolute result, not a
++      // multiplier on top of an already-translucent color -- shellOpacity a
++      // plugin never touches still reaching exactly opaque.
++      //
++      // niri port: keep that alpha instead. niri only blurs behind a surface
++      // that is not fully opaque, so with the alpha forced to 1 the bar had
++      // nothing to show through and the frost stayed invisible.
++      color: root.transparent ? "transparent"
++        : Qt.rgba(root.background.r, root.background.g, root.background.b,
++                  root.background.a > 0 ? root.background.a : 1)
++      // Style.shellOpacity is a shared token a plugin like Omablur sets when
++      // it turns blur on/off -- blur only renders behind a surface that isn't
++      // fully opaque. Only applies when the background is actually drawn:
++      // `transparent` already means "nothing to see here" and takes priority.
++      // niri port: this Omarchy version has no shellOpacity token, so fall
++      // back to fully opaque instead of assigning undefined to a double.
++      opacity: root.transparent ? 1
++        : (typeof Style.shellOpacity === "number" ? Style.shellOpacity : 1)
++      Behavior on radius { NumberAnimation { duration: 420; easing.type: Easing.InOutCubic } }
++      Behavior on color { ColorAnimation { duration: 420; easing.type: Easing.InOutCubic } }
++      Behavior on opacity { NumberAnimation { duration: 420; easing.type: Easing.InOutCubic } }
++    }
++
      Loader {
        anchors.fill: parent
        sourceComponent: root.vertical ? verticalBar : horizontalBar
-+      opacity: root.bootReveal
+@@ -1335,9 +1479,14 @@ Item {
  
-       // A child of the loader, not a sibling of the sections: an ancestor stays
-       // hovered while the pointer is over a widget, where a sibling would lose
+         Text {
+           id: tooltipLabel
+-          textFormat: Text.PlainText
+           anchors.centerIn: parent
+           text: root.tooltipText
++          // The shared tooltip renders whatever any widget hands it,
++          // including window titles and StatusNotifier tooltip text --
++          // both set by other applications, not this shell. Force plain
++          // text so Qt's default Text.AutoText can't interpret embedded
++          // rich-text markup (e.g. <img>) from an untrusted source.
++          textFormat: Text.PlainText
+           color: Color.tooltip.text
+           font.family: root.fontFamily
+           font.pixelSize: Style.font.body
+@@ -1778,9 +1927,6 @@ Item {
+     readonly property string moduleName: root.entryId(entry)
+     readonly property var moduleSettings: root.entrySettings(entry)
+     readonly property string customType: root.customModuleType(entry)
+-    readonly property var registryMetadata: root.barWidgetRegistry.metadataFor(root.canonicalWidgetId(moduleName))
+-    readonly property bool firstParty: registryMetadata && registryMetadata.firstParty === true
+-    readonly property string pluginApiId: registered ? root.canonicalWidgetId(moduleName) : "bar-entry:" + moduleName
+     // Re-evaluate when the registry mutates (Component reference changes,
+     // plugin enabled/disabled, etc.). Reading the `widgets` property creates
+     // the binding dependency — the wrapped function call alone wouldn't.
+@@ -1999,8 +2145,7 @@ Item {
+     function injectProps() {
+       var target = activeItem
+       if (!target) return
+-      if ("bar" in target) target.bar = firstParty
+-        ? root : root.pluginBarApiFor(pluginApiId, moduleName, registered)
++      if ("bar" in target) target.bar = root
+       if ("moduleName" in target) target.moduleName = moduleName
+       if ("settings" in target) target.settings = moduleSettings
+     }
+diff --git a/shell/plugins/bar/LICENSE b/shell/plugins/bar/LICENSE
+new file mode 100644
+index 00000000..e4cb7017
+--- /dev/null
++++ b/shell/plugins/bar/LICENSE
+@@ -0,0 +1,21 @@
++MIT License
++
++Copyright (c) 2026 Charlieras262
++
++Permission is hereby granted, free of charge, to any person obtaining a copy
++of this software and associated documentation files (the "Software"), to deal
++in the Software without restriction, including without limitation the rights
++to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
++copies of the Software, and to permit persons to whom the Software is
++furnished to do so, subject to the following conditions:
++
++The above copyright notice and this permission notice shall be included in all
++copies or substantial portions of the Software.
++
++THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
++IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
++FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
++AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
++LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
++OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
++SOFTWARE.
+diff --git a/shell/plugins/bar/README.md b/shell/plugins/bar/README.md
+index 5741c5f3..5c612d9f 100644
+--- a/shell/plugins/bar/README.md
++++ b/shell/plugins/bar/README.md
+@@ -1,180 +1,184 @@
+-# Omarchy bar
++# Floating Bar
+ 
+-This is the Quickshell implementation of the Omarchy status bar. It is
+-shipped as a first-party plugin of [`omarchy-shell`](../../README.md), the
+-long-running shell host. The bar is mounted at startup and lives inside
+-the shell for its whole session.
++A full [Omarchy](https://omarchy.org) bar replacement (`"kind": "bar"`): the
++stock bar, floating off the screen edge with rounded corners instead of
++spanning edge-to-edge. It inherits Omarchy's own bar position, so it isn't
++locked to the top -- drag it to any edge from the menu, or with the mouse,
++the same way you would the stock bar, and it floats there too.
+ 
+-- `manifest.json` declares the plugin (`id: omarchy.bar`, `kind: bar`) and points at `Bar.qml` as the entry point.
+-- `Bar.qml` is Omarchy-owned bar engine code, loaded by the omarchy-shell host. Users should not edit it directly.
+-- `widgets/` holds simple first-party bar widgets with sibling manifests.
+-- Feature plugins such as `../panels/audio/`, `../panels/network/`, `../panels/power/`, and `../agents/` provide richer popup bar plugins.
+-- The bar receives its config from the host shell as a `barConfig` property; the host loads it from `~/.config/omarchy/shell.json` (or `config/omarchy/shell.json` when the user has no file).
+-- `omarchy bar position` updates only the user shell.json file.
++![Floating Bar on the top, bottom, left, and right edges](preview.png)
+ 
+-## Customizing
++The floating gap isn't a fixed number — it's read from Hyprland's own
++`general:gaps_out` at startup and kept in sync with it afterward (e.g.
++Omarchy's own "no gaps" toggle, `omarchy hyprland window gaps toggle`,
++updates the bar's own gap live, no reload needed), so the space around the
++bar matches the gap Hyprland already puts between windows and the screen
++edge instead of introducing a second, inconsistent gap value.
+ 
+-The bar config lives under the `bar:` key of [`~/.config/omarchy/shell.json`](../../README.md#shelljson-shape). Out of the box the shell uses [`config/omarchy/shell.json`](../../../config/omarchy/shell.json). Once you customize anything via the bar gestures, `omarchy bar ...`, or by editing shell.json directly, your file is canonical — there is no deep-merge.
++## Install
+ 
+-The bar is configured directly on the bar itself: drag empty bar space (or click-and-hold) to move the bar to another screen edge, double-left-click empty center-bar space to toggle transparency, and drag widgets to reorder them. The `omarchy bar position`, `omarchy bar transparent`, `omarchy bar move`, and `omarchy bar set` commands do the same from scripts. Enable or disable widgets with `omarchy plugin enable` and `omarchy plugin disable` (widget ids come from `omarchy plugin list`).
++```bash
++omarchy plugin add https://github.com/Charlieras262/omarchy-floating-bar.git --enable
++```
++
++`omarchy plugin update` later pulls new versions the same way any
++git-managed plugin does.
+ 
+-Example `shell.json` (bar subtree only shown):
++## Configure
++
++Optional, set on the bar's own entry in `~/.config/omarchy/shell.json`
++(same place `position` and `transparent` already live):
+ 
+ ```json
+ {
+-  "version": 1,
+   "bar": {
+-    "position": "top",
+-    "transparent": false,
+-    "centerAnchor": "omarchy.clock",
+-    "layout": {
+-      "left": [
+-        { "id": "omarchy.menu" },
+-        { "id": "omarchy.spacer", "size": 12 },
+-        { "id": "omarchy.workspaces" }
+-      ],
+-      "center": [
+-        { "id": "omarchy.media" },
+-        { "id": "omarchy.clock", "format": "HH:mm" }
+-      ],
+-      "right": [
+-        { "id": "omarchy.audio" },
+-        { "id": "omarchy.power" }
+-      ]
+-    }
++    "id": "charlieras262.floating-bar",
++    "cornerRadius": 14,
++    "floatGap": 12
+   }
+ }
+ ```
+ 
+-`centerAnchor` pins one center module to the exact horizontal/vertical center and flanks others around it. Set to an empty string to disable anchoring (the center list is centered as a group).
+-
+-## Module catalogue
+-
+-### First-party interactive widgets
+-
+-| Name | What it does | Interactions |
+-|---|---|---|
+-| `omarchy.menu` | Omarchy menu launcher | left = menu · right = terminal |
+-| `omarchy.workspaces` | Hyprland workspace switcher | left = focus workspace |
+-| `omarchy.clock` | Date/time label + popup with a month grid, ISO week numbers, and month stepping | left = popup · right = cycle label format · middle = timezone selector |
+-| `omarchy.media` | MPRIS now-playing — scrolling track + artist, cover-art popup | left = play/pause · middle = next · scroll = prev/next · right = popup |
+-| `omarchy.indicators` | Manual state indicators | left = indicator action |
+-| `omarchy.system-update` | Available update indicator | left = update |
+-| `omarchy.tray` | System tray | hover = reveal drawer · right on chevron = manage |
+-| `omarchy.weather` | Weather icon + popup with forecast | left = popup · right = full notification |
+-| `omarchy.microphone` | Mic icon + scroll volume | left = mute toggle · middle = audio panel · scroll = source volume |
+-
+-| `omarchy.audio` | Volume icon + popup with master slider, output-device picker, per-app mixer | left = popup · right = mute · middle = popup · scroll = volume |
+-| `omarchy.network` | Wi-Fi/Ethernet icon + popup with Wi-Fi scan, signal, connect, DNS provider selection | left = popup |
+-| `omarchy.tailscale` | Tailscale status, connection switcher, machine browser, and copy actions | left = popup · right = toggle · middle = refresh |
+-| `omarchy.agents` | AI coding agent limits with pace, today, last week, and all-time model breakdown | left = panel · right = launch agent · middle = next subscription |
+-| `omarchy.power` | Battery/AC icon + popup with battery stats, power profiles, and system info | left = popup · right = toggle percentage |
+-| `omarchy.bluetooth` | Bluetooth icon + popup with device list, connect/disconnect, battery | left = popup · right = toggle radio |
+-| `omarchy.monitor` | Brightness and laptop display controls | left = popup |
++| Key | Type | Default | Description |
++|---|---|---|---|
++| `cornerRadius` | number (px) | *(auto)* | Corner radius of the floating bar. If omitted, it follows Omarchy's own `Style.cornerRadius` — which already mirrors `decoration:rounding` live — so the bar's corners match every popup panel and any window, including a live change from a plugin like [Omablur](https://github.com/Charlieras262/omarchy-omablur). Set it explicitly to override that. |
++| `floatGap` | number (px) | *(auto)* | Gap between the bar and the screen edges it floats away from. If omitted, it tracks `hyprctl getoption general:gaps_out` live (including Hyprland config reloads) — set it explicitly to override that. |
++| `noRoundedOnNoGaps` | boolean | `true` | Square the bar off whenever the gap is 0 (e.g. Omarchy's "no gaps" toggle) instead of leaving it rounded while flush against the screen edge. Set `false` to always use `cornerRadius` regardless of the current gap. |
++The bar's own background also follows Omarchy's shared `Style.shellOpacity`
++token (distinct from the `transparent` option above, which drops the
++background to fully invisible rather than a partial, blur-showing alpha) --
++see [Omablur](https://github.com/Charlieras262/omarchy-omablur), which sets
++it while its own blur is on so the whole shell (bar, menus, notifications,
++popups) dims together, not just this bar.
++
++The bar is anchored to one edge (`position: "top"` by default, same as
++stock). The gap applies to the anchored edge and both perpendicular sides;
++the edge *opposite* `position` gets none, since that's the side already
++facing Hyprland's own window-to-window gap — adding floatGap there too
++would make that one side look bigger than the other three.
++
++## Switch back to the stock bar (without uninstalling)
++
++```bash
++omarchy bar reset
++```
+ 
+-The `omarchy.indicators` widget loads individual bar indicators from `indicators/`. Omit `items` (or set it to an empty array) to show all indicators in the default order, or set `items` to a subset such as `["Dnd", "Reminder", "NightLight"]`. Set `alwaysShow` to `true` to keep inactive indicators visible instead of revealing them only on hover. Multiple `omarchy.indicators` instances are allowed, so different sections can show different subsets.
++A `"kind": "bar"` plugin doesn't show up in `omarchy menu plugin
++enable/disable`, and `omarchy plugin disable` doesn't apply to it either --
++that's an Omarchy-wide rule for anything that replaces the whole bar
++(`canDisable: !isBarOption` in Omarchy's own `shell.qml`), not specific to
++this plugin. A bar option isn't a toggle, it's one of several mutually
++exclusive choices, switched with `omarchy bar use <id>`:
+ 
+-## Orientation
++```bash
++omarchy bar use charlieras262.floating-bar   # switch to this bar
++omarchy bar reset                            # switch back to the stock bar
++```
+ 
+-All widgets work in `top`, `bottom`, `left`, and `right` positions. Popups anchor on the side opposite the bar edge, sliding into the workspace. Vertical bars use 28px width; widgets that show text fall back to compact icon-only forms (e.g. `media` hides its scrolling label).
++Switching back this way keeps the plugin installed, so switching to it
++again later doesn't need a reinstall.
+ 
+-## Custom user modules
++## Remove
+ 
+-The schema accepts arbitrary module ids that you provide. Set `type` to `command` for shell-driven output or `qml` for a custom QML widget. Both still go under `bar.layout.<section>` in `shell.json`.
++```bash
++omarchy plugin remove charlieras262.floating-bar
++```
+ 
+-Command module:
++This removes the plugin's files and switches the bar back to the stock
++`omarchy.bar`.
++
++## Dependencies
++
++`hyprctl` (ships with Hyprland/Omarchy) for the one-time `general:gaps_out`
++probe at startup. Everything else is plain QML on Omarchy's own
++`qs.Commons`/`qs.Ui` modules and the Quickshell Hyprland/Wayland
++integration — no external packages or services.
++
++## Why this needs a workaround, and when it stops needing one
++
++Cloning any `"kind": "bar"` plugin in Omarchy 4.0.0-1 fails to render at
++all, even completely unedited — filed as
++[basecamp/omarchy#8007](https://github.com/basecamp/omarchy/issues/8007).
++The cause: a cloned bar loads through `Loader.source` (a URL), which can't
++supply QML `required property` values at construction the way the built-in
++bar's `sourceComponent` can — `configureBar()` in `shell.qml` only sets
++`omarchyPath`, `barWidgetRegistry`, and `barConfig` shortly *after*
++construction, too late for `required`.
++
++This plugin works around it: those three properties in `Bar.qml` get
++inline defaults instead of `required`, since `configureBar()` still sets
++the real values immediately after and nothing reads them before that.
++
++[basecamp/omarchy#8146](https://github.com/basecamp/omarchy/pull/8146)
++fixes this properly upstream (passing the properties through
++`Loader.setSource(url, initialProperties)`). Once that ships in a stable
++Omarchy release, this plugin's workaround becomes redundant — check the
++issue/PR status if a future Omarchy update seems to double-apply something
++or warns about the properties being both set and required.
++
++## Known limitation: notifications and popup panels can overlap the bar
++
++Two pieces of Omarchy's own shell assume every bar sits flush against the
++screen edge with no margin of its own, and don't know about this plugin's
++`floatGap`:
++
++- Notification toasts (`omarchy.notifications`' `Service.qml`) clear the
++  bar using `barSize + Style.gapsOut`.
++- Every popup panel built on the shared `Ui/KeyboardPanel.qml` base (the
++  Display/network/bluetooth/audio panels you get from clicking a tray
++  icon, and others) positions itself using `barSize + gap` on the
++  away-from-bar axis.
++
++Both fall short by `floatGap`, so toasts and panels can render slightly
++over the bar when it's on the top or right edge.
++
++This can't be fixed from this plugin's own files — both belong to
++Omarchy's own shell, only read `barSize` from whichever bar is active (no
++property for edge margin), and their relevant properties are `readonly`
++computed values, so nothing external can override them either.
++
++Fixing it means editing those two files yourself as root — this plugin
++deliberately does not ship a script that runs as root against its own
++git-managed checkout (that checkout can change on every `omarchy plugin
++update`, which would turn an auto-run `sudo` script into a code-execution
++path into a user-writable directory). Open each file as root (e.g.
++`sudoedit /usr/share/omarchy/shell/plugins/notifications/Service.qml`) and
++add a `barEdgeMargin` term (read from `shell.bar.floatGap` when the active
++bar defines it, `0` otherwise, so it's a no-op for any other bar) into
++their bar-clearance math:
++
++`shell/plugins/notifications/Service.qml`, change
+ 
+-```json
+-{
+-  "version": 1,
+-  "bar": {
+-    "layout": {
+-      "right": [
+-        { "id": "omarchy.tray" },
+-        { "id": "vpn", "type": "command", "exec": "~/.config/omarchy/bar/scripts/vpn-status", "interval": 5, "tooltip": "VPN", "onClick": "nm-connection-editor" },
+-        { "id": "omarchy.audio" }
+-      ]
+-    }
+-  }
+-}
++```qml
++readonly property int barClearance: liveBarSize + Style.gapsOut
+ ```
+ 
+-The command may print plain text or Waybar-style JSON, for example:
++to
+ 
+-```json
+-{"text":"󰌆","tooltip":"Work VPN","class":"active"}
++```qml
++readonly property real barEdgeMargin: shell && shell.bar && shell.bar.barHidden !== undefined
++  && shell.bar.floatGap !== undefined ? Math.max(0, Number(shell.bar.floatGap) || 0) : 0
++readonly property int barClearance: liveBarSize + barEdgeMargin + Style.gapsOut
+ ```
+ 
+-QML module:
++`shell/Ui/KeyboardPanel.qml`, change
+ 
+-```json
+-{
+-  "version": 1,
+-  "bar": {
+-    "layout": {
+-      "right": [
+-        { "id": "gpu", "type": "qml" },
+-        { "id": "omarchy.audio" }
+-      ]
+-    }
+-  }
+-}
++```qml
++property int gap: Style.gapsOut  // distance between bar edge and panel
+ ```
+ 
+-Then create `~/.config/omarchy/bar/modules/gpu.qml`. If you want to store it elsewhere, add a `source` path.
+-
+-Custom QML modules should be an `Item` with `implicitWidth` and `implicitHeight`. They may optionally define these properties, which the bar fills after loading:
++to
+ 
+ ```qml
+-import QtQuick
+-
+-Item {
+-  property var bar
+-  property string moduleName
+-  property var settings
+-
+-  implicitWidth: 28
+-  implicitHeight: bar ? bar.barSize : 26
+-
+-  Text {
+-    anchors.centerIn: parent
+-    text: "GPU"
+-    color: bar ? bar.foreground : "white"
+-    font.family: bar ? bar.fontFamily : "monospace"
+-    font.pixelSize: 12
+-  }
+-
+-  MouseArea {
+-    anchors.fill: parent
+-    onClicked: if (bar) bar.run("omarchy-launch-or-focus-tui btop")
+-  }
+-}
++readonly property real barEdgeMargin: bar && bar.floatGap !== undefined
++  ? Math.max(0, Number(bar.floatGap) || 0) : 0
++property int gap: Style.gapsOut + barEdgeMargin  // distance between bar edge and panel
+ ```
+ 
+-## Bar properties available to widgets
+-
+-Widgets receive `bar` (the shell root), `moduleName` (string), and `settings` (object) injected at load time. The bar exposes:
+-
+-- `bar.foreground`, `bar.background`, `bar.urgent` — theme colors (live-updated)
+-- `bar.fontFamily` — current monospace family
+-- `bar.position` — `"top" | "bottom" | "left" | "right"`
+-- `bar.vertical` — boolean shortcut
+-- `bar.barSize` — 26 horizontal / 28 vertical
+-- `bar.run(command)` — fire-and-forget bash exec (quote arguments with `Util.shellQuote` from `qs.Commons`)
+-- `bar.showTooltip(target, text)` / `bar.hideTooltip(target)` — shared tooltip popup
+-- `bar.requestPopout(owner)` / `bar.releasePopout(owner)` — one-popup-at-a-time coordinator
+-
+-First-party bar widgets are manifest-backed just like third-party widgets.
+-Simple widgets carry sibling manifests such as `widgets/Workspaces.manifest.json`;
+-richer popup plugins live in feature directories such as `../panels/audio/`,
+-`../panels/network/`, and `../agents/`; and feature plugins such as
+-`omarchy.menu` and `omarchy.media` declare their bar-widget entry points in their own
+-`manifest.json`. Bar layout ids are namespaced, e.g. `omarchy.audio`,
+-`omarchy.network`, and `omarchy.clock`.
+-
+-Third-party widgets ship as separate plugins under
+-`~/.config/omarchy/plugins/<plugin-id>/` with their own `manifest.json`
+-declaring `kinds: ["bar-widget"]` and a `barWidget` entry point. See
+-[../../README.md](../../README.md) for the manifest schema. Rescan, enable,
+-and place third-party plugins with `omarchy-shell shell rescanPlugins`,
+-`omarchy plugin enable`, and `omarchy bar move`.
++Then `omarchy restart shell`. An Omarchy update to either file will
++silently drop the edit — just reapply it if toasts or panels start
++overlapping the bar again afterward.
++
++## License
++
++MIT — see [LICENSE](LICENSE).
+diff --git a/shell/plugins/bar/UPSTREAM.md b/shell/plugins/bar/UPSTREAM.md
+new file mode 100644
+index 00000000..edf5a446
+--- /dev/null
++++ b/shell/plugins/bar/UPSTREAM.md
+@@ -0,0 +1,19 @@
++# 这个 bar 是什么
++
++`omarchy.bar`（本目录）现在是**浮空圆角 bar**：上游 omarchy 官方 bar 的骨架 +
++`Charlieras262/omarchy-floating-bar` 的浮空实现 + 本机改动，全部并成一份、放在
++shell 树里，由 `niri-port/niri.patch` 在每次 `omarchy update` 后重放。
++
++- 浮空实现来源：`https://github.com/Charlieras262/omarchy-floating-bar`
++  本地克隆 commit `5e7dc23`（2026-08-28），版本 1.6.0，MIT（见同目录 `LICENSE`，
++  版权 Charlieras262）。
++- 合并基线：本机 shell 树 checkout `basecamp/omarchy` 的 `60663faf`
++  （2026-09-19）。原版这个目录的内容可用
++  `git -C ~/.local/share/omarchy show 60663faf:shell/plugins/bar/Bar.qml` 取回。
++- 合并后 `manifest.json` 用官方的（`id: omarchy.bar`），`shell.json` 的
++  `bar.id` 因此是 `omarchy.bar`——宿主按“内置 bar”路径加载它（会直接注入
++  `omarchyPath` / `barWidgetRegistry`，见 `shell.qml` 的 `configureBar()`）。
++- 上游 omarchy 对 `shell/plugins/bar/` 改动很频繁（100 提交窗口内 86 次），
++  所以**不再自动跟上游**：需要时手工把这些改动并进来（按需人工合并）。
++- 浮空会外溢到邻层：`shell/plugins/notifications/Service.qml`、
++  `shell/Ui/KeyboardPanel.qml` 里的 gap 让步也是这套的一部分，同在本补丁里。
+diff --git a/shell/plugins/bar/widgets/ActiveWindow.qml b/shell/plugins/bar/widgets/ActiveWindow.qml
+index ff7e83d8..20f7c401 100644
+--- a/shell/plugins/bar/widgets/ActiveWindow.qml
++++ b/shell/plugins/bar/widgets/ActiveWindow.qml
+@@ -29,11 +29,17 @@ BarWidget {
+ 
+     Text {
+       id: labelText
+-      textFormat: Text.PlainText
+       anchors.verticalCenter: parent.verticalCenter
+       anchors.left: parent.left
+       width: parent.width
+       text: root.title
++      // root.title is a Wayland toplevel's title -- set by whatever
++      // application owns that window, not this shell. QML's default
++      // Text.AutoText auto-detects and renders rich text, which can embed
++      // <img> tags and trigger the shell into loading arbitrary local or
++      // remote resources just from a window's title. Force plain text so
++      // untrusted window titles are always displayed literally.
++      textFormat: Text.PlainText
+       color: root.bar ? root.bar.barForeground : Color.foreground
+       font.family: root.bar ? root.bar.fontFamily : Style.font.family
+       font.pixelSize: Style.font.body
+diff --git a/shell/plugins/bar/widgets/KeyboardLayout.qml b/shell/plugins/bar/widgets/KeyboardLayout.qml
+index 6c3e7206..5457d88e 100644
+--- a/shell/plugins/bar/widgets/KeyboardLayout.qml
++++ b/shell/plugins/bar/widgets/KeyboardLayout.qml
+@@ -27,11 +27,6 @@ BarWidget {
+   // the widget ships on the bar and stays out of the way until there are two.
+   // An older Hyprland that doesn't report the list keeps showing the label.
+   property bool multipleLayouts: true
+-  // Where the reading sits in the layout list, how long that list is, and every
+-  // keyboard sharing it. A switch moves that set together, so it needs all three.
+-  property int layoutIndex: 0
+-  property int layoutCount: 0
+-  property var syncNames: []
+   // Short language code per layout description ("English (US)": "en"), read from
+   // xkb's own table rather than maintained by hand.
+   property var layoutBriefs: ({})
+@@ -68,31 +63,17 @@ BarWidget {
+   }
+ 
+   // switchxkblayout is a hyprctl command rather than a dispatcher, so it has to
+-  // be run rather than sent over the dispatch socket.
+-  //
+-  // Move every keyboard holding the same layout list, rather than the single one
+-  // the last reading spoke for. Naming one device puts the whole switch behind
+-  // UNTYPED_KEYBOARDS recognising every non-keyboard by name, and that list
+-  // cannot keep up with what a seat carries: vendor hotkey blocks
+-  // (intel-hid-events, dell-wmi-hotkeys), HID consumer controls, and Bluetooth
+-  // AVRCP endpoints from a pair of headphones all arrive holding the seat's
+-  // layout list, and they sort ahead of the keyboard being typed on. The click
+-  // then advances a device nobody types on; that device is now the furthest
+-  // along, so it wins the next reading too, and the label describes it while the
+-  // real keyboard never moved.
+-  //
+-  // An absolute index rather than "next", because "next" advances each device
+-  // from wherever it already sits: a seat that has drifted apart stays drifted
+-  // and merely inverts. One index converges them in a single click, and a seat
+-  // in lockstep is what leaves the reading nothing to disagree about afterwards.
+-  //
+-  // Keyboards given their own kb_layout hold a different list and are left out:
+-  // an index into this list would not mean the same layout to them.
++  // be run rather than sent over the dispatch socket. It switches the keyboard
++  // the last reading spoke for, so a click always advances the device the label
++  // is describing. Switching the seat together would reach the typed keyboard
++  // without having to name it, but it would also carry the buttons along, and
++  // the whole read depends on those staying where they started: once a button
++  // has been advanced too, a toggle that wraps the keyboard back to the first
++  // layout leaves the button reading as the furthest along, and the label
++  // follows the button.
+   function cycleLayout() {
+-    if (!root.bar || root.layoutCount < 2 || root.syncNames.length === 0) return
+-    const next = (root.layoutIndex + 1) % root.layoutCount
+-    root.bar.run(root.syncNames.map(name =>
+-      "hyprctl switchxkblayout " + Util.shellQuote(name) + " " + next).join("; "))
++    if (!root.keyboardName || !root.bar) return
++    root.bar.run("hyprctl switchxkblayout " + Util.shellQuote(root.keyboardName) + " next")
+     refreshTimer.restart()
+   }
+ 
+@@ -168,14 +149,6 @@ BarWidget {
+         root.keyboardCount = typed.length
+         root.keyboardName = String(kb.name || "")
+         root.multipleLayouts = kb.layout === undefined || String(kb.layout).indexOf(",") !== -1
+-        root.layoutIndex = kb.active_layout_index || 0
+-        root.layoutCount = kb.layout === undefined ? 0 : String(kb.layout).split(",").length
+-        // Buttons and virtual keyboards are included on purpose: they hold the
+-        // same list, and leaving them behind is what lets a reading drift onto
+-        // one of them later.
+-        root.syncNames = listed.filter(k => String(k.layout) === String(kb.layout))
+-                               .map(k => String(k.name || ""))
+-                               .filter(name => name !== "")
+         root.layoutFull = kb.active_keymap
+       }
+     }
+diff --git a/shell/plugins/bar/widgets/Tray.qml b/shell/plugins/bar/widgets/Tray.qml
+index 650358c1..45ec2ffc 100644
+--- a/shell/plugins/bar/widgets/Tray.qml
++++ b/shell/plugins/bar/widgets/Tray.qml
+@@ -137,7 +137,26 @@ BarWidget {
+     // tray icon outside a standard theme (e.g. Steam's flat public/ dir). Hand
+     // it straight to IconImage; guessing a theme sub-directory here only broke
+     // apps whose layout didn't match the guess.
+-    return String(icon || "")
++    //
++    // The icon string itself comes from a tray application over
++    // StatusNotifierItem/DBusMenu, though -- not from Quickshell -- so a
++    // malicious or buggy one could set it to any scheme (http(s)://,
++    // file://, a bare local path) instead of the image:// URL this shell
++    // expects, turning an icon property into an unwanted network request or
++    // arbitrary local file read the moment it's handed to Image.source.
++    // Only ever pass through the one scheme this shell's own icon
++    // resolution actually produces; anything else loads nothing.
++    return safeTraySource(icon)
++  }
++
++  // Shared allowlist for anything handed to an Image.source that ultimately
++  // came from a tray application (icon or menu-item icon): only Quickshell's
++  // own resolved image:// URLs pass, everything else is dropped rather than
++  // handed to Image, which would otherwise fetch/read whatever scheme and
++  // destination the string names.
++  function safeTraySource(icon) {
++    var value = String(icon || "")
++    return value.indexOf("image://") === 0 ? value : ""
+   }
+ 
+   // Symbolic icons ship a fixed fill (often near-white) that the host is meant
+@@ -467,13 +486,17 @@ BarWidget {
+           }
+ 
+           Text {
+-            textFormat: Text.PlainText
+             anchors.verticalCenter: parent.verticalCenter
+             anchors.left: rowIcon.right
+             anchors.leftMargin: Style.space(10)
+             anchors.right: rowHideBtn.left
+             anchors.rightMargin: Style.space(8)
+             text: rowRoot.displayName
++            // displayName ultimately comes from a tray application's own
++            // title/tooltipTitle/id over StatusNotifierItem, not this
++            // shell -- force plain text so it can't smuggle rich-text
++            // markup into Qt's default Text.AutoText.
++            textFormat: Text.PlainText
+             color: root.foreground
+             font.family: root.fontFamily
+             font.pixelSize: Style.font.bodySmall
+@@ -578,13 +601,15 @@ BarWidget {
+           }
+ 
+           Text {
+-            textFormat: Text.PlainText
+             anchors.verticalCenter: parent.verticalCenter
+             anchors.left: parent.left
+             anchors.leftMargin: Style.space(28)
+             anchors.right: parent.right
+             anchors.rightMargin: Style.space(10)
+             text: root.currentTitle
++            // currentTitle comes from a submenu entry's title, set by the
++            // tray application over DBusMenu -- not this shell.
++            textFormat: Text.PlainText
+             color: root.foreground
+             font.family: root.fontFamily
+             font.pixelSize: Style.font.bodySmall
+@@ -683,7 +708,6 @@ BarWidget {
+               }
+ 
+               Text {
+-                textFormat: Text.PlainText
+                 visible: !menuRow.modelData.isSeparator && menuRow.modelData.buttonType !== QsMenuButtonType.None
+                 anchors.verticalCenter: parent.verticalCenter
+                 anchors.left: parent.left
+@@ -697,7 +721,7 @@ BarWidget {
+ 
+               Image {
+                 id: menuIcon
+-                visible: !menuRow.modelData.isSeparator && String(menuRow.modelData.icon || "") !== ""
++                visible: !menuRow.modelData.isSeparator && root.safeTraySource(menuRow.modelData.icon) !== ""
+                 anchors.verticalCenter: parent.verticalCenter
+                 anchors.left: parent.left
+                 anchors.leftMargin: Style.space(24)
+@@ -708,11 +732,10 @@ BarWidget {
+                 // which leaves PNG icons upscaled and blurry on HiDPI displays.
+                 sourceSize.width: width * Screen.devicePixelRatio
+                 sourceSize.height: height * Screen.devicePixelRatio
+-                source: menuRow.modelData.icon
++                source: root.safeTraySource(menuRow.modelData.icon)
+               }
+ 
+               Text {
+-                textFormat: Text.PlainText
+                 visible: !menuRow.modelData.isSeparator
+                 anchors.verticalCenter: parent.verticalCenter
+                 anchors.left: parent.left
+@@ -720,6 +743,9 @@ BarWidget {
+                 anchors.right: submenuGlyph.left
+                 anchors.rightMargin: Style.space(8)
+                 text: menuRow.rowText
++                // rowText is a DBusMenu item's own label text, set by the
++                // tray application -- not this shell.
++                textFormat: Text.PlainText
+                 color: root.foreground
+                 font.family: root.fontFamily
+                 font.pixelSize: Style.font.bodySmall
 diff --git a/shell/plugins/bar/widgets/Workspaces.qml b/shell/plugins/bar/widgets/Workspaces.qml
 index ec0482a5..985d1d90 100644
 --- a/shell/plugins/bar/widgets/Workspaces.qml

@@ -25,7 +25,7 @@
 
 - `omarchy update` = `git pull --ff-only`（`omarchy-update-dev`，在 `post-update` 钩子**之前**）+ 迁移。
 - **仓库外不碰**：`config.kdl` / `shell.json` / `~/bin/hyprctl` 都不在 omarchy 仓库内，`git pull` 动不到。
-- **仓库内会撞**：我们改了仓库内 **27 个文件**。权威清单就是补丁自己的 `diff --git` 行：
+- **仓库内会撞**：我们改了仓库内 **33 个文件**。权威清单就是补丁自己的 `diff --git` 行：
   `grep '^diff --git' ~/.config/omarchy/niri-port/niri.patch | sed 's|.* b/||'`（换机器/换仓库路径也别抄下面的名单）。
   起步那 19 个是 `launch-{tui,editor,floating-terminal-with-presentation}`、`refresh-hyprland`、`theme-set`、
   `menu.jsonc`、`qmldir`、`Background.qml`、`ImagePicker.qml`、`Bar.qml`、`Workspaces.qml`、`Menu.qml`、
@@ -34,8 +34,14 @@
   `notifications/Service.qml`、`Commons/Style.qml`、`panels/monitor/Panel.qml`（分辨率滑块，2026-09-26）、
   `bin/omarchy-battery-status`（充电阈值改 sysfs 优先，2026-09-26，见 `docs/behavior.md` §8 第 38 条）、
   `bin/omarchy-default-agent` 与 `bin/omarchy-agent`（把 ante 加进默认 agent 列表，2026-09-27，见 §8 第 40 条）、
-  `bin/omarchy-update`（把 CLI `omarchy update` 委派给 `~/bin` 垫片，2026-09-30，见 `docs/omarchy-on-niri-port.md` §3.1）。
-  ——这 27 个文件正是 `niri.patch` 的内容（**27 个文件 / 82 hunk**，2026-10-04 核；2026-09-30 为 27 文件 / 81 hunk、md5 `3c672ab5…`；2026-09-27 为 26 文件 / 77 hunk；
+  `bin/omarchy-update`（把 CLI `omarchy update` 委派给 `~/bin` 垫片，2026-09-30，见 `docs/omarchy-on-niri-port.md` §3.1）；
+  **2026-10-04 合并浮空 bar** 又加入 `shell/plugins/bar/{README.md,widgets/ActiveWindow.qml,widgets/KeyboardLayout.qml,widgets/Tray.qml}`
+  与两个新文件 `LICENSE`、`UPSTREAM.md`，共 +6 文件；`shell/plugins/bar/widgets/Workspaces.qml` 的 niri 适配（`Hyprland.*`→`Niri.*`）
+  仍在这份补丁里（合并时该文件一度被插件那份覆盖回上游写法、与基线逐字节相同，2026-10-04 当天恢复，见 `docs/omarchy-on-niri-port.md` §3.2）
+  —— 上面起步名单里那两个 bar 文件同属 `shell/plugins/bar/`。
+  ——这 33 个文件正是 `niri.patch` 的内容（**33 个文件 / 105 hunk / 2956 行**，md5 `2cea1e9517bd498df185e02414595bc8`，2026-10-04 合并后核；
+  合并前为 27 个文件 / 82 hunk、md5 `cdc361f9f534e16dd9043ac21c3ce352`；
+  2026-09-30 为 27 文件 / 81 hunk、md5 `3c672ab5…`；2026-09-27 为 26 文件 / 77 hunk；
   2026-09-26 为 24 文件 / 72 hunk；
   2026-09-18 合并上游时为 30 hunk，
   2026-09-19 菜单自愈守卫 +2（§8.14）、Install/Remove 终端回退 +1（§8 第 21 条）、
@@ -44,6 +50,8 @@
   手动合并的情况。
 - **不在 patch 里的新增文件**：`shell/Commons/Niri.qml`、`shell/plugins/blurwallpaper/` 是**未跟踪**
   文件，不会出现在 `git diff` 里，所以重放必须单独 `cp`（见下第 2 步）。
+  （2026-10-04 合并浮空 bar 带进来的 `LICENSE` / `UPSTREAM.md` 也是未跟踪状态，但已按 `new file mode`
+  显式收进补丁 ⇒ `git apply` 会自己建，**不**需要单独 `cp`。）
 - **工作树里另有 238 条"有意删除"**（2026-09-19）：仓库自带主题删掉 21 个（含 `catppuccin-latte`），
   只留 `catppuccin`——用户只要 `tonal-spot` + `catppuccin`，`themes/` 从 64M 降到 1.2M。
   `omarchy-theme-remove`（§3 提到的官方脚本）**只管用户层主题**，仓库层只能直接删。

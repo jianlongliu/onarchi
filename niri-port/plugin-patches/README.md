@@ -12,10 +12,18 @@ git apply --reverse --check ~/.config/omarchy/niri-port/plugin-patches/<id>.patc
 
 | Patch | What it changes |
 |---|---|
-| `charlieras262.floating-bar.patch` | Rounded `blurRegion` on the floating bar (the bar is a separate plugin here, not `omarchy.bar`); boot reveal -- the bar `PanelWindow`'s `visible` is gated on the host's "wallpaper painted" push, so nothing is shown during load and the bar appears in one block; frost region inset by 2px (`barBlurAnchor` gets `anchors.margins: 2` + a radius-2), so the visible silhouette comes from Qt's antialiased fill instead of the compositor's hard-edged `ext_background_effect` mask (`docs/visual.md` §8 第 44 条) |
 | `ronald.input-sources.patch` | `badgeOverrides` (Model.js) + `startupSource`/`applyStartupSource` (Panel.qml) so the first input source after a shell start is rime |
 | `meviusisback.ai-subs.patch` | Font size from `caption` to `font.body` (five places), plus a leading pad and spacing so the chip lines up with the built-in widgets |
 | `jianlongliu.workspaces.patch` | Dynamic workspace pill count (`1..N` by occupancy, never below 2) |
+
+**`charlieras262.floating-bar.patch` retired 2026-10-04** — it used to carry the floating bar's niri
+adaptation (rounded `blurRegion`, boot reveal, frost inset by 2px). The bar is no longer a plugin: those
+files now live in `$OMARCHY_PATH/shell/plugins/bar/`, loaded as the built-in `omarchy.bar`, and the whole
+change rides in `niri-port/niri.patch` (33 files / 105 hunks, md5 `2cea1e9517bd498df185e02414595bc8`) —
+`omarchy-niri-repatch` replays it, so no hand `git apply` is needed. The retired patch and the old plugin
+directory are in `~/.local/state/backups/.config/omarchy/niri-port-plugin-patches-charlieras262.floating-bar.patch.bak-20261004-barmrege`
+and `~/.local/state/backups/.config/omarchy/plugins/charlieras262.floating-bar.bak-20261004-barmrege`;
+source, merge baseline and rollback: `docs/plugins.md` §5.4.
 
 **Nothing replays these automatically.** `omarchy-niri-repatch` only covers `$OVL/niri.patch`,
 `$OVL/Niri.qml` and whole-plugin copies under `$OVL/plugins/`; a plugin overwritten by

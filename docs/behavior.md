@@ -334,9 +334,10 @@
     - `update.aur`：`omarchy-launch-floating-terminal-with-presentation 'paru -Sua'`（本机 paru v2.1.0 在位；
       AUR 另有 `~/bin/yay` 垫片，此处按用户要求用 paru）。
     - `update.plugins`：`omarchy-launch-floating-terminal-with-presentation 'omarchy plugin update'`（= `bin/omarchy-plugin-update`）。
-      **它会动真格**：只更新 `~/.config/omarchy/plugins/` 下的 git 克隆（本机 5 个：`charlieras262.floating-bar`、
-      `io.github.claudsondouglas.arcdock`、`jrmmhm.pocket`、`meviusisback.ai-subs`、`ronald.input-sources`），其中
-      **3 个带本机 patch**（`niri-port/plugin-patches/` 里的 floating-bar / ai-subs / input-sources）⇒ 上游改了同一文件时
+      **它会动真格**：只更新 `~/.config/omarchy/plugins/` 下的 git 克隆（本机 4 个：`io.github.claudsondouglas.arcdock`、
+      `jrmmhm.pocket`、`meviusisback.ai-subs`、`ronald.input-sources`；浮空 bar 曾在这条线上，2026-10-04 起已并进
+      `$OMARCHY_PATH/shell/plugins/bar/`、只随 `niri.patch` 走，见 `docs/plugins.md` §5.4），其中
+      **2 个带本机 patch**（`niri-port/plugin-patches/` 里的 ai-subs / input-sources）⇒ 上游改了同一文件时
       `git merge --ff-only` 会报 "you have local changes" 并跳过、**不会**自动重放 patch，需要手工处理；更新成功后会
       `omarchy-shell shell rescanPlugins`。它拒绝非交互运行（无 TTY 时报 "refusing to continue without confirmation"），
       所以必须走终端——这条正是。
@@ -807,7 +808,7 @@ Omarchy 有两层配置，只有层1在 niri 上真正生效：
       （`git diff -- <niri.patch 里那 24 个路径>`）⇒ **24 文件 / 62 → 72 hunk**，新 md5
       `e6868080f48c5f7cd1711a22e163de86`（`--reverse --check` 通过；旧版 `4ec279cf…` 已退役）。
       注意 `omarchy-niri-repatch` **只负责重放、不会重生成**补丁文件。
-      ⚠ **2026-09-27 已被 §8 第 39/40 条那版超过**：**26 文件 / 77 hunk**、md5 `22dd2334c2210d91618b9ad903d3cbc2`（那条只加了 ante 的 5 个 hunk；`e6868080…` 这一版的 72 hunk 于是变成中间版本）。⚠ **2026-09-30 再被 §8.7 那版超过**：**27 文件 / 81 hunk**、md5 `3c672ab5…`（那条加 `bin/omarchy-update`：CLI `omarchy update` 委派给 `~/bin` 垫片）。⚠ **2026-10-04 再被 §8 第 43 条那版超过**：**27 文件 / 82 hunk**、md5 `cdc361f9f534e16dd9043ac21c3ce352`（那条加 `shell/Ui/KeyboardPanel.qml` 的卡片投影，1 hunk）。
+      ⚠ **2026-09-27 已被 §8 第 39/40 条那版超过**：**26 文件 / 77 hunk**、md5 `22dd2334c2210d91618b9ad903d3cbc2`（那条只加了 ante 的 5 个 hunk；`e6868080…` 这一版的 72 hunk 于是变成中间版本）。⚠ **2026-09-30 再被 §8.7 那版超过**：**27 文件 / 81 hunk**、md5 `3c672ab5…`（那条加 `bin/omarchy-update`：CLI `omarchy update` 委派给 `~/bin` 垫片）。⚠ **2026-10-04 再被 §8 第 43 条那版超过**：**27 文件 / 82 hunk**、md5 `cdc361f9f534e16dd9043ac21c3ce352`（那条加 `shell/Ui/KeyboardPanel.qml` 的卡片投影，1 hunk）。⚠ **2026-10-04 晚些再被 §8.11 那版超过**：**33 文件 / 105 hunk / 2956 行**、md5 `2cea1e9517bd498df185e02414595bc8`（合并浮空 bar：`shell/plugins/bar/` 6 个路径 + 新文件 `LICENSE`/`UPSTREAM.md`，见 `docs/plugins.md` §5.4）。
 
 39. **Setup > Security 新增 "Paru (AUR)" 开关：paru 的执行位就是本机 AUR 的总开关（2026-09-27）**
     - **是什么**：菜单 Security 区多一条 `Paru (AUR)`，切换 `/usr/bin/paru` 的执行位。**执行位即总开关**：本机 AUR
@@ -865,6 +866,8 @@ Omarchy 有两层配置，只有层1在 niri 上真正生效：
     - **补丁**：+5 hunk ⇒ **26 文件 / 77 hunk**，md5 `22dd2334c2210d91618b9ad903d3cbc2`（路径清单加 `bin/omarchy-agent`、
       `bin/omarchy-default-agent`；`--reverse --check` 通过，两个副本逐字节一致）。⚠ 2026-09-30 又被 §8.7 那版超过：
       **27 文件 / 81 hunk**、md5 `3c672ab5…`（那条加 `bin/omarchy-update`：CLI `omarchy update` 委派给 `~/bin` 垫片）。
+      ⚠ 2026-10-04 晚些再被 §8.11 那版超过：**33 文件 / 105 hunk / 2956 行**、md5 `2cea1e9517bd498df185e02414595bc8`
+      （合并浮空 bar，见 `docs/plugins.md` §5.4）。
 
 - 43. **窗口与卡片的投影 + 圆角统一 12（2026-10-03/04）**：正文在 `docs/visual.md`（= `§8 第 43 条`）——niri `shadow` 块开、`KeyboardPanel` 加 `RectangularShadow` 给全部状态栏弹层、圆角统一到 12（删 shell.json 的 `bar.cornerRadius`）
 

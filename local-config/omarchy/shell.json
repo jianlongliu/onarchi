@@ -2,7 +2,7 @@
   "bar": {
     "centerAnchor": "omarchy.clock",
     "floatGap": 8,
-    "id": "charlieras262.floating-bar",
+    "id": "omarchy.bar",
     "layout": {
       "center": [
         {
@@ -63,7 +63,7 @@
         },
         {
           "id": "omarchy.power",
-          "showPercentage": true
+          "showPercentage": false
         }
       ]
     },

@@ -106,7 +106,7 @@ sudo pacman -Rns dms-shell dms-shell-niri dankcalendar-bin
 | `~/bin` | — | 垫片与包装脚本（仓库 `port-bin/` 是同一批；`__pycache__/*.pyc` 是缓存，删掉即可） |
 | `~/.config/systemd/user/materal-recolor.{path,service}` | 8K | 主题取色监听（§8.10）；用 `%h` 是便携的，但 `default.target.wants/` 里的绝对软链要重新 `enable` 生成 |
 | fcitx5 配置 + `~/.config/gtk-3.0/settings.ini` | — | 双源 + `ShareInputState=All`（§8.17）与 GTK 字号对齐 |
-| `~/.config/omarchy/plugins/*` | 小 | **当前唯一的锁提供者是 `jianlongliu.split-lock`**（§11.18；explorer 已于 2026-09-19 移除，其每账户状态 `lock-{videos,designs}` 可搬可不搬）。其余用户插件：`charlieras262.floating-bar`（浮栏）、`ronald.input-sources`、`jianlongliu.{arch-logo,workspaces}`。整套 `plugins/` 随 `~/.config/omarchy` 一起走，无需单独处理 |
+| `~/.config/omarchy/plugins/*` | 小 | **当前唯一的锁提供者是 `jianlongliu.split-lock`**（§11.18；explorer 已于 2026-09-19 移除，其每账户状态 `lock-{videos,designs}` 可搬可不搬）。其余用户插件：`ronald.input-sources`、`jianlongliu.{arch-logo,workspaces}`。**浮空 bar 不在这里**（2026-10-04 起）：它是 `$OMARCHY_PATH/shell/plugins/bar/` 里的 `omarchy.bar`，随 `niri.patch` 走；整套 `plugins/` 随 `~/.config/omarchy` 一起走，无需单独处理 |
 
 **怎么运（实验账户 → 主账户）**：`$DEV_HOME` 是 0700，主账户读不到，所以走 `/var/tmp`（§11.2 路线 2）。
 
@@ -210,8 +210,9 @@ omarchy plugin list | grep lock     # 应只有 jianlongliu.split-lock enabled
   `omarchy-crash-watch.service`（同上软链；忘搬就少了崩溃诊断）。
 - `~/.local/share/omarchy`（shell 本体 + bin + 主题，git 检出，带 `.git` 一起）。
 - 壁纸库 `/data/Pictures/Wallpapers`（所有主题都软链到这里，**路径大小写敏感**）。
-- 七个插件：`charlieras262.floating-bar`、`io.github.sirjul1337.lock-explorer`、`jrmmhm.pocket`、`meviusisback.ai-subs`、
-  `ronald.input-sources`、`jianlongliu.arch-logo`、`jianlongliu.workspaces`。其中 floating-bar 在 niri 上有补丁（`niri-port/plugin-patches/`）。
+- 六个插件：`io.github.sirjul1337.lock-explorer`、`jrmmhm.pocket`、`meviusisback.ai-subs`、
+  `ronald.input-sources`、`jianlongliu.arch-logo`、`jianlongliu.workspaces`。**浮空 bar 已不是插件**
+  （2026-10-04 起）：实现住在 `$OMARCHY_PATH/shell/plugins/bar/`、随 `niri.patch` 搬（见 `docs/plugins.md` §5.4）。
 - `~/.config/niri/` 整目录（含 `config.kdl`、`binds.kdl`、`niri-port/`）。
 
 **3. 硬编码 `$DEV_HOME`：只需改 2 个文件**
@@ -233,7 +234,7 @@ omarchy plugin list | grep lock     # 应只有 jianlongliu.split-lock enabled
 **6. 自检清单**（每条都要有可观察结果，别凭感觉）
 - 重启 → 登录界面是 Split；可切账户；**空输入回车＝扫脸**；直接打字＝密码；输错有报错。
 - `Mod+Ctrl+L` 锁屏 → 输密码能解开（插件设计 = `design: "split"`）。
-- bar：floating-bar 浮栏在位；左 `jianlongliu.arch-logo` + `jianlongliu.workspaces`；右 `ronald.input-sources` 徽章；Monitor 面板能改缩放。
+- bar：浮空本体在位（`bar.id = omarchy.bar`，实现 = `$OMARCHY_PATH/shell/plugins/bar/`）；左 `jianlongliu.arch-logo` + `jianlongliu.workspaces`；右 `ronald.input-sources` 徽章；Monitor 面板能改缩放。
 - 主题取色（`materal-recolor`）、壁纸、字体 12px、fcitx5 输入源（单源会自动隐藏）。
 - 显示：分辨率五档可切（正本见 `local-overrides.md` §4「显示档位」），**开机值 = 面板最后切的那档**（2026-09-26 收工 = 2880×1800@1.8）；面板 RESOLUTION 滑块 = 立即应用 + 写 `monitor.kdl`，只想临时切的走 `omarchy-niri-monitor-modes set-runtime`。
 - `niri msg action do-screen-transition` 之类基础 IPC、以及 `Super+Alt+L`（swaylock）/`Mod+Ctrl+L`（omarchy 锁）两条路都不冲突。

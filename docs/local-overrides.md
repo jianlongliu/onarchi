@@ -65,7 +65,7 @@
 | `shell/` | 移植后的 Omarchy Quickshell 源码（层 1） | `install.sh` 把覆盖层 `git apply` 进 `$OMARCHY_PATH`（幂等），或手工 `~/bin/omarchy-niri-repatch` |
 | `port-bin/*`（14 个） | `hyprctl`、`uwsm-app`、`materal-update`、`omarchy-update`、`omarchy-niri-system`、`omarchy-niri-apply-theme`、`omarchy-niri-repatch`、`omarchy-picker-warmup`、`omarchy-display-text-size`、`omarchy-powerprofiles-{list,set}`、`omarchy-sleep-lock-start`、`omarchy-launch-screensaver`、`omarchy-avatar` | `install.sh` 拷进 `~/bin`（PATH-first） |
 | `niri-port/niri.patch` + `Niri.qml` + `plugins/blurwallpaper` | 覆盖层，挺过 `omarchy update` | `~/bin/omarchy-niri-repatch`（幂等） |
-| `niri-port/plugin-patches/` | 4 个第三方插件的本地魔改补丁（+ README 说明怎么生成/怎么重放） | 手工 `git apply`（无自动重放器） |
+| `niri-port/plugin-patches/` | 3 个插件的本地魔改补丁（第三方 `meviusisback.ai-subs`、`ronald.input-sources` + clone `jianlongliu.workspaces`；**bar 那条 2026-10-04 已退役**，浮空 bar 的改动并进 `niri-port/niri.patch`，见 `docs/plugins.md` §5.4）（+ README 说明怎么生成/怎么重放） | 手工 `git apply`（无自动重放器） |
 | `scripts/kdl-sync.sh`、`scripts/local-files-sync.sh` | 机器 ↔ 仓库的对账：前者比 `niri-config/local/*.kdl`（家目录占位符），后者比 `local-config/` + `plugins/` + `split-lock/ir-light`（逐字节） | 各自直接跑；不在本机则 `skip` |
 | `local-config/` | **本机 `~/.config` 覆盖层**（上游默认树 `config/` 之外那几份）：`ghostty/config`（含 `background-blur-radius = 0` 这条磨砂必需改动；配色走 Omarchy 主题的 `config-file`，不带私有主题文件）、`systemd/user/materal-recolor.{path,service}`、（2026-09-22）`fastfetch/config.jsonc`（上游 fastfetch 展示配置 + 内置 Arch logo 原生青蓝，删了上游的绿覆盖，纯观感） | 拷到 `~/.config/` 对应路径（见该目录 README）；`materal-recolor.path` 还要 `systemctl --user enable --now` |
 | `plugins/jianlongliu.arch-logo/` | 自研 bar 插件的源码（`BarWidget.qml` + `arch-logo.svg` + `manifest.json`；无 `clonedFrom`，不是上游克隆） | 拷到 `~/.config/omarchy/plugins/jianlongliu.arch-logo/` |
@@ -77,15 +77,22 @@
 | `default/omarchy/omarchy-menu.jsonc` | `install.package`/`install.aur`/`remove.package` 的 `xdg-terminal-exec` 回退 | 随仓库/覆盖层 |
 | `docs/` | `INSTALL{,.zh}.md` + **主文档 `omarchy-on-niri-port.md`（当前事实 + 映射表）** + 模块卷 `visual/behavior/plugins/shims/upstream/migration/lock/local-overrides`（编号沿用原号），**正本就在 `docs/`** | 直接改 `docs/`，无第二副本 |
 
-- 覆盖层实际内容：**27 文件 / 82 hunk**（`--reverse --check` 通过、repatch 幂等）；**md5 `cdc361f9f534e16dd9043ac21c3ce352`**（2026-10-04 加 `shell/Ui/KeyboardPanel.qml` 的卡片投影：18 行 / 1 hunk，81→82 hunk，见 §8 第 43 条；上一版 27 文件 / 81 hunk、md5 `3c672ab5…` = 2026-09-30 加 `bin/omarchy-update`：那份文件顶部委派给 `~/bin` 垫片，4 hunk，见 §8 第 19 项；上一版 26 文件 / 77 hunk、md5 `22dd2334…` = 2026-09-27 加 `bin/omarchy-default-agent`、`bin/omarchy-agent` 两条 ante 分支，见 `behavior.md` §8 第 40 条）
+- 覆盖层实际内容：**33 文件 / 105 hunk / 2956 行**（`--reverse --check` 通过、repatch 幂等）；**md5 `2cea1e9517bd498df185e02414595bc8`**（2026-10-04 **合并浮空 bar**：插件那 28 个文件并进 `shell/plugins/bar/` 后新增 `Bar.qml` 的 16 hunk、`README.md`、`widgets/{ActiveWindow,KeyboardLayout,Tray}.qml` 与两个新文件 `LICENSE`/`UPSTREAM.md`（+6 文件、82→105 hunk），`widgets/Workspaces.qml` 的 niri 适配（`Hyprland.*`→`Niri.*`）随这版补丁走（合并时该文件一度被插件那份覆盖回上游写法、与基线逐字节相同，2026-10-04 当天恢复，见 `docs/omarchy-on-niri-port.md` §3.2）；上一版 27 文件 / 82 hunk、md5 `cdc361f9f534e16dd9043ac21c3ce352` = 2026-10-04 加 `shell/Ui/KeyboardPanel.qml` 的卡片投影：18 行 / 1 hunk，81→82 hunk，见 §8 第 43 条；再上一版 27 文件 / 81 hunk、md5 `3c672ab5…` = 2026-09-30 加 `bin/omarchy-update`：那份文件顶部委派给 `~/bin` 垫片，4 hunk，见 §8 第 19 项；再上一版 26 文件 / 77 hunk、md5 `22dd2334…` = 2026-09-27 加 `bin/omarchy-default-agent`、`bin/omarchy-agent` 两条 ante 分支，见 `behavior.md` §8 第 40 条）
   （2026-09-26 重导出核，与 `~/.config/omarchy/niri-port/niri.patch` 逐字节一致；本次新增
   `shell/plugins/panels/monitor/Panel.qml` 的**分辨率滑块** —— 22→23 文件、48→62 hunk）。
   版本链（只留 md5，明细在各自卷）：`ef920a66ece784dfc207c7c87c479f5b`（2026-09-23，加菜单 `style.avatar.*` 三行，`docs/lock.md` §11.29）
   ← `6138cc1bece9a94312572d8685c845a4`（2026-09-21 晚：`shell/shell.qml` 的 boot reveal 标记 + `pushBootReveal()`、内置 bar 的滑入，见 §9 / `docs/visual.md` 第 33 条）
   ← 46 hunk 版（2026-09-21 01:29：活体先改了 `Background.qml` 的 `paintedOnce` 与 `shell.qml` 的推送、补丁没跟上，曾让 repatch 判 exit 2）。
-- **在用的 bar 是第三方插件，不在 `niri.patch` 里**：`~/.config/omarchy/shell.json` 的 `bar.id = charlieras262.floating-bar`，
-  它的 boot reveal 走 `niri-port/plugin-patches/charlieras262.floating-bar.patch`（md5 `df3bdd986bc026db51600dd8280b39e7`，6 hunk，2026-10-04 核（霜化区域内缩 2px + 清掉 2026-09-22 那 3 条调试 log，见 `docs/visual.md` §8 第 44 条；上一版 `a2890702…` = 同日内缩那版）；含加载期底部 `Thinking…` 卡片——卡片照 OSD 关机吐司的尺寸/字体做，表面是**卡片大小 + 借用 `omarchy-osd` 那条霜化规则**，收卡时机等宿主推的"壁纸已画"而不是固定时长），
-  该补丁**没有自动重放器**，插件被更新覆盖后要手工 `git apply`。
+- **在用的 bar 是 shell 树里的 `omarchy.bar`（浮空实现，2026-10-04 合并）**：`~/.config/omarchy/shell.json` 的
+  `bar.id = omarchy.bar`，实现住在 `$OMARCHY_PATH/shell/plugins/bar/`，改动全在 `niri.patch` 的 bar hunks
+  （33 文件 / 105 hunk、md5 `2cea1e9517bd498df185e02414595bc8`；含 boot reveal（`docs/visual.md` 第 33 条）、
+  霜化区域 2px 内缩（§8 第 44 条）、加载期底部 `Thinking…` 卡片 —— 卡片照 OSD 关机吐司的尺寸/字体做，
+  表面是**卡片大小 + 借用 `omarchy-osd` 那条霜化规则**，收卡时机等宿主推的"壁纸已画"而不是固定时长）。
+  它随覆盖层重放，**不再有独立的重放器问题**；此前那条插件线（`niri-port/plugin-patches/charlieras262.floating-bar.patch`，
+  md5 `df3bdd986bc026db51600dd8280b39e7`，6 hunk）2026-10-04 已退役 —— 补丁与活体插件目录分别存到
+  `~/.local/state/backups/.config/omarchy/niri-port-plugin-patches-charlieras262.floating-bar.patch.bak-20261004-barmrege`
+  与 `~/.local/state/backups/.config/omarchy/plugins/charlieras262.floating-bar.bak-20261004-barmrege`。
+  来源、基线、验法与回退见 `docs/plugins.md` §5.4。
 
 ---
 
@@ -134,11 +141,11 @@
 
 | 文件 | 关键内容 | 回退 |
 |---|---|---|
-| `shell.json` | bar 用 `charlieras262.floating-bar`（`centerAnchor: omarchy.clock`、`cornerRadius 10`、`floatGap 8`）；`omarchy.tray.hidden: ["Fcitx"]`（藏掉 fcitx5 的托盘图标）；`omarchy.power.showPercentage`；`ronald.input-sources.showSourceName=false`；`meviusisback.ai-subs`（`barDisplay: Data`、900s）；`idle.lock 1800` / `idle.screensaver 300`（**screensaver 功能仍由 flag 禁用**；那条腿 2026-09-24 起由垫片 `omarchy-launch-screensaver` 接管成"不插电到点锁屏、锁后灭屏"，见 §8 第 23 条）；`disabledPlugins: ["omarchy.lock"]`；`plugins: [jianlongliu.split-lock, io.github.claudsondouglas.arcdock]` | `.bak-20260919-preaisubs`、`.bak-20260919-prehidetray`、`.bak-20260920-bar`、`.bak-20260920-bardisplay`、`.bak-20260924-idle300` |
+| `shell.json` | bar 用内置 `omarchy.bar`（浮空实现；`centerAnchor: omarchy.clock`、`floatGap 8`、`position: top`、`transparent: false`、**不写 `cornerRadius`** —— 走 `Style.cornerRadius` 12，2026-10-04 起）；`omarchy.tray.hidden: ["Fcitx"]`（藏掉 fcitx5 的托盘图标）；`omarchy.power.showPercentage`；`ronald.input-sources.showSourceName=false`；`meviusisback.ai-subs`（`barDisplay: Data`、900s）；`idle.lock 1800` / `idle.screensaver 300`（**screensaver 功能仍由 flag 禁用**；那条腿 2026-09-24 起由垫片 `omarchy-launch-screensaver` 接管成"不插电到点锁屏、锁后灭屏"，见 §8 第 23 条）；`disabledPlugins: ["omarchy.lock"]`；`plugins: [jianlongliu.split-lock, io.github.claudsondouglas.arcdock]` | `.bak-20260919-preaisubs`、`.bak-20260919-prehidetray`、`.bak-20260920-bar`、`.bak-20260920-bardisplay`、`.bak-20260924-idle300`、`.bak-20261004-barmrege`（合并 bar 前） |
 | `shell.toml` | `[font] base-size 12`；`[bar]` 尺寸 + `background-alpha 0.45` + **`icon-font 12`**（要 `Style.qml` 的白名单，已进覆盖层）；`[popups]/[notifications]/[tooltip]` alpha；`[menu]` 只有 `background-alpha 0.45`、**不写底色**（走主题的 `[menu] background` ＝ matugen 出的 `colors.toml` `background`，跟 `[bar]` 同档半透明磨砂；2026-09-21 起，替掉 9-20 写死的 `"#2a2a22"` @ 0.7） | `.bak-20260920-{consistency,iconfont,menu}`、`.bak-20260921-menu` |
 | `extensions/omarchy-menu.jsonc` | 菜单用户层 override：`trigger.*` 屏蔽、`setup.input` 指 `niri/input.kdl`、screensaver 6 条 `when:"false"`、**2026-09-22 再屏蔽 6 条**（`style.unlock` / `install.webapp` / `install.preinstalls` / `update.channel` / `update.config.{plymouth,shell}`，逐条根因与验证见 §8 第 27 条）、**Update 菜单改造**（`update.omarchy` → "System"、新增 `update.aur` = `paru -Sua` 与 `update.plugins` = `omarchy plugin update`；2026-09-27 按 `docs/menu.md` 的 Entry schema 重写文案 = 名词短语 + 供搜索的 `description`，见 §8 第 28 条）、**再屏蔽 `update.password.drive`**（无 LUKS，同 §8 第 28 条体检）。⚠ 同一 id 别写两遍；**别写行内注释**（`stripJsonc` 只删整行注释） | `.bak-20260919-{prehide,prelearn}`、`.bak-20260920-prescreensaver`、`.bak-20260922-{menuhides,updatemenu,updaudit}` |
-| `niri-port/` | `niri.patch`（与仓库同 md5）、`Niri.qml`、`plugin-patches/*.patch`（4 个，机器独有，见 §6） | 各自的 `.bak-*` |
-| `plugins/`（8 个） | 自研：`jianlongliu.arch-logo`（**源码已进仓库 `plugins/jianlongliu.arch-logo/`**）、`jianlongliu.workspaces`（上游克隆 + `niri-port/plugin-patches/jianlongliu.workspaces.patch`）、`jianlongliu.split-lock`（**正本 `split-lock/`**）（**没有 `.git`**，`omarchy plugin update` 不碰）；第三方：`charlieras262.floating-bar`、`ronald.input-sources`、`meviusisback.ai-subs`、`jrmmhm.pocket`、`io.github.claudsondouglas.arcdock`（**本身就是上游 git 克隆**，本地魔改用 `git diff` 就地生成 patch） | `plugin-patches/*.patch` 反向 `git apply -R` |
+| `niri-port/` | `niri.patch`（与仓库同 md5）、`Niri.qml`、`plugin-patches/*.patch`（3 个，机器独有，见 §6） | 各自的 `.bak-*` |
+| `plugins/`（7 个） | 自研：`jianlongliu.arch-logo`（**源码已进仓库 `plugins/jianlongliu.arch-logo/`**）、`jianlongliu.workspaces`（上游克隆 + `niri-port/plugin-patches/jianlongliu.workspaces.patch`）、`jianlongliu.split-lock`（**正本 `split-lock/`**）（**没有 `.git`**，`omarchy plugin update` 不碰）；第三方：`ronald.input-sources`、`meviusisback.ai-subs`、`jrmmhm.pocket`、`io.github.claudsondouglas.arcdock`（**本身就是上游 git 克隆**，本地魔改用 `git diff` 就地生成 patch）。**浮空 bar 不在这里**（2026-10-04 起）——它是 `$OMARCHY_PATH/shell/plugins/bar/` 里的 `omarchy.bar`，随 `niri.patch` 走 | `plugin-patches/*.patch` 反向 `git apply -R` |
 | `hooks/` | 与仓库同（`post-update.d/10-niri-repatch` 的 `omarchy-restart-shell` 那 8 行 2026-09-20 已并回仓库，两侧 md5 `b077156959bc9cfb4c37941a4ffb3a5e` 一致） | 从仓库重拷 |
 
 ---
@@ -326,15 +333,16 @@ cp /tmp/niri.patch ~/.config/omarchy/niri-port/niri.patch              # 重放�
 1. ~~三个 `~/bin` 垫片~~ **已收进仓库（2026-09-20）**：`port-bin/{omarchy-update,omarchy-picker-warmup,omarchy-display-text-size}`
 2. ~~`omarchy-picker-warmup.service`~~ **已收进仓库**：`default/systemd/user/omarchy-picker-warmup.service`
    （写成 `%h` 模板；本机那份是写死 `~` 的等价物）
-3. ~~`plugin-patches`~~ **已收进仓库（2026-09-20）**：`niri-port/plugin-patches/`（4 个 patch + README，
-   说明怎么 `git diff` 生成、怎么 `git apply` 重放）；机器上这些 patch 的 `.bak-*` 是历史，仍只在本地（备份根里）。
+3. ~~`plugin-patches`~~ **已收进仓库（2026-09-20）**：`niri-port/plugin-patches/`（当时 4 个 patch + README，
+   说明怎么 `git diff` 生成、怎么 `git apply` 重放；**2026-10-04 起 3 个** —— bar 那条已退役，浮空 bar 的改动
+   并进 `niri.patch`，见 `docs/plugins.md` §5.4）；机器上这些 patch 的 `.bak-*` 是历史，仍只在本地（备份根里）。
 4. ~~`~/.config/omarchy/{shell.json,shell.toml,extensions/omarchy-menu.jsonc}` 的实际取值~~
    **已收进仓库（2026-09-21）**：`local-config/omarchy/{shell.json,shell.toml,extensions/omarchy-menu.jsonc}`
    （照 `local-config/` 的样子逐字节镜像，`local-files-sync.sh` 自动认，已验 rc=0）。三份复扫过
    **不含任何密钥**（无 token / 无 `.hermes`/`.env` 引用 / 无邮箱、URL 凭据），路径零字面量
    （`omarchy-menu.jsonc` 里那处走的是 `$HOME`），出现的 `jianlongliu.*` 只是插件 id。
-   ⚠ **换机注意**：这份 `shell.json` 钉的是本机的 bar 偏好 —— `bar.id = charlieras262.floating-bar`
-   ＋ 5 个第三方部件（`charlieras262.floating-bar` / `io.github.claudsondouglas.arcdock` /
+   ⚠ **换机注意**：这份 `shell.json` 钉的是本机的 bar 偏好 —— `bar.id = omarchy.bar`（浮空本体，随
+   `niri.patch` 走）＋ **4 个第三方部件**（`io.github.claudsondouglas.arcdock` /
    `jrmmhm.pocket` / `meviusisback.ai-subs` / `ronald.input-sources`）**都不在仓库里**，直接照抄会得到
    一条缺部件的 bar；`niri-config/shell.json`（上游默认盘）才是中性起手式，两份都留着，按需选。
 5. ~~钩子漂移~~ **已修（2026-09-20）**：本机那份多出的 8 行（更新后 `omarchy-restart-shell` ——
@@ -512,7 +520,7 @@ cp /tmp/niri.patch ~/.config/omarchy/niri-port/niri.patch              # 重放�
       PATH 上的垫片拦不到 CLI，所以 `$OMARCHY_PATH/bin/omarchy-update` 顶部加三行
       `exec "$HOME/bin/omarchy-update" "$@"`（`OMARCHY_UPDATE_NO_DELEGATE=1` 时跳过，供逃生口用），插在安全脚手架**之前**
       —— 上游那套 `omarchy_security_*` 是给它自己的 sudo 流程用的，本机用不着。该文件随 `niri.patch` 重放
-      （新增路径 ⇒ 26→27 文件、77→81 hunk，md5 `3c672ab5…`，见 §7 配方）。
+      （新增路径 ⇒ 26→27 文件、77→81 hunk，md5 `3c672ab5…`；**2026-10-04 合并浮空 bar 后整份为 33 文件 / 105 hunk、md5 `2cea1e9517bd498df185e02414595bc8`**，见 §7 配方 / `docs/plugins.md` §5.4）。
     - **由此丢掉的上游步骤**：`omarchy-update-dev`（代码 FF = `git pull --ff-only`）、`omarchy-update-keyring`、
       `omarchy-migrate`、snapshot、`omarchy-update-pkg-prune`、孤儿包清理、status/服务重启。
       逃生口 = `~/bin/omarchy-update --upstream`（跑上游真身；上游代码跟进仍走 `docs/upstream.md` §8.7 手动路径）。

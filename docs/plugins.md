@@ -13,13 +13,13 @@
 
 ## 1. 一页速查
 
-本机在 `~/.config/omarchy/plugins/` 下有 **8 个**插件（其余 **38 个第一方**在
-`$OMARCHY_PATH/shell/plugins/`，`$OMARCHY_PATH=~/.local/share/omarchy`；`omarchy plugin list` 合计 **46 条**
-—— 2026-09-21 复核，此前本表漏了 `io.github.claudsondouglas.arcdock`、总数也写错）：
+本机在 `~/.config/omarchy/plugins/` 下有 **7 个**插件（其余 **38 个第一方**在
+`$OMARCHY_PATH/shell/plugins/`，`$OMARCHY_PATH=~/.local/share/omarchy`；`omarchy plugin list` 合计 **45 条**
+—— 2026-09-21 复核，此前本表漏了 `io.github.claudsondouglas.arcdock`、总数也写错；
+2026-10-04 起少一个：浮空 bar 已经不是插件了，见 §5.4）：
 
 | 插件 id | 版本 | kind | 上游 | 干什么 | 本地改动 |
 |---|---|---|---|---|---|
-| `charlieras262.floating-bar` | 1.6.0 | bar | Charlieras262/omarchy-floating-bar | 浮空圆角 bar 本体（顶替 `omarchy.bar`） | 有 · §5.4 |
 | `meviusisback.ai-subs` | 1.4.2 | bar-widget | meviusisback/omarchy-ai-subs | 各家 AI 订阅的用量 / 余额 | 有 · §5.1 |
 | `ronald.input-sources` | 0.1.0 | bar-widget | ronaldlangeveld/omarchy-input-sources | fcitx5 输入源徽章 + 菜单 | 有 · §5.2 |
 | `jrmmhm.pocket` | 0.4.1 | bar-widget | jrmmhm/omarchy-pocket | 把不常用的 bar 部件收进抽屉 | 无 |
@@ -27,6 +27,10 @@
 | `jianlongliu.arch-logo` | 1.0.0 | bar-widget | 自研（无 `clonedFrom`，源码 `plugins/jianlongliu.arch-logo/`） | Arch logo + 菜单 | 自研 · §5.5 |
 | `jianlongliu.workspaces` | 1.0.0 | bar-widget | 自研（clone of `omarchy.workspaces`） | 胶囊工作区 | 自研 · §5.5 |
 | `jianlongliu.split-lock` | 0.1.0 | service | 自研（clone of `omarchy.lock`） | 分屏锁屏 | 自研 · §5.5 |
+
+⚠ **bar 本体不在这张表里**（2026-10-04 起）：浮空实现已并进官方 bar 目录
+`$OMARCHY_PATH/shell/plugins/bar/`（`manifest.json` 是官方的 `id: omarchy.bar`），
+`~/.config/omarchy/shell.json` 的 `bar.id = omarchy.bar`，改动随 `niri.patch` 重放 —— 来源、验法与回退见 §5.4。
 
 当前 bar 布局（`~/.config/omarchy/shell.json` → `bar.layout`，2026-09-21 逐项核对）：
 
@@ -41,21 +45,23 @@
 - `disabledPlugins[]`：`omarchy.lock`（被 `jianlongliu.split-lock` 顶掉）
 - `cloneSourceRestores[]`：`jianlongliu.split-lock` → 关掉它，`omarchy.lock` 自动回来
 
-### 1.1 换机怎么把这 8 个装回来
+### 1.1 换机怎么把这 7 个装回来
 
-5 个第三方**都是 git clone**，只能靠 `omarchy plugin add <url>` 装（它会记下 origin，`omarchy plugin update`
+4 个第三方**都是 git clone**，只能靠 `omarchy plugin add <url>` 装（它会记下 origin，`omarchy plugin update`
 才认这些目录）。URL 是 2026-09-21 从各自 `.git` 的 `remote get-url origin` 读出来的：
 
 | 插件 id | `omarchy plugin add` 的 URL |
 |---|---|
-| `charlieras262.floating-bar` | `https://github.com/Charlieras262/omarchy-floating-bar.git` |
 | `meviusisback.ai-subs` | `https://github.com/meviusisback/omarchy-ai-subs.git` |
 | `ronald.input-sources` | `https://github.com/ronaldlangeveld/omarchy-input-sources` |
 | `jrmmhm.pocket` | `https://github.com/jrmmhm/omarchy-pocket.git` |
 | `io.github.claudsondouglas.arcdock` | `https://github.com/claudsondouglas/arc.dock.git` |
 
-装完**只有 3 个需要重放本地魔改**（`niri-port/plugin-patches/` 里那 4 个 patch，用法见该目录 README）：
-`charlieras262.floating-bar`、`meviusisback.ai-subs`、`ronald.input-sources`。
+**bar 本体不走这条**（2026-10-04 起）：它是 shell 树里的 `omarchy.bar`，由 `niri.patch` 交付；
+真要退回"插件形态"，就照 §5.4 记的上游 URL 装插件并把 `bar.id` 改回去。
+
+装完**只有 2 个需要重放本地魔改**（`niri-port/plugin-patches/` 里那 3 个 patch，用法见该目录 README）：
+`meviusisback.ai-subs`、`ronald.input-sources`。
 `jrmmhm.pocket` 与 `io.github.claudsondouglas.arcdock` **无本地改动**，装完即用。
 
 3 个自研的**不要**用 `plugin add`（它们没有 `.git`，也装不出正确 id）：
@@ -78,7 +84,8 @@ split-lock/install.sh                                            # split-lock �
   bar 部件还要有 `barWidget`（`displayName` / `category` / `defaults` / `schema` —— `schema` 就是面板里
   那几行设置 UI）。`omarchy plugin validate <dir>` 复刻了壳层 `PluginRegistry.qml` 的校验。
 - **`omarchy:` 兼容字段**：`clonedFrom` 标出它是从哪个第一方插件 clone 来的（`jianlongliu.workspaces` ←
-  `omarchy.workspaces`，`jianlongliu.split-lock` ← `omarchy.lock`，`charlieras262.floating-bar` ← `omarchy.bar`）。
+  `omarchy.workspaces`，`jianlongliu.split-lock` ← `omarchy.lock`）。浮空那条不走这条路：它的实现直接住在
+  官方 bar 目录里、manifest 也是官方的（§5.4）。
 - **启用状态写在 `~/.config/omarchy/shell.json`**：
   - bar 部件：**在 `bar.layout.{left,center,right}[]` 里出现就是启用**（关掉 = 从数组里删掉）；
   - 非 bar 插件（service / panel …）：**默认启用**，关掉才写进顶层 `disabledPlugins[]`
@@ -98,7 +105,7 @@ split-lock/install.sh                                            # split-lock �
 
 | 命令 | 作用 | 备注 |
 |---|---|---|
-| `omarchy plugin list` | 列已装插件 + `STATE` / `SOURCE` / `KINDS` | 本机 46 条（8 第三方 + 38 第一方，2026-09-21） |
+| `omarchy plugin list` | 列已装插件 + `STATE` / `SOURCE` / `KINDS` | 本机 45 条（7 用户插件 + 38 第一方，2026-10-04 核） |
 | `omarchy plugin catalog` | 全部已知插件（含 `manifestPath` / `entryPoints`）JSON | 给脚本用 |
 | `omarchy plugin add <git-url> [--enable] [--yes]` | 从 git 装第三方插件 | 交互式问确认；`--enable` 会顺带问放哪个 section |
 | `omarchy plugin clone <source-id> [--edit]` | 把第一方插件复制成用户插件（写 `clonedFrom`） | 自研三件就是这么来的 |
@@ -248,16 +255,45 @@ journalctl -t omarchy-shell --since "-10min" | tail -50
   注意：成员必须和 pocket 在**同一个 section**，且 pocket 要放在成员的**外侧**。
 - 无本地改动。
 
-### 5.4 `charlieras262.floating-bar` —— bar 本体
+### 5.4 bar 本体 —— `omarchy.bar`（浮空实现已并进官方 bar 目录）
 
-- 它顶替第一方 `omarchy.bar`，bar 本体设置就在 `shell.json.bar` 里，本机实际写了：
-  `id: charlieras262.floating-bar`、`cornerRadius: 10`、`floatGap: 8`、
-  `centerAnchor: omarchy.clock`、`layout`（§1 那张布局表）。
-  `position` / `transparent` 等键没写，走插件默认（双击 bar 空白处会切换透明，那是运行时状态）。
-- **本地魔改**：圆角 + `blurRegion`（毛玻璃跟着圆角走），patch 存档
-  `plugin-patches/charlieras262.floating-bar.patch`；五处缺一不可的 blur 全栈见 `docs/omarchy-on-niri-port.md`。
-- 它对 `hyprctl -j getoption general:gaps_out` 有依赖（在 niri 上由 `~/bin/hyprctl` 垫片兜住），
-  `floatGap` 显式写在 shell.json 里所以不靠它。
+- **来历（2026-10-04 合并）**：浮空实现取自第三方插件 `Charlieras262/omarchy-floating-bar`
+  （来源 `https://github.com/Charlieras262/omarchy-floating-bar.git`，本地克隆 commit `5e7dc23`，2026-08-28，
+  v1.6.0，MIT）——插件的 28 个文件**逐文件并进**官方 bar 目录 `$OMARCHY_PATH/shell/plugins/bar/`，
+  `manifest.json` 留官方的（`id: omarchy.bar`）。于是 `~/.config/omarchy/shell.json` 的
+  `bar.id = omarchy.bar`：宿主按**内置 bar** 路径加载它（`shell.qml` 的 `configureBar()` 直接注入
+  `omarchyPath`/`barWidgetRegistry`，并调 `pushBootReveal()`）。同目录另有两个新文件：`LICENSE`
+  （MIT，版权 Charlieras262）与 `UPSTREAM.md`（写明来源、合并基线、为什么以后手动合并）。
+- **bar 设置**（`shell.json.bar`）：`floatGap: 8`、`centerAnchor: omarchy.clock`、`position: top`、
+  `transparent: false`、`layout`（§1 那张布局表）；`cornerRadius` **没写** —— 2026-10-04 起删掉 `10`，
+  回到 `Style.cornerRadius`（由 `~/bin/hyprctl` 垫片答 `decoration:rounding` = 12，见 §8 第 43 条）。
+  它对 `hyprctl -j getoption general:gaps_out` 的依赖同样由那个垫片兜住，但 `floatGap` 显式写在
+  shell.json 里，所以不靠它。
+- **交付 = `niri.patch`**：bar 的改动全在覆盖层里，随 `~/bin/omarchy-niri-repatch` 重放 ——
+  `Bar.qml`（16 hunk）、`README.md`、`widgets/{ActiveWindow,KeyboardLayout,Tray}.qml`，外加两个新文件
+  `LICENSE`/`UPSTREAM.md`。整份补丁现在是 **33 文件 / 105 hunk / 2956 行**，md5
+  `2cea1e9517bd498df185e02414595bc8`（上一版 27 文件 / 82 hunk、md5 `cdc361f9…`）。
+  `Bar.qml` 那 16 个 hunk 就是浮空全套：`floatGap`/`cornerRadius` 读取、boot reveal（`PanelWindow.visible`
+  开关，加载期整块不上屏，见 `docs/visual.md` 第 33 条）、霜化内缩 2px（`barBlurAnchor` 的
+  `anchors.margins: 2` + `radius: effectiveCornerRadius - 2`，见 §8 第 44 条）、加载期底部 `Thinking…`
+  卡片。五处缺一不可的 blur 全栈见 `docs/omarchy-on-niri-port.md`。
+- **不再自动跟上游**：上游改 `shell/plugins/bar/` 很频繁（最近 100 提交窗口里 `Bar.qml` 命中 86 次）
+  ⇒ 以后**不随 `omarchy update` 自动并**（用户 2026-10-04 明确接受），需要时人工合并；合并基线是
+  `basecamp/omarchy` 的 `60663faf`（2026-09-19），原版随时可取回：
+  `git -C ~/.local/share/omarchy show 60663faf:shell/plugins/bar/Bar.qml`。
+- **淘汰的那条线**：第三方插件补丁 `niri-port/plugin-patches/charlieras262.floating-bar.patch`
+  （md5 `df3bdd98…`）与活体插件目录 `~/.config/omarchy/plugins/charlieras262.floating-bar/` 2026-10-04
+  一起退役，分别存在
+  `~/.local/state/backups/.config/omarchy/niri-port-plugin-patches-charlieras262.floating-bar.patch.bak-20261004-barmrege`
+  与 `~/.local/state/backups/.config/omarchy/plugins/charlieras262.floating-bar.bak-20261004-barmrege`。
+- **验法**：`bar.id` 是 `omarchy.bar`；`omarchy-shell shell debugBarGeometry` 能列出各部件；
+  `journalctl --user -t omarchy-shell | grep -c "failed to load, falling back"` 为 0
+  （有条 = bar 整个没加载）；浮空/圆角/霜化内缩按 `docs/visual.md` §8 第 44 条的横剖面量法比。
+- **回退**：`shell.json` 的 `bar.id` 改回 `charlieras262.floating-bar` + 从上面那份插件备份恢复目录；
+  或整体还原三份快照 —— `~/.local/state/backups/.config/omarchy/shell.json.bak-20261004-barmrege`、
+  `~/.local/state/backups/.local/share/omarchy/shell/plugins/bar.bak-20261004-prebarmrege`（合并前的
+  bar 目录）、`~/.local/state/backups/.local/share/omarchy-niri.patch.bak-20261004-barmrege`（合并前的
+  `niri.patch`）。
 
 ### 5.5 自研三件（`jianlongliu.*`）
 
@@ -310,8 +346,8 @@ journalctl -t omarchy-shell --since "-10min" | tail -50
    `cannot fast-forward '<id>'; you have local changes in <dir>`；
 3. `omarchy-plugin-validate` 不过则 `git reset --hard ORIG_HEAD` 回滚。
 
-本机有本地 patch 的三个插件：`charlieras262.floating-bar`、`meviusisback.ai-subs`、
-`ronald.input-sources`。**更新配方**：
+本机有本地 patch 的两个插件：`meviusisback.ai-subs`、`ronald.input-sources`
+（bar 本体 2026-10-04 起不是插件了，它的改动在 `niri.patch` 里，见 §5.4）。**更新配方**：
 
 ```sh
 cd ~/.config/omarchy/plugins/<id>
@@ -345,11 +381,11 @@ omarchy-restart-shell                               # QML 不热更，必须重�
 
 | 路径 | 说明 |
 |---|---|
-| `~/.config/omarchy/plugins/` | 第三方 / 自研插件（8 个） |
+| `~/.config/omarchy/plugins/` | 第三方 / 自研插件（7 个） |
 | `~/.config/omarchy/shell.json` | 插件开关 + bar 布局 + 内联设置；**实际取值已进仓库** `local-config/omarchy/shell.json` |
 | `~/.config/omarchy/shell.toml` | 字号 / 通透度（`[bar] icon-font` 要 `Style.qml` 白名单）；仓库 `local-config/omarchy/shell.toml` |
 | `~/.config/omarchy/extensions/omarchy-menu.jsonc` | 菜单 override；仓库 `local-config/omarchy/extensions/omarchy-menu.jsonc` |
-| `~/.config/omarchy/niri-port/plugin-patches/` | 第三方插件的本地魔改存档（4 个 patch + README） |
+| `~/.config/omarchy/niri-port/plugin-patches/` | 第三方插件的本地魔改存档（3 个 patch + README） |
 | `~/Projects/omarchy-on-niri/plugins/jianlongliu.arch-logo/` | 自研插件源码正本（仓库 `plugins/` 下仅此一份） |
 | `~/Projects/omarchy-on-niri/split-lock/` | `jianlongliu.split-lock` 源码正本 |
 | `docs/plugins.md` | 本文档正本 |
@@ -369,8 +405,9 @@ omarchy-restart-shell                               # QML 不热更，必须重�
 > 插件的现状与运维** —— 装了哪些、密钥与设置、验证命令、更新与本地补丁重放、坑清单；
 > 本节与 `docs/behavior.md` §8.17 只讲**随 niri 移植产生的魔改**（patch 存档 `~/.config/omarchy/niri-port/plugin-patches/`）。
 
-三件事都是**用户层插件**，放在 `~/.config/omarchy/plugins/`（仓库外 → `omarchy update` 碰不到，
-`niri.patch` 也不必为它们加 hunk）。bar 结构仍由 `~/.config/omarchy/shell.json` 决定。
+前两件是**用户层插件**，放在 `~/.config/omarchy/plugins/`（仓库外 → `omarchy update` 碰不到，
+`niri.patch` 也不必为它们加 hunk）；第三件是 bar 本体 —— 2026-10-04 起搬进 shell 树，
+改由 `niri.patch` 交付。bar 结构仍由 `~/.config/omarchy/shell.json` 决定。
 
 **1. 胶囊式工作区指示 —— `jianlongliu.workspaces`**（manifest 记 `omarchy.clonedFrom: omarchy.workspaces`）
 
@@ -386,25 +423,26 @@ omarchy-restart-shell                               # QML 不热更，必须重�
 - SVG 必须是纯 `#ffffff`：`MultiEffect.colorization` 是**按源图亮度相乘**着色，带灰度的 logo 会发暗。
 - 菜单面板仍能挂载，是因为 `omarchy.menu` 带 `keepLoaded: true`——按钮不在 bar 上，面板也活着。
 
-**3. 浮动 bar —— 第三方 `charlieras262.floating-bar`**
+**3. 浮空 bar —— 官方目录里的 `omarchy.bar`**（实现来自第三方 `charlieras262.floating-bar`）
 
-- 来源 `https://github.com/Charlieras262/omarchy-floating-bar.git`，`omarchy plugin add <url> --yes` 安装。
-- **启用方式是 `shell.json` 的 `bar.id = "charlieras262.floating-bar"`**，不是 enable/disable 开关——
-  所以 `omarchy plugin list` 里它永远不显示 enabled，别据此判断没生效。
+- 来源 `https://github.com/Charlieras262/omarchy-floating-bar.git`（本地克隆 `5e7dc23`，2026-08-28，v1.6.0，MIT）；
+  **2026-10-04 起不再是插件**：那些文件已并进 `$OMARCHY_PATH/shell/plugins/bar/`、manifest 用官方的，
+  `shell.json` 的 `bar.id = omarchy.bar`，随 `niri.patch` 重放（交付、验法、回退见 §5.4）。
+- **启用方式是 `shell.json` 的 `bar.id` 指向它**，不是 enable/disable 开关——`omarchy plugin list` 里
+  看到的是官方那条（`omarchy.bar`，first-party），别据此判断"没生效"。
 - niri 适配 **6 处**：4 处是 Hyprland 独占调用 → 垫片/niri 等价物；2 处是磨砂相关（`Bar.qml` 不再把
   `Color.bar.background` 的 alpha 强制成 1、给 bar 的 `PanelWindow` 挂圆角 `BackgroundEffect.blurRegion`，
-  见视觉调整卷 `docs/visual.md` §8.8）。存档在 `~/.config/omarchy/niri-port/plugin-patches/charlieras262.floating-bar.patch`，
-  补丁基线是上游 `Bar.qml` HEAD，已用 `patch -p1` 从上游重建并 `cmp` 验证与实机文件逐字节一致
-  （旧版留 `.bak-20260919-preblur`）。`omarchy plugin update` 会用上游版本覆盖工作树，覆盖后要重打这个 patch。
-  该补丁**只存在实机**（插件本体仍从上游安装），未随移植仓库分发。
-- 参数：`floatGap = 8`（逻辑）、`cornerRadius = 10`、`transparent: false`。
+  见视觉调整卷 `docs/visual.md` §8.8）。这些 hunk 现在都在 `niri.patch` 的 bar 那部分；2026-10-04 之前
+  承载它们的插件补丁 `niri-port/plugin-patches/charlieras262.floating-bar.patch` 已退役（备份路径见 §5.4）。
+- 参数：`floatGap = 8`（逻辑）、`position: top`、`transparent: false`；`cornerRadius` **没写**
+  （走 `Style.cornerRadius` = 12，见 §5.4）。
 - 几何实测（scale 2.0，物理 px）：bar 占 y 16..79、左缘 x = 16（= 8 逻辑 floatGap，bar 高 32 逻辑）；
   平铺窗口上缘从 112 收到 **96**（2026-09-20，`gaps` 16 → 8 后：逻辑 48 = 32 bar + 8 floatGap + 8 gaps；
   旧值 112 = 逻辑 56 见 §9 的 2026-09-19 条目）——`tile_size` 628×744、`window_size` 624×740
   （= 800 − 32 bar − 8 floatGap − 2×8 gaps）；**niri 在自己的独占区之外又加了一次 gaps，两者不打架**
   （像素核对过；改法见 §8 第 29 条）。
 - 配套改动：`~/.config/niri/effects.kdl` 给 `^omarchy-bar$` 配 `background-effect { xray false }`（浮栏磨砂，
-  2026-09-19；模糊区域形状由插件下发的圆角 `blurRegion` 决定，原因与实测见视觉调整卷 `docs/visual.md` §8.8）。
+  2026-09-19；模糊区域形状由 bar 下发的圆角 `blurRegion` 决定，原因与实测见视觉调整卷 `docs/visual.md` §8.8）。
 - 第三方部件：`ryuhzk.ime` **2026-09-19 被 `ronald.input-sources` 取代**（macOS 式输入源徽章，见 `docs/behavior.md` §8.17）；
   `charlieras262.omablur` **已于 2026-09-19 从 `shell.json` 的 right 数组摘掉**
   （插件文件仍留在 `~/.config/omarchy/plugins/`，想加回就把它填回 right 数组；那轮的 `shell.json` 备份写在
