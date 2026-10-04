@@ -807,7 +807,7 @@ Omarchy 有两层配置，只有层1在 niri 上真正生效：
       （`git diff -- <niri.patch 里那 24 个路径>`）⇒ **24 文件 / 62 → 72 hunk**，新 md5
       `e6868080f48c5f7cd1711a22e163de86`（`--reverse --check` 通过；旧版 `4ec279cf…` 已退役）。
       注意 `omarchy-niri-repatch` **只负责重放、不会重生成**补丁文件。
-      ⚠ **2026-09-27 已被 §8 第 39/40 条那版超过**：**26 文件 / 77 hunk**、md5 `22dd2334c2210d91618b9ad903d3cbc2`（那条只加了 ante 的 5 个 hunk；`e6868080…` 这一版的 72 hunk 于是变成中间版本）。⚠ **2026-09-30 再被 §8.7 那版超过**：**27 文件 / 81 hunk**、md5 `3c672ab5…`（那条加 `bin/omarchy-update`：CLI `omarchy update` 委派给 `~/bin` 垫片）。
+      ⚠ **2026-09-27 已被 §8 第 39/40 条那版超过**：**26 文件 / 77 hunk**、md5 `22dd2334c2210d91618b9ad903d3cbc2`（那条只加了 ante 的 5 个 hunk；`e6868080…` 这一版的 72 hunk 于是变成中间版本）。⚠ **2026-09-30 再被 §8.7 那版超过**：**27 文件 / 81 hunk**、md5 `3c672ab5…`（那条加 `bin/omarchy-update`：CLI `omarchy update` 委派给 `~/bin` 垫片）。⚠ **2026-10-04 再被 §8 第 43 条那版超过**：**27 文件 / 82 hunk**、md5 `cdc361f9f534e16dd9043ac21c3ce352`（那条加 `shell/Ui/KeyboardPanel.qml` 的卡片投影，1 hunk）。
 
 39. **Setup > Security 新增 "Paru (AUR)" 开关：paru 的执行位就是本机 AUR 的总开关（2026-09-27）**
     - **是什么**：菜单 Security 区多一条 `Paru (AUR)`，切换 `/usr/bin/paru` 的执行位。**执行位即总开关**：本机 AUR
@@ -865,6 +865,8 @@ Omarchy 有两层配置，只有层1在 niri 上真正生效：
     - **补丁**：+5 hunk ⇒ **26 文件 / 77 hunk**，md5 `22dd2334c2210d91618b9ad903d3cbc2`（路径清单加 `bin/omarchy-agent`、
       `bin/omarchy-default-agent`；`--reverse --check` 通过，两个副本逐字节一致）。⚠ 2026-09-30 又被 §8.7 那版超过：
       **27 文件 / 81 hunk**、md5 `3c672ab5…`（那条加 `bin/omarchy-update`：CLI `omarchy update` 委派给 `~/bin` 垫片）。
+
+- 43. **窗口与卡片的投影 + 圆角统一 12（2026-10-03/04）**：正文在 `docs/visual.md`（= `§8 第 43 条`）——niri `shadow` 块开、`KeyboardPanel` 加 `RectangularShadow` 给全部状态栏弹层、圆角统一到 12（删 shell.json 的 `bar.cornerRadius`）
 
 41. **vantage 退休并公开归档（2026-09-27）**
     - **四功能归位**：`res` 分辨率切换 → **弃用**（交给 Monitor 面板；代码里 `DISPLAY_LOCKED = true` 保持屏蔽）；

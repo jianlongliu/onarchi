@@ -77,14 +77,14 @@
 | `default/omarchy/omarchy-menu.jsonc` | `install.package`/`install.aur`/`remove.package` 的 `xdg-terminal-exec` 回退 | 随仓库/覆盖层 |
 | `docs/` | `INSTALL{,.zh}.md` + **主文档 `omarchy-on-niri-port.md`（当前事实 + 映射表）** + 模块卷 `visual/behavior/plugins/shims/upstream/migration/lock/local-overrides`（编号沿用原号），**正本就在 `docs/`** | 直接改 `docs/`，无第二副本 |
 
-- 覆盖层实际内容：**27 文件 / 81 hunk**（`--reverse --check` 通过、repatch 幂等）；**md5 `3c672ab5cfbb5fdb4ecabfdf5eecee19`**（2026-09-30 加 `bin/omarchy-update`：那份文件顶部委派给 `~/bin` 垫片，4 hunk，见 §8 第 19 项；上一版 26 文件 / 77 hunk、md5 `22dd2334…` = 2026-09-27 加 `bin/omarchy-default-agent`、`bin/omarchy-agent` 两条 ante 分支，见 `behavior.md` §8 第 40 条）
+- 覆盖层实际内容：**27 文件 / 82 hunk**（`--reverse --check` 通过、repatch 幂等）；**md5 `cdc361f9f534e16dd9043ac21c3ce352`**（2026-10-04 加 `shell/Ui/KeyboardPanel.qml` 的卡片投影：18 行 / 1 hunk，81→82 hunk，见 §8 第 43 条；上一版 27 文件 / 81 hunk、md5 `3c672ab5…` = 2026-09-30 加 `bin/omarchy-update`：那份文件顶部委派给 `~/bin` 垫片，4 hunk，见 §8 第 19 项；上一版 26 文件 / 77 hunk、md5 `22dd2334…` = 2026-09-27 加 `bin/omarchy-default-agent`、`bin/omarchy-agent` 两条 ante 分支，见 `behavior.md` §8 第 40 条）
   （2026-09-26 重导出核，与 `~/.config/omarchy/niri-port/niri.patch` 逐字节一致；本次新增
   `shell/plugins/panels/monitor/Panel.qml` 的**分辨率滑块** —— 22→23 文件、48→62 hunk）。
   版本链（只留 md5，明细在各自卷）：`ef920a66ece784dfc207c7c87c479f5b`（2026-09-23，加菜单 `style.avatar.*` 三行，`docs/lock.md` §11.29）
   ← `6138cc1bece9a94312572d8685c845a4`（2026-09-21 晚：`shell/shell.qml` 的 boot reveal 标记 + `pushBootReveal()`、内置 bar 的滑入，见 §9 / `docs/visual.md` 第 33 条）
   ← 46 hunk 版（2026-09-21 01:29：活体先改了 `Background.qml` 的 `paintedOnce` 与 `shell.qml` 的推送、补丁没跟上，曾让 repatch 判 exit 2）。
 - **在用的 bar 是第三方插件，不在 `niri.patch` 里**：`~/.config/omarchy/shell.json` 的 `bar.id = charlieras262.floating-bar`，
-  它的 boot reveal 走 `niri-port/plugin-patches/charlieras262.floating-bar.patch`（md5 `0d36c626a9992de5a457e3f2880bc99a`，7 hunk，2026-09-21 核；含加载期底部 `Thinking…` 卡片——卡片照 OSD 关机吐司的尺寸/字体做，表面是**卡片大小 + 借用 `omarchy-osd` 那条霜化规则**，收卡时机等宿主推的"壁纸已画"而不是固定时长），
+  它的 boot reveal 走 `niri-port/plugin-patches/charlieras262.floating-bar.patch`（md5 `8d10d4b921ffb9d71071cfe05c4eb491`，7 hunk，2026-10-04 核（含 bar 端帽羽化，见 `docs/visual.md` §8 第 44 条；上一版 `0d36c626…`）；含加载期底部 `Thinking…` 卡片——卡片照 OSD 关机吐司的尺寸/字体做，表面是**卡片大小 + 借用 `omarchy-osd` 那条霜化规则**，收卡时机等宿主推的"壁纸已画"而不是固定时长），
   该补丁**没有自动重放器**，插件被更新覆盖后要手工 `git apply`。
 
 ---

@@ -51,10 +51,12 @@ window-rule {
 }
 // geometry-corner-radius rounds the window geometry (logical px); clip-to-geometry
 // actually clips the rendered content to the rounded shape. Tune the radius to taste.
+// Kept equal to the shell's Style.cornerRadius (12) so windows, panel cards, the
+// floating bar and niri's now-enabled window shadow all share one radius.
 // If CSD apps (their own rounded titlebars) show artifacts, also enable `prefer-no-csd`
 // in config.kdl — but that requires restarting apps to take effect.
 window-rule {
-    geometry-corner-radius 10
+    geometry-corner-radius 12
     clip-to-geometry true
 }
 

@@ -22,11 +22,21 @@ tmp=$(mktemp)
 tmp2=$(mktemp)
 trap 'rm -f "$tmp" "$tmp2"' EXIT INT TERM
 
-# Theme-generated keys, plus the bare flag inside `border { }`. Only layout.kdl has them.
-generated='^[[:space:]]*((active|inactive)-(color|gradient)([[:space:]]|$)|(on|off)[[:space:]]*$)'
+# Theme-generated keys. Active/inactive colour and gradient lines are dropped anywhere;
+# bare `on`/`off` flags only inside the `border { }` block, which is the only flag
+# omarchy-niri-apply-theme rewrites. Everything else — including `focus-ring { on }` and
+# `shadow { on }` — stays byte-compared, so a hand edit there still fails the check.
+# Only layout.kdl has any of it.
+generated='^[[:space:]]*(active|inactive)-(color|gradient)([[:space:]]|$)'
 normalise() { # <file name without .kdl>
   if [ "$1" = layout ]; then
-    grep -v -E "$generated"
+    awk -v gen="$generated" '
+      $0 ~ gen                               { next }
+      /^[[:space:]]*border[[:space:]]*\{/    { inborder = 1; print; next }
+      inborder && /^[[:space:]]*\}/          { inborder = 0; print; next }
+      inborder && /^[[:space:]]*(on|off)[[:space:]]*$/ { next }
+      { print }
+    '
   else
     cat
   fi

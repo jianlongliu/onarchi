@@ -559,18 +559,19 @@ index 4bfd0b78..17edf0c8 100644
  singleton Style 1.0 Style.qml
  singleton Util 1.0 Util.qml
 diff --git a/shell/Ui/KeyboardPanel.qml b/shell/Ui/KeyboardPanel.qml
-index b2fb218f..c64a57e8 100644
+index b2fb218f..3883fc46 100644
 --- a/shell/Ui/KeyboardPanel.qml
 +++ b/shell/Ui/KeyboardPanel.qml
-@@ -1,6 +1,7 @@
+@@ -1,6 +1,8 @@
  import QtQuick
++import QtQuick.Effects
  import Quickshell
  import Quickshell.Wayland
 +import Quickshell.Wayland._BackgroundEffect
  import qs.Commons
  
  // Layer-shell popup attached to a bar widget icon, designed for
-@@ -82,6 +83,13 @@ PanelWindow {
+@@ -82,6 +84,13 @@ PanelWindow {
    color: "transparent"
    exclusionMode: ExclusionMode.Ignore
  
@@ -584,6 +585,31 @@ index b2fb218f..c64a57e8 100644
    WlrLayershell.namespace: "omarchy-keyboard-panel"
    WlrLayershell.layer: WlrLayer.Overlay
    // Keyboard focus follows `open` (NOT `visible`). The window remains
+@@ -376,6 +385,24 @@ PanelWindow {
+ 
+   // --- card ----------------------------------------------------------------
+ 
++  // Drop shadow for the card. Declared as a sibling placed just before it so the
++  // stacking is declaration order (no negative-z guessing); the layer surface is
++  // full-screen, so the blur has room to spill past the card without reserving
++  // padding or touching the mask. Opacity is tied to the card so it fades with it.
++  // Values follow the Apple-style preset: blur 22 / offset (0,5) / black 0.16.
++  RectangularShadow {
++    x: card.x
++    y: card.y
++    width: card.width
++    height: card.height
++    radius: card.radius
++    blur: 22
++    spread: 0
++    offset: Qt.vector2d(0, 5)
++    color: Qt.rgba(0, 0, 0, 0.16)
++    opacity: card.opacity
++  }
++
+   BorderSurface {
+     id: card
+     x: root.cardOrigin.x
 diff --git a/shell/plugins/background/Background.qml b/shell/plugins/background/Background.qml
 index dea93a4c..96b26b69 100644
 --- a/shell/plugins/background/Background.qml

@@ -35,7 +35,7 @@
   `bin/omarchy-battery-status`（充电阈值改 sysfs 优先，2026-09-26，见 `docs/behavior.md` §8 第 38 条）、
   `bin/omarchy-default-agent` 与 `bin/omarchy-agent`（把 ante 加进默认 agent 列表，2026-09-27，见 §8 第 40 条）、
   `bin/omarchy-update`（把 CLI `omarchy update` 委派给 `~/bin` 垫片，2026-09-30，见 `docs/omarchy-on-niri-port.md` §3.1）。
-  ——这 27 个文件正是 `niri.patch` 的内容（**27 个文件 / 81 hunk**，2026-09-30 核；2026-09-27 为 26 文件 / 77 hunk；
+  ——这 27 个文件正是 `niri.patch` 的内容（**27 个文件 / 82 hunk**，2026-10-04 核；2026-09-30 为 27 文件 / 81 hunk、md5 `3c672ab5…`；2026-09-27 为 26 文件 / 77 hunk；
   2026-09-26 为 24 文件 / 72 hunk；
   2026-09-18 合并上游时为 30 hunk，
   2026-09-19 菜单自愈守卫 +2（§8.14）、Install/Remove 终端回退 +1（§8 第 21 条）、

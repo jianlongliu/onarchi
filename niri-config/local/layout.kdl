@@ -66,14 +66,14 @@ layout {
         // active-border gradient -- the same token the Omarchy menu ring is drawn from.
         // niri takes two stops per gradient, so a three-stop theme gradient is split over
         // the ring and the border below: ring = first half, border = second half.
-        active-color "#97ccf8ff"
-        active-gradient from="#97ccf8ff" to="#d0c0e8ff" angle=135
+        active-color "#ffb598ff"
+        active-gradient from="#ffb598ff" to="#d3c78eff" angle=135
 
         // Color of the ring on inactive monitors.
         //
         // The focus ring only draws around the active window, so the only place
         // where you can see its inactive-color is on other monitors.
-        inactive-color "#8b9198aa"
+        inactive-color "#a08d86aa"
 
         // You can also use gradients. They take precedence over solid colors.
         // Gradients are rendered the same as CSS linear-gradient(angle, from, to).
@@ -100,8 +100,8 @@ layout {
 
         width 2
         inactive-gradient from="#00000000" to="#00000000" angle=135
-        active-gradient from="#d0c0e8ff" to="#004b71ff" angle=135
-        active-color "#d0c0e8ff"
+        active-gradient from="#d3c78eff" to="#71361bff" angle=135
+        active-color "#d3c78eff"
         inactive-color "#00000000"
 
         // Color of the border around windows that request your attention.
@@ -117,8 +117,9 @@ layout {
 
     // You can enable drop shadows for windows.
     shadow {
-        // Uncomment the next line to enable shadows.
-        // on
+        // On (2026-10-03). The square-corner warning below doesn't apply here:
+        // window-rules.kdl sets geometry-corner-radius, so niri knows the radius.
+        on
 
         // By default, the shadow draws only around its window, and not behind it.
         // Uncomment this setting to make the shadow draw behind its window.
@@ -148,8 +149,10 @@ layout {
         // Offset moves the shadow relative to the window.
         offset x=0 y=5
 
-        // You can also change the shadow color and opacity.
-        color "#0007"
+        // You can also change the shadow color and opacity. Written 8-digit on
+        // purpose -- 4-digit "#0007" is ambiguous. Reference: the Apple-style
+        // preset uses rgba(0,0,0,0.14) light / 0.40 dark.
+        color "#00000040"
     }
 
     // Struts shrink the area occupied by windows, similarly to layer-shell panels.

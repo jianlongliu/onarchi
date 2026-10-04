@@ -1,7 +1,6 @@
 {
   "bar": {
     "centerAnchor": "omarchy.clock",
-    "cornerRadius": 10,
     "floatGap": 8,
     "id": "charlieras262.floating-bar",
     "layout": {
