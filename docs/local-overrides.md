@@ -84,7 +84,7 @@
   ← `6138cc1bece9a94312572d8685c845a4`（2026-09-21 晚：`shell/shell.qml` 的 boot reveal 标记 + `pushBootReveal()`、内置 bar 的滑入，见 §9 / `docs/visual.md` 第 33 条）
   ← 46 hunk 版（2026-09-21 01:29：活体先改了 `Background.qml` 的 `paintedOnce` 与 `shell.qml` 的推送、补丁没跟上，曾让 repatch 判 exit 2）。
 - **在用的 bar 是第三方插件，不在 `niri.patch` 里**：`~/.config/omarchy/shell.json` 的 `bar.id = charlieras262.floating-bar`，
-  它的 boot reveal 走 `niri-port/plugin-patches/charlieras262.floating-bar.patch`（md5 `a2890702e5d6130fc2f7dc4c96aa9995`，7 hunk，2026-10-04 核（霜化区域内缩 2px，见 `docs/visual.md` §8 第 44 条；上一版 `8d10d4b9…` = 同日端帽羽化那版）；含加载期底部 `Thinking…` 卡片——卡片照 OSD 关机吐司的尺寸/字体做，表面是**卡片大小 + 借用 `omarchy-osd` 那条霜化规则**，收卡时机等宿主推的"壁纸已画"而不是固定时长），
+  它的 boot reveal 走 `niri-port/plugin-patches/charlieras262.floating-bar.patch`（md5 `df3bdd986bc026db51600dd8280b39e7`，6 hunk，2026-10-04 核（霜化区域内缩 2px + 清掉 2026-09-22 那 3 条调试 log，见 `docs/visual.md` §8 第 44 条；上一版 `a2890702…` = 同日内缩那版）；含加载期底部 `Thinking…` 卡片——卡片照 OSD 关机吐司的尺寸/字体做，表面是**卡片大小 + 借用 `omarchy-osd` 那条霜化规则**，收卡时机等宿主推的"壁纸已画"而不是固定时长），
   该补丁**没有自动重放器**，插件被更新覆盖后要手工 `git apply`。
 
 ---

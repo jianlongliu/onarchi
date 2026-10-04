@@ -1,5 +1,5 @@
 diff --git a/Bar.qml b/Bar.qml
-index 6839594..bbd99ee 100644
+index 6839594..415fb27 100644
 --- a/Bar.qml
 +++ b/Bar.qml
 @@ -1,7 +1,7 @@
@@ -278,14 +278,10 @@ index 6839594..bbd99ee 100644
      exclusionMode: root.barHidden ? ExclusionMode.Ignore : ExclusionMode.Auto
  
      ScreenMoveRemap {
-@@ -1135,22 +1350,67 @@ Item {
+@@ -1135,22 +1350,63 @@ Item {
      WlrLayershell.namespace: "omarchy-bar"
      WlrLayershell.layer: WlrLayer.Top
  
-+    // niri-port debug (temporary): bar window lifetime vs the tooltip popup's parent surface.
-+    onVisibleChanged: console.log("omarchy-floating-bar: bar window visible=" + visible)
-+    Component.onDestruction: console.log("omarchy-floating-bar: bar window destroyed")
-+
 +    // The whole reveal: off the screen, then on it. Nothing moves -- see
 +    // the boot reveal notes above for why a slide cannot work.
 +    visible: root.bootRevealShown && !remapGuard.remapping
@@ -352,12 +348,3 @@ index 6839594..bbd99ee 100644
        Behavior on radius { NumberAnimation { duration: 420; easing.type: Easing.InOutCubic } }
        Behavior on color { ColorAnimation { duration: 420; easing.type: Easing.InOutCubic } }
        Behavior on opacity { NumberAnimation { duration: 420; easing.type: Easing.InOutCubic } }
-@@ -1176,6 +1436,8 @@ Item {
- 
-       visible: root.tooltipShown && root.tooltipTarget !== null && root.tooltipText !== "" && root.targetBelongsToWindow(root.tooltipTarget, barWindow)
-       color: "transparent"
-+      // niri-port debug (temporary): name the popup + its parent's state at map time.
-+      onVisibleChanged: console.log("omarchy-floating-bar: tooltip visible=" + visible + " tooltipShown=" + root.tooltipShown + " parentVisible=" + (barWindow ? barWindow.visible : "null"))
-       implicitWidth: Math.ceil(tooltipBubble.implicitWidth)
-       implicitHeight: Math.ceil(tooltipBubble.implicitHeight)
- 
