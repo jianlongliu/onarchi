@@ -12,7 +12,7 @@ git apply --reverse --check ~/.config/omarchy/niri-port/plugin-patches/<id>.patc
 
 | Patch | What it changes |
 |---|---|
-| `charlieras262.floating-bar.patch` | Rounded `blurRegion` on the floating bar (the bar is a separate plugin here, not `omarchy.bar`); boot reveal -- the bar `PanelWindow`'s `visible` is gated on the host's "wallpaper painted" push, so nothing is shown during load and the bar appears in one block; ~2px feather on the bar's own fill (`MultiEffect`) because Qt's 1px transition reads as a hard staircase on the end caps (`docs/visual.md` §8 第 44 条) |
+| `charlieras262.floating-bar.patch` | Rounded `blurRegion` on the floating bar (the bar is a separate plugin here, not `omarchy.bar`); boot reveal -- the bar `PanelWindow`'s `visible` is gated on the host's "wallpaper painted" push, so nothing is shown during load and the bar appears in one block; frost region inset by 2px (`barBlurAnchor` gets `anchors.margins: 2` + a radius-2), so the visible silhouette comes from Qt's antialiased fill instead of the compositor's hard-edged `ext_background_effect` mask (`docs/visual.md` §8 第 44 条) |
 | `ronald.input-sources.patch` | `badgeOverrides` (Model.js) + `startupSource`/`applyStartupSource` (Panel.qml) so the first input source after a shell start is rime |
 | `meviusisback.ai-subs.patch` | Font size from `caption` to `font.body` (five places), plus a leading pad and spacing so the chip lines up with the built-in widgets |
 | `jianlongliu.workspaces.patch` | Dynamic workspace pill count (`1..N` by occupancy, never below 2) |

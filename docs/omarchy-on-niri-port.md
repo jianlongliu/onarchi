@@ -151,7 +151,7 @@ hyprctl 调用面有界、可直接映射。
 | `~/.local/share/omarchy/default/omarchy/omarchy-menu.jsonc` | **菜单指向 niri 真配置**（见 §8.6）；2026-09-19 给 `install.package` / `install.aur` / `remove.package` 加 `xdg-terminal-exec` 回退（§8 第 21 条）|
 | `~/.config/niri/config.kdl` | 编排器：`environment`/`spawn`/`animations`/`screenshot-path` + 6 个 `include`（§5.7）；`focus-ring` 在 `layout.kdl`，颜色由主题驱动（§5.6）|
 | `~/.config/niri/{input,monitor,layout,window-rules,effects,binds}.kdl` | 模块化拆分出的子配置（§5.7）：输入/显示器/布局/窗口规则(含圆角)/磨砂(effects)/按键 |
-| `~/.config/niri/effects.kdl` | 2026-09-19 给 `^omarchy-bar$` 配 `background-effect { xray false }`（浮栏磨砂；圆角模糊区域由插件端下发，§8.8）|
+| `~/.config/niri/effects.kdl` | flotbar 磨砂：给 `^omarchy-bar$` 配 `background-effect { xray … }`（圆角模糊区域由插件端下发，§8.8）；`xray` **2026-10-04 起为 `false`**（2026-09-19 首配即为 `false`，2026-09-21–10-04 曾为 `true`，实测三者不可分）|
 | `~/.config/omarchy/shell.json` | bar：`id` = `charlieras262.floating-bar`、`floatGap` 8、`cornerRadius` 10；`layout.left` = `jianlongliu.arch-logo` + `jianlongliu.workspaces`；`layout.right` 2026-09-19 摘掉空转的 `charlieras262.omablur`、并由 `ronald.input-sources` 取代 `ryuhzk.ime`；`layout.center` 同日摘掉 `omarchy.keyboard-layout`（与插件徽章重复，§8.11、§8.17）；2026-09-20 `layout.right` 的 `omarchy.power` 加 `"showPercentage": true`、`layout.center` 摘掉 `omarchy.system-update`（§8 第 28 条）|
 | `~/.config/ghostty/config` | 半透明 (`background-opacity = 0.85`) + 关自带模糊 (`background-blur-radius = 0`)，blur 交给 niri（§5.8） |
 
@@ -623,7 +623,7 @@ false` 让 niri 把焦点环画在窗口**周围**而非背后，问题解决（
 | `§8 第 38 条` | 电池面板加 CHARGE LIMIT 档位切换（`pkexec tlp setcharge`，只写运行时） | `docs/behavior.md` |
 | `§8 第 42 条` | 通用剪贴板 `Super+C/V/X`（垫片注入）+ 终端复制/剪切的 OSD 卡片 | `docs/shims.md`（目录行在 `docs/behavior.md`） |
 | `§8 第 43 条` | 窗口与卡片的投影（niri `shadow` + `KeyboardPanel` 的 `RectangularShadow`）+ 圆角统一 12 | `docs/visual.md` |
-| `§8 第 44 条` | 浮动 bar 端帽的羽化（插件填充加 `MultiEffect`，过渡 1px → 2–5px）+ 两条更正（quickshell 支持 fractional scale / bar 无霜化） | `docs/visual.md` |
+| `§8 第 44 条` | 浮动 bar 端帽的硬边（真因＝niri 霜化遮罩无抗锯齿 ⇒ 把霜化区域内缩 2px）+ 两条更正（quickshell 支持 fractional scale / bar 无霜化） | `docs/visual.md` |
 | `§8.6` | A 层 | `docs/behavior.md` |
 | `§8.7` | 更新覆盖层 | `docs/upstream.md` |
 | `§8.8` | 视觉磨砂 | `docs/visual.md` |

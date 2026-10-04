@@ -68,6 +68,11 @@ layer-rule {
 
 // Floating bar frost. Only `xray` is set here, NOT `blur true`: the rounded
 // region comes from the client, exactly like the status-bar popups below.
+// xray false (2026-10-04, user: "黑色背景下很怪"): the bar kept showing the blurred
+// WALLPAPER through itself, so over anything dark it read as a bright haze instead of
+// glass. It now frosts the live content behind it, like the menu/popups/OSD rules above.
+// The note below is the PREVIOUS setting (xray true, 2026-09-21 -> 2026-10-04), kept for
+// the measurement it records.
 // xray true (2026-09-21, user): blur the wallpaper alone. Measured against
 // xray false on a live desktop: mean 0.4% of pixels differ, max 12/255 -- i.e.
 // invisible -- because niri keeps tiled windows out of the bar's strip. The only
@@ -78,7 +83,21 @@ layer-rule {
 layer-rule {
     match namespace="^omarchy-bar$"
     background-effect {
-        xray true
+        xray false
+    }
+    // 2026-10-04: rounded shadow, same radius as the plugin's own fill (12 logical).
+    // geometry-corner-radius only shapes the shadow -- it never clips a layer surface.
+    // It dims the outside of the bar but does NOT reshape the silhouette (user: "没感觉").
+    // The hard edge over the end caps was the compositor's frost mask
+    // (ext_background_effect regions have no antialiasing) -- fixed in the plugin by
+    // insetting the frost region 2px, see docs/visual.md §8 第 44 条.
+    geometry-corner-radius 12
+    shadow {
+        on
+        color "#00000080"
+        softness 30
+        spread 5
+        offset x=0 y=4
     }
 }
 

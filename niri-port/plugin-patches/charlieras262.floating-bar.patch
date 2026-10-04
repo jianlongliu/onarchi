@@ -1,19 +1,17 @@
 diff --git a/Bar.qml b/Bar.qml
-index 6839594..1df138c 100644
+index 6839594..bbd99ee 100644
 --- a/Bar.qml
 +++ b/Bar.qml
-@@ -1,8 +1,9 @@
+@@ -1,7 +1,7 @@
  import Quickshell
 -import Quickshell.Hyprland
  import Quickshell.Io
  import Quickshell.Wayland
 +import Quickshell.Wayland._BackgroundEffect
  import QtQuick
-+import QtQuick.Effects
  import QtQuick.Layouts
  import qs.Commons
- import qs.Ui
-@@ -119,13 +120,8 @@ Item {
+@@ -119,13 +119,8 @@ Item {
      gapsOutProbe.running = true
    }
  
@@ -29,7 +27,7 @@ index 6839594..1df138c 100644
    Process {
      id: gapsOutProbe
      command: ["hyprctl", "-j", "getoption", "general:gaps_out"]
-@@ -565,11 +561,11 @@ Item {
+@@ -565,11 +560,11 @@ Item {
      return window && window.screen ? String(window.screen.name || "") : ""
    }
  
@@ -44,7 +42,7 @@ index 6839594..1df138c 100644
      return monitor ? String(monitor.name || "") : ""
    }
  
-@@ -662,6 +658,224 @@ Item {
+@@ -662,6 +657,224 @@ Item {
  
    Component.onCompleted: applyBarConfig()
  
@@ -269,7 +267,7 @@ index 6839594..1df138c 100644
    // Revealing the indicators widens their section, which can slide a neighbour
    // under a stationary pointer. Collapsing on that un-hover would move it back
    // out and re-open the peek, so hold until the pointer leaves the bar.
-@@ -1087,7 +1301,9 @@ Item {
+@@ -1087,7 +1300,9 @@ Item {
      // reveal has to rebuild them — new surface, re-shaped glyphs, re-uploaded
      // textures — which measures ~150ms against ~20ms to tear down. Parking
      // keeps the surface alive, so showing is only a margin change.
@@ -280,7 +278,7 @@ index 6839594..1df138c 100644
      exclusionMode: root.barHidden ? ExclusionMode.Ignore : ExclusionMode.Auto
  
      ScreenMoveRemap {
-@@ -1135,27 +1351,77 @@ Item {
+@@ -1135,22 +1350,67 @@ Item {
      WlrLayershell.namespace: "omarchy-bar"
      WlrLayershell.layer: WlrLayer.Top
  
@@ -305,7 +303,14 @@ index 6839594..1df138c 100644
 +    Rectangle {
 +      id: barBlurAnchor
 +      anchors.fill: parent
-+      radius: root.effectiveCornerRadius
++      // niri port (2026-10-04): the frost region the compositor masks out is a
++      // HARD edge -- niri's background-effect region has no antialiasing, and
++      // because the fill under it is only ~46% alpha that hard cut is what the
++      // eye sees, no matter what the fill does. Inset the frost 2px so the
++      // fill's own (antialiased) rounded edge is the visible silhouette and the
++      // compositor's staircase sits inside it -- see docs/visual.md.
++      anchors.margins: 2
++      radius: Math.max(0, root.effectiveCornerRadius - 2)
 +      color: "transparent"
 +    }
 +
@@ -316,7 +321,7 @@ index 6839594..1df138c 100644
      Rectangle {
        id: barBackground
        anchors.fill: parent
-+      visible: false
++      antialiasing: true
        radius: root.effectiveCornerRadius
        // The theme's own background color can carry its own baked-in alpha
        // (shell.toml's [bar] background-alpha); forcing it to 1 here first
@@ -347,24 +352,7 @@ index 6839594..1df138c 100644
        Behavior on radius { NumberAnimation { duration: 420; easing.type: Easing.InOutCubic } }
        Behavior on color { ColorAnimation { duration: 420; easing.type: Easing.InOutCubic } }
        Behavior on opacity { NumberAnimation { duration: 420; easing.type: Easing.InOutCubic } }
-     }
- 
-+    // niri port: a 2px feather on the bar's own edge. Qt rasterises the
-+    // rounded fill with a 1px transition (and snaps the straight edges to the
-+    // device grid), which reads as a hard staircase on the end caps over a
-+    // flat backdrop -- see docs/visual.md §44.
-+    MultiEffect {
-+      anchors.fill: barBackground
-+      source: barBackground
-+      blurEnabled: true
-+      blurMax: 6
-+      blur: 0.35
-+    }
-+
-     Loader {
-       anchors.fill: parent
-       sourceComponent: root.vertical ? verticalBar : horizontalBar
-@@ -1176,6 +1442,8 @@ Item {
+@@ -1176,6 +1436,8 @@ Item {
  
        visible: root.tooltipShown && root.tooltipTarget !== null && root.tooltipText !== "" && root.targetBelongsToWindow(root.tooltipTarget, barWindow)
        color: "transparent"
