@@ -55,6 +55,7 @@ layout {
 
         // How many logical pixels the ring extends out from the windows.
         width 2
+        active-gradient from="#feb0d2ff" to="#f2bb98ff" angle=135
 
         // Colors can be set in a variety of ways:
         // - CSS named colors: "red"
@@ -66,14 +67,13 @@ layout {
         // active-border gradient -- the same token the Omarchy menu ring is drawn from.
         // niri takes two stops per gradient, so a three-stop theme gradient is split over
         // the ring and the border below: ring = first half, border = second half.
-        active-color "#ffb598ff"
-        active-gradient from="#ffb598ff" to="#d3c78eff" angle=135
+        active-color "#feb0d2ff"
 
         // Color of the ring on inactive monitors.
         //
         // The focus ring only draws around the active window, so the only place
         // where you can see its inactive-color is on other monitors.
-        inactive-color "#a08d86aa"
+        inactive-color "#9d8c92aa"
 
         // You can also use gradients. They take precedence over solid colors.
         // Gradients are rendered the same as CSS linear-gradient(angle, from, to).
@@ -100,8 +100,8 @@ layout {
 
         width 2
         inactive-gradient from="#00000000" to="#00000000" angle=135
-        active-gradient from="#d3c78eff" to="#71361bff" angle=135
-        active-color "#d3c78eff"
+        active-gradient from="#f2bb98ff" to="#6d3350ff" angle=135
+        active-color "#f2bb98ff"
         inactive-color "#00000000"
 
         // Color of the border around windows that request your attention.

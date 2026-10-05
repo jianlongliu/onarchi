@@ -4,21 +4,20 @@ base-size = 14
 [bar]
 size-horizontal = 32
 size-vertical = 34
-background-alpha = 0.45
+background-alpha = 0.32
 # 内置部件的图标与数字字号（上游默认 13）。降到 12 = 跟 bar 上的纯文本（[font] base-size 12）
 # 及自研/第三方插件的正文同档，整条 bar 只有一个字号；调大回去就删这行。
 icon-font = 12
 
 [popups]
-background-alpha = 0.65
-
+background-alpha = 0.38
 [notifications]
 background-alpha = 0.35
 
 [menu]
 # 卡片底色不再写死色值，跟 [bar] / [popups] 同一色源（主题的 [menu] background），
 # 只靠 alpha 决定通透度：0.45 = 跟 bar 同档的半透明磨砂。
-background-alpha = 0.45
+background-alpha = 0.38
 # 全屏变暗层（menu.scrim）关掉（2026-10-05，用户："把那个黑去掉，bar 上哪有这层"）。
 # 0 = 桌面完全不压暗，菜单就是一张浮卡，和 bar / 状态栏弹层的做法一致。
 # 想要一点轻微压暗就填 0.1~0.25（默认是 0.5）。这一层同时负责"点空白处关闭"，

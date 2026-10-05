@@ -77,7 +77,7 @@
 | `default/omarchy/omarchy-menu.jsonc` | `install.package`/`install.aur`/`remove.package` 的 `xdg-terminal-exec` 回退 | 随仓库/覆盖层 |
 | `docs/` | `INSTALL{,.zh}.md` + **主文档 `omarchy-on-niri-port.md`（当前事实 + 映射表）** + 模块卷 `visual/behavior/plugins/shims/upstream/migration/lock/local-overrides`（编号沿用原号），**正本就在 `docs/`** | 直接改 `docs/`，无第二副本 |
 
-- 覆盖层实际内容：**33 文件 / 106 hunk / 3022 行**（`--reverse --check` 通过、repatch 幂等）；**md5 `bcb5aca36ace33d829c6773da7026801`**（2026-10-05 加 `shell/plugins/menu/Menu.qml` 的卡片投影、同日再改实现并按 bar 的实测剖面标定 alpha：+1 hunk、2956→3022 行，105→106 hunk（hunk 数不变、只改内容），见 `docs/visual.md` §8 第 45 条；上一版 `2cea1e9517bd498df185e02414595bc8` = 2026-10-04 **合并浮空 bar**：插件那 28 个文件并进 `shell/plugins/bar/` 后新增 `Bar.qml` 的 16 hunk、`README.md`、`widgets/{ActiveWindow,KeyboardLayout,Tray}.qml` 与两个新文件 `LICENSE`/`UPSTREAM.md`（+6 文件、82→105 hunk），`widgets/Workspaces.qml` 的 niri 适配（`Hyprland.*`→`Niri.*`）随这版补丁走（合并时该文件一度被插件那份覆盖回上游写法、与基线逐字节相同，2026-10-04 当天恢复，见 `docs/omarchy-on-niri-port.md` §3.2）；上一版 27 文件 / 82 hunk、md5 `cdc361f9f534e16dd9043ac21c3ce352` = 2026-10-04 加 `shell/Ui/KeyboardPanel.qml` 的卡片投影：18 行 / 1 hunk，81→82 hunk，见 §8 第 43 条；再上一版 27 文件 / 81 hunk、md5 `3c672ab5…` = 2026-09-30 加 `bin/omarchy-update`：那份文件顶部委派给 `~/bin` 垫片，4 hunk，见 §8 第 19 项；再上一版 26 文件 / 77 hunk、md5 `22dd2334…` = 2026-09-27 加 `bin/omarchy-default-agent`、`bin/omarchy-agent` 两条 ante 分支，见 `behavior.md` §8 第 40 条）
+- 覆盖层实际内容：**33 文件 / 106 hunk / 3098 行**（`--reverse --check` 通过、repatch 幂等）；**md5 `f6ef5a467795e2bd6f1ccf14161b185e`**（2026-10-05 三轮：① `shell/plugins/menu/Menu.qml` 的卡片投影、同日再改实现并按 bar 的实测剖面标定 alpha（105→106 hunk、2956→3022 行），见 `docs/visual.md` §8 第 45 条；② **`shell/Ui/KeyboardPanel.qml` 的弹层卡片投影换成同款环带 + 裁到卡片外沿**（hunk 数不变、3022→3088 行），见 `docs/visual.md` §8 第 43 条；③ **`shell/plugins/bar/Bar.qml` 的 1px 顶边高光**（hunk 数不变、3088→3098 行），见 `docs/visual.md` §8 第 46 条；上一版 3088 行 / md5 `423813f5702a120214ea09da21af1fc4` = 上面那步 ②；再上一版 `bcb5aca36ace33d829c6773da7026801` = 上面那步 ①；再上一版 `2cea1e9517bd498df185e02414595bc8` = 2026-10-04 **合并浮空 bar**：插件那 28 个文件并进 `shell/plugins/bar/` 后新增 `Bar.qml` 的 16 hunk、`README.md`、`widgets/{ActiveWindow,KeyboardLayout,Tray}.qml` 与两个新文件 `LICENSE`/`UPSTREAM.md`（+6 文件、82→105 hunk），`widgets/Workspaces.qml` 的 niri 适配（`Hyprland.*`→`Niri.*`）随这版补丁走（合并时该文件一度被插件那份覆盖回上游写法、与基线逐字节相同，2026-10-04 当天恢复，见 `docs/omarchy-on-niri-port.md` §3.2）；上一版 27 文件 / 82 hunk、md5 `cdc361f9f534e16dd9043ac21c3ce352` = 2026-10-04 加 `shell/Ui/KeyboardPanel.qml` 的卡片投影：18 行 / 1 hunk，81→82 hunk，见 §8 第 43 条；再上一版 27 文件 / 81 hunk、md5 `3c672ab5…` = 2026-09-30 加 `bin/omarchy-update`：那份文件顶部委派给 `~/bin` 垫片，4 hunk，见 §8 第 19 项；再上一版 26 文件 / 77 hunk、md5 `22dd2334…` = 2026-09-27 加 `bin/omarchy-default-agent`、`bin/omarchy-agent` 两条 ante 分支，见 `behavior.md` §8 第 40 条）
   （2026-09-26 重导出核，与 `~/.config/omarchy/niri-port/niri.patch` 逐字节一致；本次新增
   `shell/plugins/panels/monitor/Panel.qml` 的**分辨率滑块** —— 22→23 文件、48→62 hunk）。
   版本链（只留 md5，明细在各自卷）：`ef920a66ece784dfc207c7c87c479f5b`（2026-09-23，加菜单 `style.avatar.*` 三行，`docs/lock.md` §11.29）
@@ -85,7 +85,7 @@
   ← 46 hunk 版（2026-09-21 01:29：活体先改了 `Background.qml` 的 `paintedOnce` 与 `shell.qml` 的推送、补丁没跟上，曾让 repatch 判 exit 2）。
 - **在用的 bar 是 shell 树里的 `omarchy.bar`（浮空实现，2026-10-04 合并）**：`~/.config/omarchy/shell.json` 的
   `bar.id = omarchy.bar`，实现住在 `$OMARCHY_PATH/shell/plugins/bar/`，改动全在 `niri.patch` 的 bar hunks
-  （33 文件 / 106 hunk、md5 `bcb5aca36ace33d829c6773da7026801`；含 boot reveal（`docs/visual.md` 第 33 条）、
+  （33 文件 / 106 hunk、md5 `f6ef5a467795e2bd6f1ccf14161b185e`；含 boot reveal（`docs/visual.md` 第 33 条）、
   霜化区域 2px 内缩（§8 第 44 条）、加载期底部 `Thinking…` 卡片 —— 卡片照 OSD 关机吐司的尺寸/字体做，
   表面是**卡片大小 + 借用 `omarchy-osd` 那条霜化规则**，收卡时机等宿主推的"壁纸已画"而不是固定时长）。
   它随覆盖层重放，**不再有独立的重放器问题**；此前那条插件线（`niri-port/plugin-patches/charlieras262.floating-bar.patch`，
@@ -521,7 +521,7 @@ cp /tmp/niri.patch ~/.config/omarchy/niri-port/niri.patch              # 重放�
       PATH 上的垫片拦不到 CLI，所以 `$OMARCHY_PATH/bin/omarchy-update` 顶部加三行
       `exec "$HOME/bin/omarchy-update" "$@"`（`OMARCHY_UPDATE_NO_DELEGATE=1` 时跳过，供逃生口用），插在安全脚手架**之前**
       —— 上游那套 `omarchy_security_*` 是给它自己的 sudo 流程用的，本机用不着。该文件随 `niri.patch` 重放
-      （新增路径 ⇒ 26→27 文件、77→81 hunk，md5 `3c672ab5…`；**2026-10-04 合并浮空 bar 后整份为 33 文件 / 106 hunk、md5 `bcb5aca36ace33d829c6773da7026801`**，见 §7 配方 / `docs/plugins.md` §5.4）。
+      （新增路径 ⇒ 26→27 文件、77→81 hunk，md5 `3c672ab5…`；**2026-10-04 合并浮空 bar 后整份为 33 文件 / 106 hunk（2026-10-05 起 3098 行、md5 `f6ef5a467795e2bd6f1ccf14161b185e`；同日早些的 3088 行那版为 `423813f5…`）**，见 §7 配方 / `docs/plugins.md` §5.4）。
     - **由此丢掉的上游步骤**：`omarchy-update-dev`（代码 FF = `git pull --ff-only`）、`omarchy-update-keyring`、
       `omarchy-migrate`、snapshot、`omarchy-update-pkg-prune`、孤儿包清理、status/服务重启。
       逃生口 = `~/bin/omarchy-update --upstream`（跑上游真身；上游代码跟进仍走 `docs/upstream.md` §8.7 手动路径）。

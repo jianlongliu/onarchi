@@ -559,7 +559,7 @@ index 4bfd0b78..17edf0c8 100644
  singleton Style 1.0 Style.qml
  singleton Util 1.0 Util.qml
 diff --git a/shell/Ui/KeyboardPanel.qml b/shell/Ui/KeyboardPanel.qml
-index b2fb218f..3883fc46 100644
+index b2fb218f..e8a6f95a 100644
 --- a/shell/Ui/KeyboardPanel.qml
 +++ b/shell/Ui/KeyboardPanel.qml
 @@ -1,6 +1,8 @@
@@ -585,26 +585,92 @@ index b2fb218f..3883fc46 100644
    WlrLayershell.namespace: "omarchy-keyboard-panel"
    WlrLayershell.layer: WlrLayer.Overlay
    // Keyboard focus follows `open` (NOT `visible`). The window remains
-@@ -376,6 +385,24 @@ PanelWindow {
+@@ -376,6 +385,90 @@ PanelWindow {
  
    // --- card ----------------------------------------------------------------
  
-+  // Drop shadow for the card. Declared as a sibling placed just before it so the
-+  // stacking is declaration order (no negative-z guessing); the layer surface is
-+  // full-screen, so the blur has room to spill past the card without reserving
-+  // padding or touching the mask. Opacity is tied to the card so it fades with it.
-+  // Values follow the Apple-style preset: blur 22 / offset (0,5) / black 0.16.
-+  RectangularShadow {
-+    x: card.x
-+    y: card.y
-+    width: card.width
-+    height: card.height
-+    radius: card.radius
-+    blur: 22
-+    spread: 0
-+    offset: Qt.vector2d(0, 5)
-+    color: Qt.rgba(0, 0, 0, 0.16)
++  // Drop shadow for the card, painted only *outside* it -- same construction as
++  // the menu's (plugins/menu/Menu.qml): twelve disjoint rounded-rect bands whose
++  // alpha follows the bar's own measured niri shadow (0.363 at the surface edge,
++  // half by ~15 logical px, gone by ~48), with a MultiEffect blur turning the
++  // band steps into one falloff. Nothing is drawn inside the card's rect, so the
++  // translucent card cannot be darkened from underneath.
++  //
++  // Why not the RectangularShadow this replaced: it is a *filled*, blurred
++  // rectangle, so it also paints under the card -- and with the card only ~45%
++  // opaque the shadow showed through it as a grey wash (measured 7.63/80 luma
++  // darker than the same card without a shadow; docs/visual.md §8 第 43 条).
++  //
++  // The halo must not reach over the bar: this surface sits in the Overlay layer,
++  // *above* the bar, so a halo painted up there lands on the bar's own strip.
++  // Two things do not work here. `clip` on the layered host: the layer's texture is
++  // built around the children and the effect's padding lets them through (measured:
++  // with the bar's edge at y77 the halo still showed at y7). Clamping each band's
++  // rect: a Rectangle paints a border along every edge, so the ten bands cut by the
++  // bar stacked ten borders on the cut line -- that strip measured 0.55 where one
++  // band carries 0.40. An inner clipping item is what actually cuts: the rings keep
++  // their natural geometry and whatever is above the bar is simply not drawn, so the
++  // strip under the bar shows the single band that belongs there.
++  Item {
++    id: cardShadow
++    readonly property int band: 4                  // band width, logical px
++    readonly property int drop: 4                  // how far it hangs below
++    readonly property int pad: 68                  // room for the blur to fade
++    // Sampled off the bar's profile every `band` logical px (see docs/visual.md
++    // §8 第 45 条 for the measurement and the iteration that produced them).
++    readonly property var alphas: [0.40, 0.27, 0.21, 0.18, 0.12, 0.09,
++                                   0.05, 0.03, 0.02, 0.012, 0.008, 0.005]
++    // On the bar's side the halo is clipped to the card's own edge. Not to the
++    // bar's edge: the two are only `Style.gapsOut` (5) apart, and a cut there sits
++    // inside the blur's reach (blur 0.22 x blurMax 40 ~ 9 physical px), so the
++    // blur smeared the cut back onto the bar's own bottom rows -- measured -32 luma
++    // over the card's x-band, against -3 for the same popup with the shadow off.
++    // Clipped at the card's edge, what the blur smears upward dies in that 5 px gap
++    // and never reaches the bar.
++    readonly property real clipLeft: root.barPos === "left" ? card.x : x
++    readonly property real clipTop: root.barPos === "top" ? card.y : y
++    readonly property real clipRight: root.barPos === "right" ? card.x + card.width : x + width
++    readonly property real clipBottom: root.barPos === "bottom" ? card.y + card.height : y + height
++    x: card.x - pad
++    y: card.y - pad
++    width: card.width + pad * 2
++    height: card.height + pad * 2
 +    opacity: card.opacity
++    layer.enabled: true
++    layer.effect: MultiEffect {
++      blurEnabled: true
++      autoPaddingEnabled: false
++      blur: 0.22
++      blurMax: 40
++    }
++
++    Item {
++      id: shadowClip
++      x: cardShadow.clipLeft - cardShadow.x
++      y: cardShadow.clipTop - cardShadow.y
++      width: cardShadow.clipRight - cardShadow.clipLeft
++      height: cardShadow.clipBottom - cardShadow.clipTop
++      clip: true
++
++      Repeater {
++        model: cardShadow.alphas
++        Rectangle {
++          required property int index
++          required property var modelData
++          readonly property real e: (index + 1) * cardShadow.band
++          // shadowClip's origin is (clipLeft, clipTop) in cardShadow's absolute
++          // coordinates, so the bands are placed against those.
++          x: card.x - cardShadow.clipLeft - e
++          y: card.y - cardShadow.clipTop - e + cardShadow.drop
++          width: card.width + 2 * e
++          height: card.height + 2 * e - cardShadow.drop
++          radius: card.radius + e
++          color: "transparent"
++          border.width: cardShadow.band
++          border.color: Qt.rgba(0, 0, 0, modelData)
++        }
++      }
++    }
 +  }
 +
    BorderSurface {
@@ -654,7 +720,7 @@ index dea93a4c..96b26b69 100644
              root.incomingBackground = ""
              root.oldBackground = ""
 diff --git a/shell/plugins/bar/Bar.qml b/shell/plugins/bar/Bar.qml
-index be9fece4..415fb273 100644
+index be9fece4..e979f2b9 100644
 --- a/shell/plugins/bar/Bar.qml
 +++ b/shell/plugins/bar/Bar.qml
 @@ -1,7 +1,7 @@
@@ -1352,7 +1418,7 @@ index be9fece4..415fb273 100644
      }
  
      anchors {
-@@ -1263,11 +1342,76 @@ Item {
+@@ -1263,11 +1342,86 @@ Item {
  
      implicitWidth: root.vertical ? root.barSize : 0
      implicitHeight: root.vertical ? 0 : root.barSize
@@ -1427,10 +1493,20 @@ index be9fece4..415fb273 100644
 +      Behavior on opacity { NumberAnimation { duration: 420; easing.type: Easing.InOutCubic } }
 +    }
 +
++    Rectangle {
++      id: barTopHighlight
++      visible: !root.transparent
++      x: root.vertical ? 0 : Math.round(root.effectiveCornerRadius)
++      y: root.vertical ? Math.round(root.effectiveCornerRadius) : 0
++      width: root.vertical ? 1 : Math.max(0, parent.width - Math.round(root.effectiveCornerRadius) * 2)
++      height: root.vertical ? Math.max(0, parent.height - Math.round(root.effectiveCornerRadius) * 2) : 1
++      color: Qt.rgba(root.barForeground.r, root.barForeground.g, root.barForeground.b, 0.10)
++    }
++
      Loader {
        anchors.fill: parent
        sourceComponent: root.vertical ? verticalBar : horizontalBar
-@@ -1335,9 +1479,14 @@ Item {
+@@ -1335,9 +1489,14 @@ Item {
  
          Text {
            id: tooltipLabel
@@ -1446,7 +1522,7 @@ index be9fece4..415fb273 100644
            color: Color.tooltip.text
            font.family: root.fontFamily
            font.pixelSize: Style.font.body
-@@ -1778,9 +1927,6 @@ Item {
+@@ -1778,9 +1937,6 @@ Item {
      readonly property string moduleName: root.entryId(entry)
      readonly property var moduleSettings: root.entrySettings(entry)
      readonly property string customType: root.customModuleType(entry)
@@ -1456,7 +1532,7 @@ index be9fece4..415fb273 100644
      // Re-evaluate when the registry mutates (Component reference changes,
      // plugin enabled/disabled, etc.). Reading the `widgets` property creates
      // the binding dependency — the wrapped function call alone wouldn't.
-@@ -1999,8 +2145,7 @@ Item {
+@@ -1999,8 +2155,7 @@ Item {
      function injectProps() {
        var target = activeItem
        if (!target) return
