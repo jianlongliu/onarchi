@@ -39,7 +39,7 @@
   与两个新文件 `LICENSE`、`UPSTREAM.md`，共 +6 文件；`shell/plugins/bar/widgets/Workspaces.qml` 的 niri 适配（`Hyprland.*`→`Niri.*`）
   仍在这份补丁里（合并时该文件一度被插件那份覆盖回上游写法、与基线逐字节相同，2026-10-04 当天恢复，见 `docs/omarchy-on-niri-port.md` §3.2）
   —— 上面起步名单里那两个 bar 文件同属 `shell/plugins/bar/`。
-  ——这 33 个文件正是 `niri.patch` 的内容（**33 个文件 / 105 hunk / 2956 行**，md5 `2cea1e9517bd498df185e02414595bc8`，2026-10-04 合并后核；
+  ——这 33 个文件正是 `niri.patch` 的内容（**33 个文件 / 106 hunk / 3022 行**，md5 `bcb5aca36ace33d829c6773da7026801`，2026-10-05 核；105 hunk / 2956 行那版为 md5 `2cea1e9517bd498df185e02414595bc8`（2026-10-04 合并浮空 bar）；
   合并前为 27 个文件 / 82 hunk、md5 `cdc361f9f534e16dd9043ac21c3ce352`；
   2026-09-30 为 27 文件 / 81 hunk、md5 `3c672ab5…`；2026-09-27 为 26 文件 / 77 hunk；
   2026-09-26 为 24 文件 / 72 hunk；

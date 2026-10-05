@@ -19,7 +19,7 @@ git apply --reverse --check ~/.config/omarchy/niri-port/plugin-patches/<id>.patc
 **`charlieras262.floating-bar.patch` retired 2026-10-04** — it used to carry the floating bar's niri
 adaptation (rounded `blurRegion`, boot reveal, frost inset by 2px). The bar is no longer a plugin: those
 files now live in `$OMARCHY_PATH/shell/plugins/bar/`, loaded as the built-in `omarchy.bar`, and the whole
-change rides in `niri-port/niri.patch` (33 files / 105 hunks, md5 `2cea1e9517bd498df185e02414595bc8`) —
+change rides in `niri-port/niri.patch` (33 files / 106 hunks, md5 `bcb5aca36ace33d829c6773da7026801`) —
 `omarchy-niri-repatch` replays it, so no hand `git apply` is needed. The retired patch and the old plugin
 directory are in `~/.local/state/backups/.config/omarchy/niri-port-plugin-patches-charlieras262.floating-bar.patch.bak-20261004-barmrege`
 and `~/.local/state/backups/.config/omarchy/plugins/charlieras262.floating-bar.bak-20261004-barmrege`;

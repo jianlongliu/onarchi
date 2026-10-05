@@ -808,7 +808,7 @@ Omarchy 有两层配置，只有层1在 niri 上真正生效：
       （`git diff -- <niri.patch 里那 24 个路径>`）⇒ **24 文件 / 62 → 72 hunk**，新 md5
       `e6868080f48c5f7cd1711a22e163de86`（`--reverse --check` 通过；旧版 `4ec279cf…` 已退役）。
       注意 `omarchy-niri-repatch` **只负责重放、不会重生成**补丁文件。
-      ⚠ **2026-09-27 已被 §8 第 39/40 条那版超过**：**26 文件 / 77 hunk**、md5 `22dd2334c2210d91618b9ad903d3cbc2`（那条只加了 ante 的 5 个 hunk；`e6868080…` 这一版的 72 hunk 于是变成中间版本）。⚠ **2026-09-30 再被 §8.7 那版超过**：**27 文件 / 81 hunk**、md5 `3c672ab5…`（那条加 `bin/omarchy-update`：CLI `omarchy update` 委派给 `~/bin` 垫片）。⚠ **2026-10-04 再被 §8 第 43 条那版超过**：**27 文件 / 82 hunk**、md5 `cdc361f9f534e16dd9043ac21c3ce352`（那条加 `shell/Ui/KeyboardPanel.qml` 的卡片投影，1 hunk）。⚠ **2026-10-04 晚些再被 §8.11 那版超过**：**33 文件 / 105 hunk / 2956 行**、md5 `2cea1e9517bd498df185e02414595bc8`（合并浮空 bar：`shell/plugins/bar/` 6 个路径 + 新文件 `LICENSE`/`UPSTREAM.md`，见 `docs/plugins.md` §5.4）。
+      ⚠ **2026-09-27 已被 §8 第 39/40 条那版超过**：**26 文件 / 77 hunk**、md5 `22dd2334c2210d91618b9ad903d3cbc2`（那条只加了 ante 的 5 个 hunk；`e6868080…` 这一版的 72 hunk 于是变成中间版本）。⚠ **2026-09-30 再被 §8.7 那版超过**：**27 文件 / 81 hunk**、md5 `3c672ab5…`（那条加 `bin/omarchy-update`：CLI `omarchy update` 委派给 `~/bin` 垫片）。⚠ **2026-10-04 再被 §8 第 43 条那版超过**：**27 文件 / 82 hunk**、md5 `cdc361f9f534e16dd9043ac21c3ce352`（那条加 `shell/Ui/KeyboardPanel.qml` 的卡片投影，1 hunk）。⚠ **2026-10-04 晚些再被 §8.11 那版超过**：**33 文件 / 105 hunk / 2956 行**、md5 `2cea1e9517bd498df185e02414595bc8`（合并浮空 bar：`shell/plugins/bar/` 6 个路径 + 新文件 `LICENSE`/`UPSTREAM.md`，见 `docs/plugins.md` §5.4）。⚠ **2026-10-05 再被 §8 第 45 条那版超过**：**33 文件 / 106 hunk / 3022 行**、md5 `bcb5aca36ace33d829c6773da7026801`（加 `shell/plugins/menu/Menu.qml` 的卡片投影，1 hunk）。
 
 39. **Setup > Security 新增 "Paru (AUR)" 开关：paru 的执行位就是本机 AUR 的总开关（2026-09-27）**
     - **是什么**：菜单 Security 区多一条 `Paru (AUR)`，切换 `/usr/bin/paru` 的执行位。**执行位即总开关**：本机 AUR
@@ -868,8 +868,11 @@ Omarchy 有两层配置，只有层1在 niri 上真正生效：
       **27 文件 / 81 hunk**、md5 `3c672ab5…`（那条加 `bin/omarchy-update`：CLI `omarchy update` 委派给 `~/bin` 垫片）。
       ⚠ 2026-10-04 晚些再被 §8.11 那版超过：**33 文件 / 105 hunk / 2956 行**、md5 `2cea1e9517bd498df185e02414595bc8`
       （合并浮空 bar，见 `docs/plugins.md` §5.4）。
+      ⚠ 2026-10-05 再被 §8 第 45 条那版超过：**33 文件 / 106 hunk / 3022 行**、md5 `bcb5aca36ace33d829c6773da7026801`（加 `shell/plugins/menu/Menu.qml` 的卡片投影，1 hunk；当天按 bar 的实测剖面把 alpha 分布调过一轮，行数 3016→3022、hunk 数不变）。
 
 - 43. **窗口与卡片的投影 + 圆角统一 12（2026-10-03/04）**：正文在 `docs/visual.md`（= `§8 第 43 条`）——niri `shadow` 块开、`KeyboardPanel` 加 `RectangularShadow` 给全部状态栏弹层、圆角统一到 12（删 shell.json 的 `bar.cornerRadius`）
+
+- 45. **menu 卡片投影（自己画：外圈渐降圆角带 + MultiEffect 模糊）+ 关掉全屏 `menu.scrim` 压暗（2026-10-05）**：正文在 `docs/visual.md`（= `§8 第 45 条`）——`shell/plugins/menu/Menu.qml` 的 `card` 前加投影，**不能用 `RectangularShadow`**：它是实心模糊矩形、会垫在只有 45% 不透明的卡片底下，把卡片压成黑玻璃（卡片内部实测 52 → 22）；也**不能用直角渐变带**：两端是硬切、亮底上一眼一块灰方块（最大阶跃 56，现版 ≤4）。正解=`band 4` 的 **12 条**同心圆角带（alpha `0.40/0.27/0.21/0.18/0.12/0.09/0.05/0.03/0.02/0.012/0.008/0.005`，铺满 48 逻辑像素）整体过一遍 `MultiEffect{blurEnabled}`，宿主留 `pad 68`；**alpha 是照 bar 的实测剖面标定的**（把 bar 的 niri `shadow` 颜色临时改 `#00000000` + `niri msg action load-config-file`，`α=1-on/off` 量出峰值 0.346–0.363、~48 逻辑像素归零；第一版 8 段在同距离上高 0.04–0.066 才显得比 bar 重），终稿 t≥7 起逐点差 ≤0.015；判画法好坏用沙盒（`qml6` 起整屏窗口 + `grabToImage`，量内部压暗 / alpha 剖面 / 横线最大阶跃）。**`[menu] background-alpha` 本来就是 0.45、与 `[bar]` 同值（三档实测有效 alpha 0.449），不是它的问题**；同日 `~/.config/omarchy/shell.toml` 的 `[menu] scrim-alpha` 0.5 → **0**（bar 没有这一层；热生效，验法＝开/关菜单两张图在卡片外逐块差恰好 0.00）
 
 41. **vantage 退休并公开归档（2026-09-27）**
     - **四功能归位**：`res` 分辨率切换 → **弃用**（交给 Monitor 面板；代码里 `DISPLAY_LOCKED = true` 保持屏蔽）；

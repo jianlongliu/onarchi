@@ -2114,18 +2114,20 @@ index 5c002402..5fbeb0c0 100644
                    smooth: true
                  }
 diff --git a/shell/plugins/menu/Menu.qml b/shell/plugins/menu/Menu.qml
-index aa879c18..95fc7352 100644
+index aa879c18..53060e8d 100644
 --- a/shell/plugins/menu/Menu.qml
 +++ b/shell/plugins/menu/Menu.qml
-@@ -1,6 +1,7 @@
+@@ -1,7 +1,9 @@
  import Quickshell
  import Quickshell.Io
  import Quickshell.Wayland
 +import Quickshell.Wayland._BackgroundEffect
  import QtQuick
++import QtQuick.Effects
  import qs.Commons
  import qs.Ui
-@@ -251,6 +252,14 @@ Item {
+ import "MenuModel.js" as MenuModel
+@@ -251,6 +253,14 @@ Item {
      root.items = mergedMenu.items
      root.itemOrder = mergedMenu.itemOrder
      root.rowsLoaded = true
@@ -2140,7 +2142,7 @@ index aa879c18..95fc7352 100644
      root.evaluateGuards()
      if (root.opened) {
        root.rebuildDisplay()
-@@ -981,6 +990,30 @@ Item {
+@@ -981,6 +991,30 @@ Item {
      onFileChanged: reload()
    }
  
@@ -2171,7 +2173,7 @@ index aa879c18..95fc7352 100644
    // ---------------------------------------------------------------- guards
    //
    // `when:` (visibility) and `checked:` (✓ marker) are bash expressions the
-@@ -1072,6 +1105,11 @@ Item {
+@@ -1072,6 +1106,11 @@ Item {
      WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
      exclusionMode: ExclusionMode.Ignore
  
@@ -2183,6 +2185,70 @@ index aa879c18..95fc7352 100644
      // The card opens centered exactly as always. The first search keystroke
      // or submenu move freezes the top line where it currently sits — from
      // then on the card grows and shrinks downward instead of re-centering
+@@ -1100,6 +1139,63 @@ Item {
+       onClicked: root.cancel()
+     }
+ 
++    // Drop shadow for the card, painted only *outside* it. Three traps here:
++    //  1. A filled RectangularShadow is a blurred rectangle, so it also paints
++    //     under the card -- and the card's fill is only ~45% opaque, so the
++    //     shadow showed through and the card rendered as black glass
++    //     (measured 2026-10-05: the backdrop under the card dropped 52 -> 22
++    //     luma over a dark terminal, 185 -> 100 over the wallpaper).
++    //  2. Straight gradient strips are rectangles: their ends are hard cuts,
++    //     so over a bright wallpaper a crisp grey block appeared next to the
++    //     card's corner (measured step 56 luma; the bands below give <5).
++    //  3. Shifting the whole ring down by `drop` leaves a lit 4px gap between
++    //     the card and its shadow (alpha 0.01 -> 0.06 -> 0.33 just below the
++    //     card) which reads as a second edge. The ring has to hug the card;
++    //     only its *outer* reach gets the offset.
++    // So: twelve disjoint rounded-rect bands whose alpha follows the bar's own
++    // measured falloff (niri's ^omarchy-bar$ shadow: peak 0.363 at the surface
++    // edge, gone by ~48 logical px), blurred by MultiEffect so the band steps
++    // become one continuous falloff. Nothing is ever painted inside the card's
++    // rect, so the interior cannot darken.
++    Item {
++      id: cardShadow
++      readonly property int band: 4                  // band width, logical px
++      readonly property int drop: 4                  // how far it hangs below
++      readonly property int pad: 68                  // room for the blur to fade
++      // Sampled off the bar's profile every `band` logical px; the ~8% is
++      // compensation for the blur flattening the innermost peak.
++      readonly property var alphas: [0.40, 0.27, 0.21, 0.18, 0.12, 0.09,
++                                     0.05, 0.03, 0.02, 0.012, 0.008, 0.005]
++      x: card.x - pad
++      y: card.y - pad
++      width: card.width + pad * 2
++      height: card.height + pad * 2
++      opacity: card.opacity
++      layer.enabled: true
++      layer.effect: MultiEffect {
++        blurEnabled: true
++        blur: 0.22
++        blurMax: 40
++      }
++
++      Repeater {
++        model: cardShadow.alphas
++        Rectangle {
++          required property int index
++          required property var modelData
++          readonly property real e: (index + 1) * cardShadow.band
++          x: cardShadow.pad - e
++          y: cardShadow.pad - e + cardShadow.drop
++          width: card.width + 2 * e
++          height: card.height + 2 * e - cardShadow.drop
++          radius: card.radius + e
++          color: "transparent"
++          border.width: cardShadow.band
++          border.color: Qt.rgba(0, 0, 0, modelData)
++        }
++      }
++    }
++
+     BorderSurface {
+       id: card
+       width: root.cardWidth
 diff --git a/shell/plugins/notifications/Service.qml b/shell/plugins/notifications/Service.qml
 index 0122310e..39d5556f 100644
 --- a/shell/plugins/notifications/Service.qml
