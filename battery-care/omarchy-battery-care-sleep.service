@@ -1,0 +1,18 @@
+[Unit]
+Description=Release any in-flight battery force-discharge before sleeping
+# While the machine is suspended the discharge loop cannot run, so an armed
+# force-discharge would keep draining the pack on AC with nothing to stop it at
+# the threshold. Disarm on the way into sleep; the loop re-arms after resume if
+# the pack is still above a protective stop.
+Before=sleep.target
+StopWhenUnneeded=yes
+# Nothing to release on a machine without the capability.
+ConditionPathExists=/sys/class/power_supply/BAT0/charge_behaviour
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/omarchy-battery-care --release
+
+[Install]
+WantedBy=sleep.target

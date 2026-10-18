@@ -1,0 +1,298 @@
+#!/bin/bash
+# omarchy-battery-care -- hold the pack at the protective charge threshold.
+#
+# Why this exists
+# ---------------
+# TLP charge thresholds are a hysteresis loop, not a fill-to level: charging is
+# allowed below START, stopped at or above STOP, and nothing happens in between.
+# The EC only ever *stops* charging -- it never discharges. So a pack once charged
+# above STOP stays there. A one-shot `tlp setcharge 95 100` ("Full" in the battery
+# panel) takes it to 100%; selecting Protect writes 75/80 back but leaves the
+# charge where it is, so the machine then sits at 99% on AC indefinitely -- the
+# state the thresholds exist to avoid. Self-discharge is ~1-3%/month, so waiting
+# it out is not a plan.
+#
+# This does the one thing TLP will not: on AC, with a protective STOP and a charge
+# level above it, it turns on the pack's own force-discharge until the level falls
+# back to STOP -- no unplugging, no progress bar to watch.
+#
+# The discharge needs an active brake
+# -----------------------------------
+# `force-discharge` does NOT stop at charge_control_end_threshold. The threshold
+# is honoured in `auto` only: the kernel ABI documents start/stop thresholds as
+# charge-scoped ("above which charging will stop") and ties "respect thresholds"
+# to `auto`; the ThinkPad battery hook just calls ACPI BDSS on the HKEY handle
+# with no threshold operand and never monitors the result; TLP's own FAQ says the
+# thresholds "do not exercise any control over the discharging of the battery".
+# So with force-discharge selected, *this script is the brake* -- that is why it
+# is a resident loop rather than a fire-and-forget one-shot, and why the brake is
+# duplicated:
+#
+#   1. the loop re-reads sysfs every tick, so the stop happens within a tick
+#   2. traps on EXIT/INT/TERM write `auto` (normal stop and ^C)
+#   3. ExecStopPost runs `--release` as a second, independent cleanup
+#   4. omarchy-battery-care-sleep.service releases it before suspend -- while the
+#      machine is suspended this loop cannot run at all, so an in-flight discharge
+#      must not be left armed across sleep
+#   5. Restart=always: a crash resumes correcting within RestartSec
+#   6. UPower's critical-battery action is the last-resort OS floor
+#
+# A one-shot design was rejected for a related reason: `tlp discharge` (the
+# obvious alternative) blocks and polls internally but only ever traps SIGINT, so
+# a SIGKILL would leave force-discharge armed with nothing left to end it.
+# ExecStopPost was measured on this machine and does NOT run after a SIGKILL.
+#
+# What it refuses to do
+# --------------------
+# charge_behaviour is only touched while the STOP threshold sits in the protective
+# band (PROTECT_MIN_STOP..PROTECT_MAX_STOP). The panel's Full preset (95-100) is
+# above it, so choosing Full both cancels an in-flight discharge and keeps this
+# out of the way until Protect is chosen again. The floor matters too: a pair like
+# START=0 STOP=0 (a real convention meaning "no start threshold") would otherwise
+# read as "fall to 0%". Unplugging stops it as well.
+#
+#   omarchy-battery-care             reconcile once, then exit
+#   omarchy-battery-care --daemon    resident loop (what the unit runs)
+#   omarchy-battery-care --release   force-discharge off, unconditionally
+#   omarchy-battery-care --status    print the decision, change nothing
+#   omarchy-battery-care --dry-run   say what it would write, change nothing
+#
+# Tuning is by environment (see the unit's Environment= lines).
+
+set -u
+
+SYSFS=${OMARCHY_BATTERY_SYSFS:-/sys/class/power_supply}
+# Protective band for the STOP threshold. Inside it, a charge level above STOP
+# means the pack is parked where the thresholds were meant to prevent.
+PROTECT_MIN_STOP=${OMARCHY_BATTERY_PROTECT_MIN_STOP:-50}
+PROTECT_MAX_STOP=${OMARCHY_BATTERY_PROTECT_MAX_STOP:-80}
+# Poll intervals: cheap while idle, tight while current is actually flowing so
+# the target is not overshot (5 s ~= 0.06% at this machine's discharge rate).
+IDLE_TICK=${OMARCHY_BATTERY_IDLE_TICK:-30}
+ACTIVE_TICK=${OMARCHY_BATTERY_ACTIVE_TICK:-5}
+
+mode=run
+dry=0
+verbose=0
+while (($#)); do
+  case $1 in
+  --daemon) mode=daemon ;;
+  --release) mode=release ;;
+  --status) mode=status ;;
+  --dry-run) dry=1 ;;
+  --verbose) verbose=1 ;;
+  --help | -h)
+    # Print this script's own leading comment block (up to the first blank line
+    # after it), so the help text never drifts out of sync with the header.
+    awk 'NR>1 && /^#!/ {next} NR>1 { if (/^[^#]/) exit; sub(/^# ?/,""); print }' "$0"
+    exit 0
+    ;;
+  *)
+    printf 'omarchy-battery-care: unknown option: %s\n' "$1" >&2
+    exit 2
+    ;;
+  esac
+  shift
+done
+
+log() { printf 'omarchy-battery-care: %s\n' "$*" >&2; }
+
+read_uint() { # file -> integer on stdout, empty if absent or not an integer
+  local v
+  [[ -r $1 ]] || return 0
+  v=$(<"$1")
+  [[ $v =~ ^[0-9]+$ ]] && printf '%s' "$v"
+}
+
+# First present battery wins; this chassis has exactly one (BAT0).
+find_battery() {
+  local d
+  bat=""
+  for d in "$SYSFS"/*; do
+    [[ -r $d/type ]] || continue
+    [[ $(<"$d/type") == Battery ]] || continue
+    bat=$d
+    break
+  done
+}
+
+# Read from the Mains supply rather than UPower: no D-Bus, no session, and it is
+# the same signal TLP's own check_ac_power uses.
+ac_is_online() {
+  local d
+  for d in "$SYSFS"/*; do
+    [[ -r $d/type && -r $d/online ]] || continue
+    [[ $(<"$d/type") == Mains ]] || continue
+    [[ $(<"$d/online") == 1 ]] && return 0
+  done
+  return 1
+}
+
+# ---- state -----------------------------------------------------------------
+# Globals: bat soc start stop supports active want
+snapshot() {
+  find_battery
+  if [[ -z $bat ]]; then
+    return 1
+  fi
+  soc=$(read_uint "$bat/capacity")                         # integer percent
+  start=$(read_uint "$bat/charge_control_start_threshold")  # may not exist
+  stop=$(read_uint "$bat/charge_control_end_threshold")     # on all threshold hw
+
+  # Guard with -r rather than an inline `|| true`: bash only optimises the bare
+  # $(<file) form into a read, so `$(<file 2>/dev/null || true)` silently yields
+  # the empty string (measured here) and every decision below would then read as
+  # "no discharge support". Kernel 5.17+ only.
+  behaviour=""
+  [[ -r $bat/charge_behaviour ]] && behaviour=$(<"$bat/charge_behaviour")
+
+  # Capability and current selection share one file, and the kernel brackets
+  # whichever option is active: "auto [inhibit-charge] force-discharge" (measured
+  # here). Every real rendering contains "[", so the second clause only fires for
+  # a tree that omits brackets -- it resolves toward "active" on purpose, because
+  # misreading that way can only miss an *enable*, while the stop path
+  # (`!want && active`) still fires. Erring the other way could skip a stop.
+  supports=0
+  [[ $behaviour == *force-discharge* ]] && supports=1
+  active=0
+  if [[ $behaviour == *"[force-discharge]"* ]]; then
+    active=1
+  elif [[ $behaviour != *"["* && $behaviour == *force-discharge* ]]; then
+    active=1
+  fi
+
+  ac=0
+  ac_is_online && ac=1
+
+  # Discharge only when all four hold. No usable threshold or level means either
+  # the hardware cannot do this or the data is untrustworthy -- both are "leave
+  # alone".
+  want=0
+  if [[ -n $stop && -n $soc ]] && ((ac)) && ((supports)) \
+    && ((stop >= PROTECT_MIN_STOP)) && ((stop <= PROTECT_MAX_STOP)) \
+    && ((soc > stop)); then
+    want=1
+  fi
+  return 0
+}
+
+write_behaviour() { # force-discharge | auto
+  printf '%s\n' "$1" >"$bat/charge_behaviour"
+}
+
+release() { # brake: disarm, whatever the current verdict is
+  snapshot || return 0
+  ((active)) || return 0
+  if ((dry)); then
+    log "would release force-discharge"
+    return 0
+  fi
+  write_behaviour auto && log "released force-discharge (${soc}%, range ${start}-${stop}%)"
+}
+
+# ---- one reconcile step ----------------------------------------------------
+# Prints the action taken: enabled | released | none | error
+reconcile() {
+  snapshot || {
+    echo none
+    return 0
+  }
+  if [[ -z $stop || -z $soc ]]; then
+    ((verbose)) && log "no usable charge threshold on ${bat##*/}"
+    echo none
+    return 0
+  fi
+
+  if ((want)) && ((!active)); then
+    if ((dry)); then
+      log "would enable force-discharge: at ${soc}%, falling to ${stop}% on AC"
+      echo enabled
+      return 0
+    fi
+    if write_behaviour force-discharge; then
+      log "enabled force-discharge: ${soc}% -> ${stop}% (range ${start}-${stop}%)"
+      echo enabled
+    else
+      log "could not enable force-discharge on $bat"
+      echo error
+    fi
+    return 0
+  fi
+
+  if ((!want)) && ((active)); then
+    if ((dry)); then
+      log "would release force-discharge"
+      echo released
+      return 0
+    fi
+    if write_behaviour auto; then
+      log "released force-discharge: at ${soc}%, ac ${ac}, range ${start}-${stop}%"
+      echo released
+    else
+      log "could not release force-discharge on $bat"
+      echo error
+    fi
+    return 0
+  fi
+
+  ((verbose)) && log "nothing to do: ${soc}%, stop ${stop}%, ac ${ac}, discharge ${active}"
+  echo none
+}
+
+# ---- modes -----------------------------------------------------------------
+case $mode in
+status)
+  if ! snapshot; then
+    printf 'battery          = none\n'
+    exit 0
+  fi
+  printf 'battery          = %s\n' "${bat##*/}"
+  printf 'charge range     = %s-%s%%\n' "${start:-?}" "${stop:-?}"
+  printf 'charge level     = %s%%\n' "${soc:-?}"
+  printf 'ac online        = %s\n' "$ac"
+  printf 'force-discharge  = %s (capability %s)\n' \
+    "$(((active)) && echo on || echo off)" \
+    "$(((supports)) && echo yes || echo no)"
+  decision="leave alone"
+  ((want)) && decision="discharge back to ${stop}%"
+  printf 'decision         = %s\n' "$decision"
+  exit 0
+  ;;
+
+release)
+  # Unconditional disarm. Safe to call when nothing is armed.
+  release
+  exit 0
+  ;;
+
+run)
+  reconcile >/dev/null
+  exit 0
+  ;;
+
+daemon) ;;
+esac
+
+# ---- resident loop ---------------------------------------------------------
+# The loop holds the brake. Nothing here may leave force-discharge armed on the
+# way out, so cleanup is on EXIT (which INT/TERM also reach).
+cleaned=0
+on_exit() {
+  ((cleaned)) && return 0
+  cleaned=1
+  release
+}
+trap on_exit EXIT
+trap 'exit 0' INT TERM
+
+log "started (idle tick ${IDLE_TICK}s, active tick ${ACTIVE_TICK}s)"
+while :; do
+  action=$(reconcile)
+  case $action in
+  # sleep in the foreground: EXIT/INT/TERM are handled promptly by bash between
+  # commands, and a tick is seconds, so no signal dance is needed.
+  enabled) sleep "$ACTIVE_TICK" ;;
+  released) sleep "$IDLE_TICK" ;;
+  *) sleep "$IDLE_TICK" ;;
+  esac
+done

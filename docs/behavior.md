@@ -38,6 +38,7 @@
 - 41. **vantage 退休并公开归档（2026-09-27）**：自写 TUI `~/Projects/vantage` 的四个功能全部搬进菜单/面板后，用户要求"推到远程仓库、标记归档、二进制发 release、先脱敏"⇒ `github.com/jianlongliu/vantage`（**PUBLIC + 已归档**），release `v2026.8.19` 挂由该 tag 源码构建的 `vantage-x86_64-linux-gnu` + `.sha256`；README 精简成退休说明、`.gitignore` 照抄本仓库基线、commit 用 noreply 身份；⚠ **归档前必须先建 release**（归档后只读）、`gh release create` 里的 `<file>#<name>` 那个 `#` 是 label 不是文件名
 
 - 42. **通用剪贴板 `Super+C/V/X` + 终端里复制/剪切的 OSD 卡片（2026-09-27）**：niri 抓键（`binds.kdl` 三条 `spawn-sh "omarchy-universal-clipboard copy|paste|cut"`），垫片按焦点窗口注入——终端 → `Ctrl+Insert`/`Shift+Insert`，其他 → `Ctrl+C/V`，剪切恒 `Ctrl+X`（上游 Hyprland 靠 `send_key_state`，niri 只能 spawn ⇒ 自造 uinput 注入器 `omarchy-sendkeys`、零安装）；终端里复制/剪切额外弹一次**壳层 OSD 卡片**（`omarchy-osd`，关机/重启同款）——ghostty 自己的 `app-notifications = clipboard-copy` 走 libnotify 吐司、在本机根本不显示，所以那边保持关闭。机制、两条硬约束（注入设备必须声明 1..248 全段键码、物理按住的 SUPER 会并进和弦）、≈0.45 s/键 与验法见 `docs/shims.md`「通用剪贴板垫片」（= `§8 第 42 条`）
+- 47. **omarchy-battery-care：把"停在阈值之上"的电自动放回 STOP（2026-10-17）**：装置在仓库 `battery-care/`（脚本 + 两个 systemd 单元 + `install.sh` + `README.md` + 契约测试）。解决的问题＝滞环只决定"以后充不充"，EC 只停充**不放电** ⇒ 用过 Full(95–100) 再切回 Protect(75/80) 后包停在 99% 插着电不动（自放电 ~1–3%/月）。判据、冗余刹车与实测见 §8 第 47 条正文
 
 ---
 
@@ -895,6 +896,48 @@ Omarchy 有两层配置，只有层1在 niri 上真正生效：
       `~/.config/vantage/config.json`、`~/.zshrc` 第 130–140 行那段 `# >>> vantage agent launcher` 的 `a()` 函数
       （**自包含**：读 `config.json` 再裸起 agent，不依赖那个二进制）、`~/.zshrc.bak-vantage`。
       **没有任何菜单项/键位还在调 vantage**（只有 `~/.config/niri/monitor.kdl` 一句注释提到它，历史说明，保留）。
+
+47. **omarchy-battery-care：把"停在阈值之上"的电自动放回 STOP（2026-10-17）**
+    - **是什么**：装置在仓库 `battery-care/`（`omarchy-battery-care` 脚本 + `omarchy-battery-care.service`
+      + `omarchy-battery-care-sleep.service` + `install.sh` + `README.md` + `tests/`）。装成 root 属主真副本：
+      `/usr/local/sbin/omarchy-battery-care`、`/etc/systemd/system/omarchy-battery-care{,-sleep}.service`、
+      `/usr/local/share/omarchy-battery-care/README.md`。**无需新 polkit 规则**（由 systemd 以 root 拉起；
+      阈值写入沿用 `49-tlp.rules`）。
+    - **要解决的问题**（与 §8 第 38 条同一族）：滞环只决定"以后充不充"，**EC 只停充、不放电** ⇒ 用过
+      Full(95–100) 再切回 Protect(75/80) 后，包停在 99% 插着电不动（自放电 ~1–3 %/月）。TLP 自己解决不了，
+      它的 FAQ 明写阈值"**do not exercise any control over the discharging of the battery**"。
+    - **决定形态的技术事实（这条决定了为什么不是"写一次就走"）**：**`force-discharge` 不会在
+      `charge_control_end_threshold` 自己停**。内核 ABI 把 start/stop 记为**充电语义**（"above which
+      charging will stop"）且把 "respect thresholds" 只绑给 `auto`；ThinkPad 侧走
+      `drivers/platform/x86/lenovo/thinkpad_acpi.c` 的 ACPI **`BDSS`**（get `BDSG`，HKEY handle），
+      **不传阈值、也不监控结果**；`drivers/acpi/battery.c` 里根本没有 `charge_behaviour` 代码
+      （旧路径 `drivers/platform/x86/thinkpad_acpi.c` 已移走）。⇒ **放电一开，刹车只可能是自己的循环**；
+      没刹住就会**插着电一路放到 0%**。所以：常驻循环**就是刹车**（放电中 5 s / 空闲 30 s 重读 sysfs，
+      5 s ≈ 0.06%）。
+    - **冗余刹车 6 层**：①循环每 tick 重读 sysfs ②`EXIT/INT/TERM` trap 写 `auto` ③
+      `ExecStopPost=… --release` ④`omarchy-battery-care-sleep.service`（`Before=sleep.target`；**睡时循环跑不了**）
+      ⑤`Restart=always`（5 s）⑥UPower 临界动作兜底。**已知缺口如实记录**：SIGKILL 能绕过 trap，且**本机实测
+      `ExecStopPost` 在 SIGKILL 后不执行**（用一个真单元 + `systemctl --user kill --signal=KILL` 验的：
+      `SuccessExitStatus=SIGKILL` 也不能让它跑）⇒ 被 SIGKILL 的守护可能留下 armed，由 ③④ 与"下次 tick
+      重新推导"收敛。**同一实验否掉了 `tlp discharge` 当守护**：它内部 poll 但**只 trap INT**。
+    - **闸门＝阈值本身**（保护带 `PROTECT_MIN_STOP=50`..`PROTECT_MAX_STOP=80`）：只在 STOP 落在带内才碰
+      `charge_behaviour`。**点 Full(95–100) 自动让路**（带外）——既取消进行中的放电（否则充电起不来、看着像
+      Full 失灵），又不与之打架；下限挡 `STOP=0` 那种"无 start 阈值"约定（否则会被读成"放到 0%"）；
+      未插电一律不放电，已 armed 的会 disarm。**面板不需要新按钮**，纯靠阈值状态驱动。
+    - **实测（真机，2026-10-17）**：①手动武装 `force-discharge` → 守护循环 **60 s 内自己收回**
+      （`released force-discharge: at 53%, ac 1, range 75-80%`，日志与 sysfs 双向对上）②Full 档下判
+      `leave alone`、不干预 ③**正向全流程**：89% 时切回 75/80 → 循环 **12 s 内自动武装**，89→88→…→81→80
+      全程 `status=Discharging`，**触 80% 当拍自动释放**（`released force-discharge: at 80%`），
+      **触后 2 分钟稳在 80%（未越过到 79%）**——正是缺刹车时不会发生的事。④`systemd-analyze verify`
+      两个单元 0 错（**这个命令值得当单元 lint 用**：它抓到我把 `ConditionPathExists` 写进了 `[Service]`）。
+      ⑤契约测试 **47 检查全绿**（假 sysfs，不碰真硬件；含 SIGKILL 缺口那条，如实断言而非假装闭合）。
+    - **回退**：`pkexec bash ~/Projects/omarchy-on-niri/battery-care/install.sh --remove`（先 disarm 再删）。
+      **改仓库后必须重跑 `install.sh`**（装的是 root 属主真副本，不是指回用户可写树的软链——同 §5 那条理由），
+      `omarchy update` 不会刷新它。暂停：`touch /etc/omarchy-battery-care-off && systemctl restart omarchy-battery-care`。
+    - **写脚本时踩到的坑（可复用）**：`$(<file 2>/dev/null || true)` **恒为空**——`|| true` 破坏了 bash 的
+      `$(<file)` 读特例（实测三种写法对照）；要判可读性就 `[[ -r f ]] && v=$(<f)`。顶层 `case` 分支里写
+      `local` ⇒ `can only be used in a function` 且**在输出中途崩**（后面几行不打印）。**一条消息里并发两条
+      `pkexec` 会双双静默挂死**（本次复现：监视与一条 pkexec 并发，两条都挂到被我 kill）。
 
 ---
 

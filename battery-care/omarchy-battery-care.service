@@ -1,0 +1,34 @@
+[Unit]
+Description=Hold the battery at the protective charge threshold (discharge above it)
+Documentation=file:///usr/local/share/omarchy-battery-care/README.md
+# Only meaningful where the pack exposes both a charge threshold and the kernel's
+# force-discharge capability (kernel >= 5.17). On a machine without them the
+# script exits by itself, so this is a keep-the-unit-honest guard, not a hard
+# requirement -- but a unit that can never do anything should not run at all.
+ConditionPathExists=/sys/class/power_supply/BAT0/charge_behaviour
+ConditionPathExists=/sys/class/power_supply/BAT0/charge_control_end_threshold
+# Off switch, same convention as the other omarchy units on this machine.
+ConditionPathExists=!/etc/omarchy-battery-care-off
+
+[Service]
+Type=exec
+# Resident loop, not a one-shot: force-discharge does not stop at the end
+# threshold by itself (the kernel sends no threshold with it), so this loop *is*
+# the brake. See the script header.
+ExecStart=/usr/local/sbin/omarchy-battery-care --daemon
+# Second cleanup path, independent of the script's own EXIT trap. It cannot help
+# against SIGKILL (measured: ExecStopPost does not run after one), which is why
+# the loop also re-derives its decision every tick -- but it does cover the
+# ordinary stop/restart path, where it is the one guaranteed disarm.
+ExecStopPost=/usr/local/sbin/omarchy-battery-care --release
+# A crash must resume correcting rather than silently leaving a discharge armed.
+Restart=always
+RestartSec=5
+# Releasing before suspend is handled by omarchy-battery-care-sleep.service: while
+# the machine is asleep this loop cannot run, and an armed discharge with no brake
+# would keep draining on AC.
+Nice=10
+IOSchedulingClass=idle
+
+[Install]
+WantedBy=multi-user.target
