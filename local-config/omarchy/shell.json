@@ -24,12 +24,6 @@
         },
         {
           "id": "jianlongliu.workspaces"
-        },
-        {
-          "id": "meviusisback.ai-subs",
-          "barDisplay": "Icon",
-          "defaultSub": "commandcode",
-          "refreshIntervalSec": 900
         }
       ],
       "right": [
@@ -40,7 +34,11 @@
           ]
         },
         {
-          "id": "jrmmhm.pocket"
+          "id": "flux"
+        },
+        {
+          "id": "jrmmhm.pocket",
+          "members": "flux"
         },
         {
           "id": "ronald.input-sources",

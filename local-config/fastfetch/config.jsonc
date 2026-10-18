@@ -67,16 +67,15 @@
       "format": "\u001b[90m┌──────────────────────Software──────────────────────┐"
     },
     {
-      "type": "command",
+      "type": "os",
       "key": "\ue900 OS",
-      "keyColor": "blue",
-      "text": "version=$(omarchy-version) && echo \"Omarchy $version\""
+      "keyColor": "blue"
     },
     {
       "type": "command",
       "key": "│ ├󰘬",
       "keyColor": "blue",
-      "text": "omarchy-version-branch"
+      "text": "version=$(omarchy-version); echo \"omarchy $version · $(omarchy-version-branch)\""
     },
     {
       "type": "command",

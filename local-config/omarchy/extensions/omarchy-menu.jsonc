@@ -75,9 +75,18 @@
   "update.config.plymouth": {"icon":"󱣴","label":"Plymouth","when":"false"},
   "update.config.shell": {"icon":"󰍜","label":"Shell","when":"false"},
 
+  // 2026-09-27 文案按规范重写（用户："pacman 和 AUR 那文字描述太潦草，遵循 omarchy 设计规范"）：
+  //   Entry schema 见 `$OMARCHY_PATH/docs/menu.md` —— `label` 是行标题，取与同菜单其它行同构的
+  //   名词短语（对照 Firmware / Timezone / Extra Themes / Plugins；工具名不等于"要更新的对象"）；
+  //   `description` 是规范里唯一的描述字段，**只在搜索时**显示在行下，并参与搜索（平时不显示）。
+  //   ⚠ 它的匹配是 `MenuModel.termInSearchWords`：按空白切成词后**精确相等**才算命中，所以别写
+  //     `(pacman -Syu)` 这类带括号/标点的写法 —— 那样搜 "pacman" 永远匹配不到（label / leaf id
+  //     那一侧走的才是子串匹配）。
+  //   ⇒ update.omarchy 由 "Pacman" 改为 "System"（动作依旧 = 垫片 sudo pacman -Syu），
+  //     update.aur 由 "AUR" 改为 "AUR Packages"，三条一起补齐 description。
   // 2026-09-22 用户要求：Update 菜单把 "Omarchy" 改成 "Pacman"，并新增 AUR / Plugins 两条更新入口。
   //   三行都走演示终端包装器（本机 2026-09-22 实测：窗口起得来、`tty`=/dev/pts/N、sudo 能弹密码框）。
-  //   update.omarchy 只改显示：label 换 "Pacman"、图标换成 Arch 那枚、iconFont 清空（不清会继续用 omarchy
+  //   update.omarchy 只改显示：label 见 2026-09-27 那条（现为 "System"）、图标换成 Arch 那枚、iconFont 清空（不清会继续用 omarchy
   //     品牌字体渲染这枚普通 Nerd Font 字形）——动作仍原样裸调 `omarchy-update`，即 ~/bin 垫片 = sudo pacman -Syu
   //     （与 bar 的 system-update 部件同一条路；想更直白就把 action 换成 'sudo pacman -Syu'）。
   //   update.aur = paru -Sua（本机 paru v2.1.0 在位；AUR 另有 ~/bin/yay 垫片，此处按用户要求用 paru）。
@@ -85,9 +94,9 @@
   //     3 个带本地 patch（charlieras262.floating-bar / meviusisback.ai-subs / ronald.input-sources）=> 上游改了同一文件时
   //     `git merge --ff-only` 会拒绝并报 "you have local changes"，需要手工重放 plugin-patches。
   //   注：新增 id 按合并规则**追加在 Update 子菜单末尾**（"Time" 之后）；override 无法改位置，要挪只能改默认文件。
-  "update.omarchy": {"icon":"󰣇","iconFont":"","label":"Pacman","action":"omarchy-launch-floating-terminal-with-presentation omarchy-update"},
-  "update.aur": {"icon":"󰣇","label":"AUR","when":"omarchy-setup-security-paru --enabled","action":"omarchy-launch-floating-terminal-with-presentation 'paru -Sua'"},
-  "update.plugins": {"icon":"󰐱","label":"Plugins","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy plugin update'"},
+  "update.omarchy": {"icon":"󰣇","iconFont":"","label":"System","description":"Update all system packages with pacman","action":"omarchy-launch-floating-terminal-with-presentation omarchy-update"},
+  "update.aur": {"icon":"󰣇","label":"AUR Packages","description":"Update AUR packages with paru","when":"omarchy-setup-security-paru --enabled","action":"omarchy-launch-floating-terminal-with-presentation 'paru -Sua'"},
+  "update.plugins": {"icon":"󰐱","label":"Plugins","description":"Update cloned shell plugins with git","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy plugin update'"},
 
   // 2026-09-22 续（用户"你继续"）：Update 面板逐行体检 —— 只多出一条同 §8 第 27 条性质的死行，一并隐藏。
   //   update.password.drive（Drive Encryption）：脚本第一句 blkid -t TYPE=crypto_LUKS 本机命中 0 个（无 LUKS，理由同 §8 第 27 条
