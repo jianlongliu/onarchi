@@ -16,6 +16,7 @@
 - 8.13 上游小更新（`d174d4a` → `8675600`，2026-09-19）
 - 8.20 上游 sudo 安全机制：代码已合入、机制未启用（2026-09-27）
 - 8.21 上游 shell 层的取舍：只跟 `Color.qml` 的颜色环修复（2026-09-27）
+- 8.22 上游单条挑拣：壳层四条（2026-10-19）
 - 16. **GitHub 发布流程（2026-08-25 建立）**：移植差分推到 pub 仓库
 - 8. **A+C 落地 / 更新覆盖层（2026-08-24）**：本节最后两项。
 
@@ -296,6 +297,61 @@ git restore --source=HEAD --worktree -- \
 
 丢的是"等于上游的内容"，无损；`bin/omarchy-remove-ai-hermes` **不在本次范围内**（它属于 Hermes 主题，
 本机那处 150+/56- 的改动是"自动关闭 Hermes"那批，本次没跟）。
+
+---
+
+### 8.22 上游单条挑拣：壳层四条（2026-10-19）
+
+上游 `quattro` 停在 2026-10-18（`e3eea45e`），本机基线还在 2026-09-19（`60663faf`），
+相隔 575 提交。**不做 FF**（`niri.patch` 33 个文件里 23 个在 quattro tip 上已经套不上，属于
+"重做移植层"，见本卷 §8.21 的立场）。这里只从差额里挑**能干净套上、又打在本机真实痛点上**的单条。
+
+**是什么（挑中 4 条）**
+
+| 提交 | 内容 | 落点 |
+| --- | --- | --- |
+| `47e86a27` | 壳启动时回收无主的插件目录 watcher（Quickshell 停止时不带走 Process 子进程，每次重启漏一个 `inotifywait` 挂到 init；上游一台机器攒到 79 个） | `shell/services/PluginRegistry.qml`（+31） |
+| `d1a614ce` | 锁状态改为**读当前值**而非缓存绑定：绑定漏一次通知会在解锁后仍报 locked；挂起前发出的锁请求被判成已完成而永不锁屏 | `shell/plugins/lock/Service.qml`（+14/-7） |
+| `754d2d04` | 只回收**无主**的会话锁：Hyprland 允许任意客户端接管已持有的锁，第二个壳会把真壳的活锁判成孤儿抢走，退出后把会话甩在 failsafe 后面；新 helper 在还有别的 locker 时返回 undetermined | `lock/Service.qml`（+7/-3）+ 新脚本 `bin/omarchy-hyprland-session-lock-stranded`（+19） |
+| `6e15d76a` | 锁屏密码框丢弃按键自动重复（唤醒 DPMS 熄灭的显示器会让 compositor 卡数秒，唤醒键的释放迟到，客户端连发把那个字符灌满密码框；Backspace/Delete 保留） | `shell/plugins/lock/LockView.qml`（+12） |
+
+**机制**：watcher 回收用 `pgrep -f '[i]notifywait -m -r …'` 找进程，再读 `/proc/<pid>/cmdline`
+**整参数**比对 `pluginsDir`（子串匹配会误伤 `plugins-backup` 的 watcher），父进程 `comm` 不是
+`quickshell`/`qs` 才杀；另加 `Component.onDestruction` 管优雅停止那条路。锁的 undetermined
+约定是退出码：`0` 有锁、`1` 没锁、`2` 说不准（调用方**继续问**，不是当没锁）。
+
+**niri 侧适配核验**：新 helper 靠 `pgrep -u $UID -x 'quickshell|qs|hyprlock'` 判断"还有别的
+locker"，niri 下成立——本机壳进程名就是 `quickshell`（实测匹配到 pid），`hyprlock` 不存在正好
+等于"没有第二个 locker"。它转调的 `omarchy-hyprland-session-locked` 由 `~/bin/hyprctl` 垫片
+支撑（垫片把 logind `LockedHint` 翻成 `solitaryBlockedBy: ["LOCK"]`）。
+
+**为什么只挑这 4 条**：只碰**不在 `niri.patch` 路径表**里的文件（`grep '^diff --git'` 可查），
+所以补丁 md5 不动、不加重重放负担。其余 575 条里，bar 拖拽/分段（`b7e900ce`）、每显示器工作区
+（`f2bd3cef`）、多语言（`84cfb939`）都撞补丁或撞本机配置；`62c5165d`（CJK 语言标签字体）对
+`LANG=en_US.UTF-8` 无用且本机已有 `60-cjk-fallback.conf`；`879d6583`/`76557733`（fprintd 指纹
+解锁）不适用——本机锁屏走 howdy 人脸；`0b5f8275`（power 面板 `close()` 改 `Qt.callLater`）
+**主动不跟**：那个分支只在 `!batteryPresent` 时进，本机有 `BAT0`，等于零收益的补丁负担。
+
+**验证（2026-10-19 实测）**
+
+- 上游自带测试 4 条全绿：`test/shell.d/{plugin-watcher-reap,lock-autorepeat,lock-stranded-recovery,hyprland-session-lock-stranded}-test.sh`
+  （逐条 `bash` 跑，最短的 watcher 回收那条验了三件事：杀掉孤儿、放过同名目录的 watcher、放过活壳的 watcher）。
+- `runtime-smoke-test.sh` 通过（bar/面板/克隆部件 IPC 无回归）。
+- 真机：重启前有 1 个孤儿 watcher（pid 2172，父进程 init）→ `omarchy-restart-shell` 后**该 pid 消失**，
+  新 watcher 的 ppid 指向壳进程；`omarchy-shell shell ping` → `ok`；`omarchy-shell lock status`
+  → `{"locked":false,…,"passwordPam":true,"face":true}`；`omarchy-hyprland-session-locked` 返回 1
+  （未锁，正确）；壳日志只剩移植版常态的 `quickshell.hyprland.ipc` ServerNotFound。
+- `git apply --reverse --check ~/.config/omarchy/niri-port/niri.patch` 仍通过（移植层完整），
+  补丁 md5 仍是 `f6ef5a467795e2bd6f1ccf14161b185e`（本轮没碰补丁内文件）。
+
+**回退**：三条已跟踪文件 `git restore --source=HEAD --worktree -- shell/plugins/lock/Service.qml
+shell/plugins/lock/LockView.qml shell/services/PluginRegistry.qml`，再删
+`bin/omarchy-hyprland-session-lock-stranded` 与 4 个新测试文件，然后 `omarchy-restart-shell`。
+改动前的副本在 `~/.local/state/backups/.local/share/omarchy/`（后缀 `.bak-20261019-pick4`）。
+
+**FF 后果（与 §8.20/§8.21 那批同类）**：这 3 个已跟踪文件从此是"本地内容 ≠ 上游内容"，上游若改到它们
+`git pull --ff-only` 会中止。届时按同一办法处理：先 `git restore --source=HEAD` 丢回本地上游内容
+（新脚本与测试文件是未跟踪/新增，不受影响），FF 完再用上面的 `git apply` 命令重放这 4 条。
 
 ---
 
