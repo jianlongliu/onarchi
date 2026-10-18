@@ -623,10 +623,15 @@ false` 让 niri 把焦点环画在窗口**周围**而非背后，问题解决（
 | `§8 第 36 条` | About 窗口（fastfetch TUI）的磨砂与尺寸 | `docs/visual.md`（2026-09-24 从 34 让号，见该条末尾） |
 | `§8 第 37 条` | 浮动工具窗"太黑"：alpha 没用、旋钮是底色 | `docs/visual.md`（**还没定稿**，三个选项在 `docs/todo.md` 等拍板表） |
 | `§8 第 38 条` | 电池面板加 CHARGE LIMIT 档位切换（`pkexec tlp setcharge`，只写运行时） | `docs/behavior.md` |
+| `§8 第 39 条` | Paru Security 开关（root 属主 helper + 只放行该 program 的 pkexec 规则） | `docs/behavior.md` |
+| `§8 第 40 条` | ante 进菜单的"默认 agent"列表（`omarchy-default-agent` / `omarchy-agent` 两条分支） | `docs/behavior.md` |
+| `§8 第 41 条` | vantage 退休并公开归档（`github.com/jianlongliu/vantage`） | `docs/behavior.md`、`docs/migration.md` |
 | `§8 第 42 条` | 通用剪贴板 `Super+C/V/X`（垫片注入）+ 终端复制/剪切的 OSD 卡片 | `docs/shims.md`（目录行在 `docs/behavior.md`） |
 | `§8 第 43 条` | 窗口与卡片的投影（niri `shadow` + `KeyboardPanel` 自画的卡片外环带投影）+ 圆角统一 12 | `docs/visual.md` |
 | `§8 第 45 条` | menu 卡片投影（**自己画**：`band 4` 的 12 条同心圆角带 alpha `0.40/0.27/0.21/0.18/0.12/0.09/0.05/0.03/0.02/0.012/0.008/0.005`（=48 逻辑像素，照 bar 的实测剖面标定）过 `MultiEffect` 模糊，宿主留 `pad 68`；`RectangularShadow` 垫底会把半透明卡片压黑 52→22，直角渐变带会留硬边灰方块 56）+ 关掉全屏 `menu.scrim` 压暗（`scrim-alpha = 0`；`[menu] background-alpha` 本就跟 `[bar]` 同值 0.45） | `docs/visual.md` |
 | `§8 第 44 条` | 浮动 bar 端帽的硬边（真因＝niri 霜化遮罩无抗锯齿 ⇒ 把霜化区域内缩 2px）+ 两条更正（quickshell 支持 fractional scale / bar 无霜化） | `docs/visual.md` |
+| `§8 第 46 条` | "UI 很平、浮不起来"：bar 顶边高光 / 面更透 / 窗口双边框（三条杠杆里做了能量出的两条，影子没动） | `docs/visual.md` |
+| `§8 第 47 条` | omarchy-battery-care：把"停在充电阈值之上"的电自动放回 STOP（常驻循环就是放电的刹车） | `docs/behavior.md`（源件 `battery-care/`） |
 | `§8.6` | A 层 | `docs/behavior.md` |
 | `§8.7` | 更新覆盖层 | `docs/upstream.md` |
 | `§8.8` | 视觉磨砂 | `docs/visual.md` |
@@ -641,12 +646,16 @@ false` 让 niri 把焦点环画在窗口**周围**而非背后，问题解决（
 | `§8.17` | 输入源徽章 | `docs/behavior.md` |
 | `§8.18` | 锁屏"不能锁" | `docs/lock.md` |
 | `§8.19` | 全桌面字号 / DPI 一致性 | `docs/visual.md` |
+| `§8.20` | 上游 sudo 安全机制（代码已合入、机制未启用） | `docs/upstream.md` |
+| `§8.21` | 上游 shell 层取舍：只跟 `Color.qml` 颜色环修复 | `docs/upstream.md` |
+| `§8.22` | 上游单条挑拣：壳层四条（watcher 回收 / 锁状态 / 无主锁 / 密码框去重复） | `docs/upstream.md` |
 
 > 注：`§8 第 34 条` 曾在 2026-09-23 被 `About 窗口` 与 `AUR 助手 yay → paru 垫片` 同时占用（两条都没登记本表）；
 > 2026-09-24 定案：About 让号改 **36**，34 归垫片。**加新条目先扫全库取号、再登记本表。**
 > 2026-09-27 补记：`§8 第 39 条`（Paru Security 开关）、`§8 第 40 条`（ante 进默认 agent 列表）、
-> `§8 第 41 条`（vantage 退休归档）目前只在 `docs/behavior.md` / `docs/migration.md` 的目录行里出现，
-> 本表没登记 —— 补登记时以各卷正文为准，**别重新取号**。
+> `§8 第 41 条`（vantage 退休归档）当时只在 `docs/behavior.md` / `docs/migration.md` 的目录行里出现，
+> 本表没登记 —— **2026-10-19 已按各卷正文补登（未重新取号）**，同时补登了 `§8 第 46 条`、`§8 第 47 条`
+> 与 `§8.20`–`§8.22`。今后加条目仍须先扫全库取号、再登记本表。
 
 ### 未决项速查（还没做的）
 
