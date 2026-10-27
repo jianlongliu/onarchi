@@ -273,6 +273,15 @@
 | `/etc/polkit-1/rules.d/49-paru.rules` | **放行 `/usr/bin/omarchy-setup-security-paru` 的 pkexec**（2026-09-27 装，见 `behavior.md` §8 第 39 条；**源件已入档**：仓库 `etc/polkit-1/rules.d/49-paru.rules`，同日起 `49-tlp.rules` 也在那儿入档，`/tmp` 那份是易失的）：`org.freedesktop.policykit.exec` + `action.lookup("program") == "/usr/bin/omarchy-setup-security-paru"` + `subject.isInGroup("wheel")` → `polkit.Result.YES`。**刻意没放行 `/usr/bin/chmod`**：vantage 原实现是 `pkexec chmod ±x /usr/bin/paru`，那等于要求放行 chmod 本体（wheel 无密码改任意文件权限 ⇒ `chmod u+s` 就地提权），所以换成"root 属主 helper + 只放行该 helper 这一个 program" | `pkexec rm /etc/polkit-1/rules.d/49-paru.rules`（**改前本机没有这个文件**）。删掉后点菜单里的 Paru 开关会报 `Failed to change paru's permissions.`；脚本自己的 `--status`/`--enabled` 查询不受影响（菜单的勾选状态照旧显示）。⚠ **`/etc/polkit-1/rules.d` 是 `750 root:polkitd`** ⇒ 普通用户 `[ -e <某规则> ]` 永远为假，**别拿它当"文件不存在"的证据**（要确认装没装得用 `sudo ls -l`，或看目录 mtime 变没变） |
 | `/usr/lib/firmware/edid/CSO1411.bin`（+ `/etc/kernel/cmdline` 的 `drm.edid_firmware=eDP-1:edid/CSO1411.bin`、`/etc/mkinitcpio.conf` 的 `FILES=(… /lib/firmware/edid/CSO1411.bin …)`） | **面板 EDID 覆盖件**（256 B = base + CTA 扩展）。`pacman -Qo` 查过**无包拥有**（包升级不会覆盖）；靠 `FILES=` 打进 initramfs、靠 cmdline 在 i915 之前加载 ⇒ **改动后必须 `pkexec mkinitcpio -P` + 重启**才生效（本机 systemd-boot + UKI + Secure Boot，**没有**"启动菜单里临时删参数"这条路）。**2026-09-26 逐字节核过**：现行件（md5 `bd15a152…`）相对 `/data/App/firmware/CSO1411.bin.backup.20260722_235519`（`6ad0583a…`）**只差 19 字节**，全在 base 块描述符区 —— ① 加了一条 **DTD2 = 2560×1600@59.97**（`cvt -r` 268.5 MHz，"均衡档"那条模式）② 水平范围从 **149–149 kHz 放宽到 80–250 kHz**（旧件把行频钉死在 4K 那一条上；不放宽则任何自定义模式都判不合法）③ 描述符区重排 + 校验和。CTA 块（HDR 静态元数据 / AMD FreeSync 40–60）逐字节相同。⚠ **存疑**：用户记得注入件是"强制 8bit 色深"，但**两份 base 的"每通道位深"字段都写着 8bpc**（原厂原始值机器上已无副本可查）⇒ "注入 EDID = 钉 8bpc"在字节层面**没有证据**，别当结论用；"10bpc 花屏"本身是用户实测事实 | `pkexec cp ~/.local/state/backups/usr/lib/firmware/edid/CSO1411.bin.bak-20260926 /usr/lib/firmware/edid/CSO1411.bin && pkexec mkinitcpio -P`，重启生效（备份 2026-09-26 补的，与在用件同 md5；`/data/App/firmware/` 另有两份**旧件**副本，拿它回退会丢掉 DTD2 那条 1600p 模式）。屏幕万一黑：Ctrl+Alt+F3 进 TTY，走同一条 `cp` + `mkinitcpio -P` + 重启 |
 | `/etc/pacman.conf` | **`IgnorePkg` 钉住 Qt 6.12 相关的一批包（2026-10-10 起，临时项）**：`qt6-{base,declarative,shadertools,5compat,svg,wayland,translations,imageformats,multimedia,multimedia-ffmpeg}` + `qt6ct fcitx5-qt quickshell` + `opencv python-opencv vtk`。原因：**Qt 6.12 下 `MultiEffect` 的模糊整体失效**（验法：`qml6` 沙盒里一个 `MultiEffect{blurEnabled:true; blur:0.6}`，6.12 是硬边、6.11.2 有真模糊）⇒ 浮动 bar 与 omarchy menu 画成**精确 (0,0,0) 的不透明黑**。前 13 个必须一起降（`qt6ct`/`fcitx5-qt`/`quickshell` 是 **Qt 插件提供方**，Qt 会拒载版本不匹配的插件）；`opencv`/`python-opencv`/`vtk` 是**连带项**——`opencv 5.0.0-13`、`vtk 9.7.1-1` 都是按 6.12 编的，只降 qt6 不清它们会在**动态链接期**挂符号（`libopencv_highgui.so.500` 缺 `QVariant(QString&&)`、`libopencv_viz.so.500` 缺 `vtkImplicitArray::SetValueEx`）。外显症状长得很像「锁屏人脸（howdy）凭空消失」：其实 PAM 照样跑 `omarchy-lock-face`，只是 `compare.py` 的 `import cv2` 立刻死 ⇒ `Error while authenticating: "System error" (code 4)`。**别信界面**，判据是 `journalctl -t omarchy-shell \| grep -A3 omarchy-lock-face` 里的 traceback，或直接 `python3 -c "import cv2"`。**同类残留没处理**：`krita` 与 KDE 系 `-2` 重编包（用户 2026-10-10 拍板：不用 krita ⇒ 不降）。`/etc/pacman.conf` 是 `pacman` 包的文件，本机这份改过 ⇒ 将来 pacman 包升级会落 `.pacnew`、不会静默覆盖。核对现状：`pacman-conf IgnorePkg` 应列出这 16 个，`pacman -Qu` 里它们显示 `[ignored]` | **要恢复跟踪 Qt 6.12**：删掉那行 `IgnorePkg`（连同它上面那三行说明注释）+ `pacman -Syu`，并把 `opencv`/`python-opencv`/`vtk` 一起解开；若将来某个包声明 `qt6-base>=6.12`，`-Syu` 会直接报依赖错误（那是要重新评估的信号，不是静默出错）。降级前的原样备份：`~/.local/state/backups/etc/pacman.conf.bak-20261010`（**没有** `IgnorePkg` 那几行）；本次两步的中间态在 `/etc/pacman.conf.bak-20261010-180352`（只有 13 个 qt 项）与 `/etc/pacman.conf.bak-vtk-20261010-182853`（已含 opencv/python-opencv） |
+**Qt 6.12 是否已可解钉（2026-10-28 复查，结论：仍不建议）**：上游确实有一个 Qt 6.12 相关提交
+`b83d3df08 "Qualify shell palette references for Qt 6.12 (#14553)"`（已在本机 HEAD），但看 diff 它**只改 QML
+的 palette 限定名**（`Commons.Color.xxx` 一类语法兼容），**不是** `MultiEffect` 模糊渲染的修复。
+`git log 60663faf..HEAD --grep='blur\|MultiEffect'` 也没有针对性提交。基线实测：Qt 6.11.2 下
+`qml6` 跑 `MultiEffect{blurEnabled:true; blur:1.0; blurMax:48}`，水平剖面 150 个采样点里 **104 个是中间调**
+（有真实渐变），模糊正常。**要验证 6.12 只能真升**：16 个 `[ignored]` 包必须一起动
+（`qt6-*` 全家 + `quickshell` + `qt6ct` + `fcitx5-qt` + `opencv` + `vtk`，Qt 插件版本必须匹配，
+vtk/opencv 是按 6.12 编的、不一起升会在动态链接期挂符号）。可逆（`IgnorePkg` 那行有备份、pacman 缓存里有旧包），
+但过程中 bar/menu 可能黑屏。**建议单独立项，不要在其它改动收尾时顺带做。**
 
 - 换主题/壁纸后同步到登录页：`sudo split-greeter-sync "$USER"`（还有实验账户时要一起列）。
 - 登录页切换是唯一会把自己锁在外面的步骤，所以 `split-greeter/install.sh` **故意不碰 `config.toml`**。
@@ -538,6 +547,20 @@ cp /tmp/niri.patch ~/.config/omarchy/niri-port/niri.patch              # 重放�
       两者都无 → 打印跳过、无外部包 → 跳过 AUR。委派验证：`$OMARCHY_PATH/bin/omarchy-update -h` 打印的是**垫片**用法
       （= 委派生效），而 `omarchy update --help` 仍是 dispatcher 帮助。⚠ 桩目录别把真 `~/bin` 留在 PATH 里，
       否则 paru 缺失时会回落到 `~/bin/yay` 垫片 → **真 paru**（2026-09-30 初测踩到；`sudo` 被桩掉所以没真升级）。
+    - **别给垫片加 `SUDO_ASKPASS` / `sudo -A` / 前置 `sudo true` 授权（2026-10-28 试过、已回退）**：起因是
+      `omarchy menu → Update → System` 点下去"卡一阵就没了"，看着像截断。我据此判成"菜单那条路径没 tty、
+      sudo 读不到密码"，于是给垫片加了 askpass 前置授权 + `sudo -n pacman -Syu`。**实测全是负收益**：
+      ① `/etc/pam.d/sudo` 首行是 `auth sufficient pam_fprintd.so forward_pass`，无 tty 时指纹永远等不到人、
+      **实测 47 秒**才超时，之后才轮到密码 —— 这段等待在加了 askpass 后照旧存在；
+      ② 一旦 `prepare_askpass` 找到 `/usr/lib/ssh/x11-ssh-askpass` 就强制 `-A`，反而把**真终端里的正常
+      指纹/密码提示抢走**，然后 `sudo -n` 直接判死，用户看到的是 `sudo: a password is required` +
+      `omarchy-update: sudo 授权没有生效`——比原版更坏；
+      ③ `x11-ssh-askpass` 装在 `/usr/lib/ssh/` 而**不是** `/usr/bin/`，按 `pacman -Ql` 之外的习惯路径写会找不到；
+      `gcr4-ssh-askpass` 明确拒绝直接运行（"this program is not meant to be run directly"）。
+      **用户原话「以前就是让我按手指」** ⇒ 真终端里 PAM 链路本来正常，那个"卡"是菜单路径特有的等待，
+      不该用改垫片的方式绕。**回退方式**：`cp ~/Projects/onarchi/port-bin/omarchy-update ~/bin/omarchy-update`
+      （现在这份就是原版，`grep -c 'authorize_update\|ASKPASS'` 应为 0）。真要走图形 askpass，
+      正确姿势是给 sudo 单独配一套 PAM 服务名（不含 fprintd 那行），**不是**往垫片里塞 `-A`。
       **真机决定性验证（2026-09-30 16:17，用户从菜单跑的，当时 AUR 段还是 `-Su`）**：四段依次执行、无报错 —— repo 段
       `there is nothing to do`、AUR 段**确实带上了 AUR**（升了 `herdr-bin 0.9.3`；也正是这次跑出来的证据说明
       `-Su` 会先做一遍 "Starting full system upgrade" 的 repo 段 —— 与第一段重复，故当晚改成 `-Sua`）、

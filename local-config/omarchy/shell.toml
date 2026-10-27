@@ -2,7 +2,9 @@
 base-size = 14
 
 [bar]
-size-horizontal = 32
+# 32 → 34（2026-10-22）：bar 加厚一档。实际值是 size × 字体缩放（base-size 14 ⇒ ×7/6），
+# 32→37 逻辑像素、34→40。
+size-horizontal = 34
 size-vertical = 34
 background-alpha = 0.32
 # 内置部件的图标与数字字号（上游默认 13）。降到 12 = 跟 bar 上的纯文本（[font] base-size 12）

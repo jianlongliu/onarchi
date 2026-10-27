@@ -5,7 +5,7 @@
 #      必须自己声明，否则汉字会落到系统排序的任意 CJK 字体上。
 # font-family = FiraCode Nerd Font Mono
 font-family = "GoogleSansCode Nerd Font"
-font-family = "Noto Sans CJK SC"
+font-family = "GoogleSansCode Nerd Font"
 font-style = Regular
 font-size = 11
 

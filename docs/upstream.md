@@ -17,6 +17,7 @@
 - 8.20 上游 sudo 安全机制：代码已合入、机制未启用（2026-09-27）
 - 8.21 上游 shell 层的取舍：只跟 `Color.qml` 的颜色环修复（2026-09-27）
 - 8.22 上游单条挑拣：壳层四条（2026-10-19）
+- 8.23 全量 FF 到 `bc220e70`（2026-10-28）：846 提交、32 冲突、补丁失效
 - 16. **GitHub 发布流程（2026-08-25 建立）**：移植差分推到 pub 仓库
 - 8. **A+C 落地 / 更新覆盖层（2026-08-24）**：本节最后两项。
 
@@ -297,6 +298,131 @@ git restore --source=HEAD --worktree -- \
 
 丢的是"等于上游的内容"，无损；`bin/omarchy-remove-ai-hermes` **不在本次范围内**（它属于 Hermes 主题，
 本机那处 150+/56- 的改动是"自动关闭 Hermes"那批，本次没跟）。
+
+---
+
+### 8.23 全量 FF 到 `bc220e70`（2026-10-28）
+
+**这是第一次真做全量合并**：§8.20–8.22 那几轮都是"只挑能干净套上的单条"，理由是补丁 33
+个文件里 23 个在 quattro tip 上套不上。这次不挑了——直接把 846 个提交吃进来，然后把移植层
+按上游的新结构重做。
+
+**规模**（`60663faf` → `bc220e70`，2026-09-19 → 2026-10-27）：846 提交、4121 个文件、
++472k/−24k 行；`bin/` 459→558 条命令，`migrations/` 122→211（新增 91 条，33 条要 root），
+shell 新增 `dock` / `elsewhen` / `remote-session` / `panels/*` 十来个插件，`bar/Bar.qml`
+从 2076 行重写到 3184 行。上游**依然完全没有 niri 支持**（`shell`/`bin` 里 grep `niri` 命中 0），
+Hyprland 耦合反而加重：19 文件 54 处 → 26 文件 118 处，且配置分发改成 Lua（`hl.dsp.*`）。
+
+**流程**（真机 `~/.local/share/omarchy`，先打 snapper 快照 `root` #2474 / `home` #1229）：
+
+```bash
+git reset -q                                   # 索引里有个空 blob 的 bar/LICENSE，会挡 stash
+git stash push -m "pre-ff-bc220e70"            # 只 stash 已跟踪改动
+git status --porcelain | awk '$1=="??"{print $2}'   # 未跟踪文件先备份再逐条判断
+git merge --ff-only FETCH_HEAD                 # 与上游同路径的未跟踪文件要先移走，否则 abort
+git stash pop                                  # 冲突集中在这一步
+```
+
+**冲突分布**：32 个 `UU` + 30 个主题删除 `UD` + 4 个 `DU`（`omarchy-system-{logout,reboot,shutdown}`
+被上游合并成 `omarchy-system`，`test/shell.d/lock-stranded-recovery-test.sh` 上游已有）。
+
+| 类别 | 条数 | 处置 |
+|---|---|---|
+| 主题删除（只留 `catppuccin`） | 34 | `git rm --cached` + `rm`，与 §8.7 那 238 条同一条线 |
+| 本地内容来自上游历史（§8.20 sudo 那批） | 10 | `git checkout --theirs`，判据＝`git rev-list 60663faf..up/quattro -- <file>` 的 blob 里能找到本地那份 |
+| `omarchy-system-*` 三个脚本 | 3 | 删掉，把 4 行 niri 守卫移进上游新的 `omarchy-system` |
+| 真实移植冲突 | 19 | 逐个人工合 |
+
+**关键取舍（用户拍板：浮动 bar / monitor 分辨率 / size / 电池阈值保留，纯装饰可丢）**
+
+| 项 | 结果 |
+|---|---|
+| 浮动 bar（浮空 + 圆角 + blur） | **保留**，移植进上游新结构（`barStrip` 加 floatGap 边距 + `BackgroundEffect.blurRegion`） |
+| monitor 分辨率滑块 | **全保留**，自动合并干净（上游完全没有这套，235 行零丢失） |
+| size（`[bar] icon-font` 等） | **退役**——上游 `Style.qml` 已原生支持 `icon-font`/`icon-slot`/`icon-canvas`/`status-slot`，还多了 `notch-height`/`icon-size`，我们的补丁成了子集 |
+| 电池阈值（sysfs 优先） | **保留**，并吸收上游改进（用 UPower 解析出的电池路径，不再 BAT* glob） |
+| bar 霜化以外装饰（投影 / 高光 / 圆角统一 12） | **丢弃**，接受上游覆盖 |
+| menu / 通知 / OSD 的霜化 | menu 补回（见 `docs/visual.md` §47）；通知与 OSD 随上游结构变化放弃 |
+
+**上游 tip 对新 `OverlayWindow` 的依赖**（这是合并后最容易漏的一处）：`shell/Ui/OverlayWindow.qml`
+是**上游新增文件**，所有 overlay 类面板（menu / OSD / clipboard / image-picker）都改用它，而它
+用 `Hyprland.monitors.values` 与 `Hyprland.focusedMonitor` 判断 `contentReady`，在 niri 上恒为空
+⇒ `targetMonitor == null` ⇒ `contentItem.opacity` 永远是 0 ⇒ **面板画出来但看不见**。改成
+`Niri.monitors` / `Niri.focusedMonitor` 后恢复。
+
+**`Niri.qml` 要补的 API**（从 186 行扩到 358 行）：`monitors`、`monitorFor(screen)`、`toplevels`、
+`refreshMonitors/Workspaces/Toplevels`、`dispatch(expression)`（同时认 `hl.dsp.*` 与
+`o.workspaces.focus(...)` 两种写法）。两个数据形状的坑：
+
+- `niri msg -j outputs` 返回的是**对象**（`{"eDP-1":{…}}`），不是 `workspaces`/`windows` 那样的数组 ——
+  按数组写 `data.length` 是 `undefined`，循环一次都不跑，monitor 全 `width:0`
+- `current_mode` 是**索引**，真实分辨率在 `modes[current_mode]`；scale 在 `logical.scale`
+
+**验证**：938 个 bash 脚本 `bash -n` 全过；400 个 shell QML `qmllint` 0 错；真机重启后
+`qs ipc call shell ping` → `ok`、`omarchy-menu ping` → `ok`；bar 浮动+圆角+霜化实测（带内 12/12
+采样点不同）；菜单 10 项全部渲染；电池 `Holding at 75-80%`；monitor 5 档完整。
+
+**补丁已重导出（2026-10-28）**：`niri.patch` 现在是 **30 文件 / 136 hunk / 3355 行、md5 `9797a9374011ad25ac5875c92bff043b`**，两项检查都过：
+
+- `git apply --reverse --check` → 通过（patch 精确等于当前工作区）
+- 在纯净 `HEAD`（`bc220e70`）的 `git archive` 副本上 `git apply --check` → 通过（更新后可重放）
+
+**导出时剔掉了 10 个"假改动"**：`bin/omarchy-{channel-set,refresh-pacman,restart-shell,sudo-passwordless,update-restart,update-stay-awake}`、
+`config/omarchy/hooks/pre-refresh-pacman.d/add-custom-repo.sample`、`docs/update-process.md`、`manual/48-security.md` ——
+它们在合并时用 `checkout --theirs` 拿成了 FETCH_HEAD 的内容，而 HEAD 已经是同一个 commit，于是显示成 dirty。
+判据：`git hash-object <file>` 的结果能在 `git rev-list HEAD -- <file>` 的某个 `c:<file>` 里找到 ⇒ 内容是上游历史的一份，不是本机改动。
+已 `git checkout HEAD --` 全部还原。**下次导补丁前先跑这个判据**，否则会把降级残留当成移植层背下去。
+
+**路径表变化**（相对上一版 33 文件）：移除 `shell/plugins/notifications/Service.qml`（上游改成窄条带表面，我们的
+`blurRegion` 依赖的 `popupColumn` 已不存在，采用上游版）、`bin/omarchy-system-{logout,reboot,shutdown}`（合进 `omarchy-system`）、
+`shell/plugins/bar/{LICENSE,UPSTREAM.md}`（上游删除）；新增 `bin/omarchy-launch-shell`、
+`shell/Ui/OverlayWindow.qml`（niri 适配）、`test/shell.d/launch-shell-test.sh`。
+`shell/Commons/Niri.qml` 仍是未跟踪文件，`omarchy-niri-repatch` 单独 `cp`（`$OVL/Niri.qml` 已同步为 358 行新版）。
+
+**幂等性与重放都已验**：`omarchy-niri-repatch` 报 `overlay already applied`（exit 0）；在纯净 HEAD 副本上
+`cp Niri.qml` + `git apply niri.patch` 后，`OverlayWindow.qml` 的 4 处 `Niri.`、`Menu.qml` 的 2 处 `BackgroundEffect`、
+`Bar.qml` 的 `exclusiveZone: thickness + root.floatGap` 全部在位。
+
+**迁移进度（2026-10-28，未完）**：FF 后 `omarchy-migrate --pending` 有 **91 条**（仓库 211 条 − 已标 121 条 + 我们自己的 `1788163635`）。
+按 §8.9.3 的老规矩「全部标已跑、只摘该跑的」，先分了类：
+
+| 类别 | 条数 | 处置 |
+|---|---|---|
+| 要 root（含 `pkexec`/`pacman -S`/`bootctl`/`limine`/`mkinitcpio`） | 33 | **不执行**。绝大多数是 N1x / ASUS ProArt / aarch64 / Limine / systemd-boot 机型专属，本机 x86_64 + systemd-boot 之外的形态都用不上；用户 2026-10-28 明确「机型专属不需要，我只管我的 x86」 |
+| Hyprland / uwsm 耦合 | 42 | **不执行**。本机跑 niri，这些迁移改的是 `~/.config/hypr/*` 或调 `hyprctl` |
+| 用户配置类 | 44 | 见下 |
+
+**已执行（6 条，都验过）**：
+
+- `1791969355` — bar 旧 `centerAnchor` 拆成 `centerBegin` / `center` / `centerEnd`（上游 bar 结构变了，不跑会 widget 错位）
+- `1791968925` — tray 写进布局、清掉空 `tray` 段
+- `1791470456` / `1792259038` — 上游把捆绑壁纸换成 WebP 并重排序号，修壁纸选型
+- `1792020559` — Fcitx 候选窗跟主题（本机用 fcitx5）
+- `1791376887` — Chromium 系启用 overlay 滚动条
+
+前两条改的是 `~/.config/omarchy/shell.json`，跑前备份在 `~/.local/state/backups/omarchy-migrate-20261028-0359/shell.json`；
+跑完 `floatGap: 8` 与 `disabledPlugins: ["omarchy.lock"]` 都还在，bar 布局目视无变化。
+
+**待决（用户配置类剩下 38 条）**，分三组：
+
+- **A 组该跑、还没跑**：`1791640449`（keyboard-layout 挪到右侧，本机 bar 没这个 widget、跑了无效果）、
+  `1791367434`（装 `fcitx5-{mozc,hangul,chinese-addons,chewing}` + `omarchy-input-method configure --defaults`，
+  会改 fcitx 配置，**需要 root 装包**）—— 两条都卡在「要装包」，见下
+- **B 组是装 App，用户要的部分**：`omasnap`（用户明确要，替换 Satty/Tensaku）、`monologue`（摄像头录制）、
+  `hype`（Markdown 演示）、`signed`（PDF 签名）、`disktree-bin`（替换 Disk Usage）、`1790702362`（编译器和 Qt 组件，
+  含 `qt6-*` ⇒ **与 Qt 6.11 钉版冲突，不能跑**）
+- **B 组 AI agent，用户跳过**：`1786967403` Kimi、`1790863209` Grok、`1792334754` OpenClaw、
+  `1792345511` T3 Code、`1790017600` 退役 mise 版 Hermes
+- **C 组清理类，安全**：`1792648436`（删 4.0 通知引擎残留）等
+
+**B 组卡住的根因**：`omasnap` / `monologue` / `hype` / `signed` / `disktree-bin` **都不在 Arch 官方仓库**
+（`pacman -Si` 全部未找到），上游把它们放在自家 `[omarchy]` 仓库，而本机**没配那个仓库**（这也是
+`~/bin/omarchy-update` 垫片存在的原因之一）。要装这些 App 得先加 Omarchy 仓库 —— **用户待定**。
+包清单在 `install/omarchy-base.packages`（第 23/60/86/107/131 行）。
+
+**回退**：`snapper -c root undochange 2474..0` / `snapper -c home undochange 1229..0`；或
+`git reset --hard 60663faf` + 从 `~/.local/state/backups/omarchy-pre-ff-20261028-013056/`
+（537 MB worktree tgz + repo bundle + `~/.config/omarchy` + `~/.config/niri` + `~/bin`）恢复。
 
 ---
 

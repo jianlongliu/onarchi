@@ -1,21 +1,28 @@
 {
   "bar": {
-    "centerAnchor": "omarchy.clock",
+    "background": "opaque",
     "floatGap": 8,
     "id": "omarchy.bar",
     "layout": {
       "center": [
         {
-          "id": "omarchy.indicators"
-        },
-        {
-          "id": "omarchy.clock",
           "format": "ddd d MMM HH:mm",
           "formatAlt": "d MMMM 'W'ww yyyy",
+          "id": "omarchy.clock",
           "verticalFormat": "HH\n—\nmm"
-        },
+        }
+      ],
+      "centerBegin": [
+        {
+          "id": "omarchy.indicators"
+        }
+      ],
+      "centerEnd": [
         {
           "id": "omarchy.weather"
+        },
+        {
+          "id": "omarchy.menu"
         }
       ],
       "left": [
@@ -28,17 +35,18 @@
       ],
       "right": [
         {
-          "id": "omarchy.tray",
           "hidden": [
             "Fcitx"
-          ]
+          ],
+          "id": "omarchy.tray"
         },
         {
           "id": "flux"
         },
         {
           "id": "jrmmhm.pocket",
-          "members": "flux"
+          "members": "flux",
+          "pinned": ""
         },
         {
           "id": "ronald.input-sources",
@@ -63,11 +71,17 @@
           "id": "omarchy.power",
           "showPercentage": false
         }
-      ]
+      ],
+      "tray": []
     },
-    "position": "top",
-    "transparent": false
+    "position": "top"
   },
+  "cloneSourceRestores": [
+    "jianlongliu.split-lock"
+  ],
+  "disabledPlugins": [
+    "omarchy.lock"
+  ],
   "idle": {
     "lock": 1800,
     "screensaver": 300
@@ -77,14 +91,8 @@
       "id": "jianlongliu.split-lock"
     },
     {
-      "id": "io.github.claudsondouglas.arcdock"
+      "id": "io.github.jeocrypto.launchpad"
     }
   ],
-  "version": 1,
-  "disabledPlugins": [
-    "omarchy.lock"
-  ],
-  "cloneSourceRestores": [
-    "jianlongliu.split-lock"
-  ]
+  "version": 1
 }
