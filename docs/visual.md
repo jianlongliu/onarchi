@@ -12,6 +12,7 @@
 
 
 - 47. 上游 FF 后的三处视觉回归：bar 与窗口的缝、menu 的霜化与边框闪烁（2026-10-28）
+- 48. **Apps 菜单（`omarchy.dock` 网格）高透到读不清（TODO，2026-10-28 登记，待重启后修）**
 - 8.8 视觉磨砂（frosted Quickshell / 状态栏面板毛玻璃）
 - 46. **"UI 很平、浮不起来"这一轮：bar 的顶边高光 / 面更透 / 窗口双边框（2026-10-05；起因：用户看 bar「有投影、感觉是浮起来的」→ 给 menu、弹层套上之后问「我感觉我这套 UI 很平，是不是 bar 和 widgets 做重口味了?」）**：**先量清楚，结论是"不是影子重"** —— ① 所有面都比自己背后的底**暗**：bar 面 56 vs 其下壁纸 95、窗口面 49 vs 其右壁纸 84、菜单卡内 39（暗面 + 暗影 ⇒ 影子只把暗块糊大，托不起来）；② 影子**太紧**：bar 实测峰值 0.346、半衰 ~15、**~20 逻辑像素就归零**（读成"贴边描一圈"= 描边感，不是悬空），窗口 0.145 / ~25 逻辑像素归零；③ `shell/plugins/bar/Bar.qml` 的 `barBackground` 是**纯色 `Rectangle`**（无边框、无渐变、无顶边高光）⇒ 缺"厚度"这条线索。三条杠杆（面更透 / 影子更宽更淡 / 加高光），本轮做了 ①③ 两条**能量出、且不动影子**的。
     **① bar 顶边高光（新加）**：`Bar.qml` 里 `barBackground` 之后插入 `Rectangle { id: barTopHighlight }` —— 1 逻辑像素高、`color: Qt.rgba(root.barForeground.{r,g,b}, 0.10)`（**取自主题前景色、只写 alpha，不写死色值**）、**两端各让开 `Math.round(root.effectiveCornerRadius)`**（不然 1px 直线会戳出圆角）、`visible: !root.transparent`；竖排 bar 时改落左缘（`root.vertical` 分支）。实测（scale 1.8、行 y14–15）：**53.1 → 76.9（+23.8）**，整条连续（x30→2790 逐段 +23~33），两端圆角处**为 0**（无溢出）。
@@ -30,6 +31,19 @@
     - **边框闪烁**：**第一次修错了**——我先把它归因成"region 跟着卡片长高而移动"，于是加了一个 140ms 的 snapshot `Timer`，只在卡片静止后才把几何抄给 anchor。结果**更糟**：快拍显示打开过程中多了一次跳变（帧 6–7 各 41/65、30/65 变化），因为 Timer 到点又动了一次 region。**正确做法是直接绑定**（`x/y/width/height` 全绑 `card`）——卡片映射时就是最终尺寸、**没有位移动画**，region 从第一帧起就静止。**验证**：`grim` 连拍 10 帧、取卡片左缘外侧竖线 65 点比较相邻帧，改后 **9 组全部 0/65**。
     **回退**：三处都在 `$OMARCHY_PATH` 工作区里，`git checkout HEAD -- shell/plugins/bar/Bar.qml shell/plugins/menu/Menu.qml` 会退回上游原状（但会一并丢掉本文第 47 条以外的移植改动，别这么用）；本机改动尚未导出成 `niri.patch`，见 `docs/upstream.md` §8.23。
     **另记**：`socat` 是上游 `install/omarchy-base.packages` 的必需依赖，本机此前没装 ⇒ `omarchy-shell` 的快速 IPC 失败、`Mod+Space` 与所有 `omarchy <cmd>` 静默无反应（不是 bar/menu 的毛病）。已 `pkexec pacman -S socat`。
+- 48. **Apps 菜单高透到读不清（TODO，2026-10-28 登记）**：`Mod+Space → Apps`（或者 `omarchy menu summon apps`）打开的
+  应用网格，卡片底色几乎透明 —— 背景终端里的文字直接透过图标和行标签，两者叠在一起谁都看不清。截图留档
+  `/tmp/apps-menu-bug.png`（当次会话，**重启后作废**，要复查得重拍）。
+  **已知线索**：① 网格本体是上游 **`omarchy.dock`** 插件（`shell/plugins/dock/`，`Dock.qml` 的网格视图），
+  不是 menu 自己的卡片 —— 本轮给 menu 卡片补的是 `Menu.qml` 的 `BackgroundEffect.blurRegion`，覆盖不到它；
+  ② `dock` 是上游 tip **新增**的插件（`kinds: ["service"]`，浮空工作区上的 app dock），2026-10-28 合并时才第一次
+  进本机；③ `~/.config/omarchy/shell.toml` 的 `[popups] background-alpha = 0.38` 是卡片类的通用旋钮，
+  dock 是否读它、读哪个 token（`Commons.Color.dock.*` 还是 popups）**还没查**。
+  **下次先查**：`Dock.qml` / 它的 popup 卡片用了哪个背景 token、`effects.kdl` 有没有 `^omarchy-dock$`
+  这类 namespace 的 `xray` 规则（当前 `~/.config/niri/effects.kdl` 里**没有** dock 的 layer-rule，
+  也就是说它背后根本没有霜化，只有半透明填充 ⇒ 透出来的是**未模糊的原始背景**，这解释了为什么比别处更糊）。
+  **两种修法方向**：给 `effects.kdl` 加 `^omarchy-dock$` 的 `xray false`（让它像 menu/弹层一样有底霜化），
+  或提高该卡的 `background-alpha`；哪个对取决于它在 QML 里用的是哪层 token。
 - 45. **menu 卡片的投影：自己画，跟 bar 同档（2026-10-05；起因：用户看 bar「有投影效果，感觉是浮起来的」→「先给 menu 套上」）**：**是什么** —— `shell/plugins/menu/Menu.qml` 里 `card` 之前有一段投影项，`opacity` 绑 `card.opacity`（卡片淡出时跟着淡）。**为什么必须自己画（实测过，不是推论）**：bar 的投影是 niri 画的（`~/.config/niri/effects.kdl` 的 `^omarchy-bar$` rule：`color "#00000080"` / softness 30 / spread 5 / offset y 4 / geometry-corner-radius 12）—— 因为 bar 的 layer surface 就**是 bar 那么大**，投影贴着它自己画得出来。menu / 状态栏弹层是**整屏透明 `PanelWindow`**（卡片是里面的一个子项），niri 只认整块表面 ⇒ 2026-10-05 拿同样的 `shadow{}` 试过：临时给 `^omarchy-menu$` 那条 rule 加 `shadow { on; color "#0000ff80"; softness 30; spread 5; offset x=0 y=4 }`（用纯蓝好辨认）、`niri msg action load-config-file`、开菜单抓屏，与"同一画面无 shadow"对照：**屏幕四条边 40px 条带内蓝色增量最大 0–3/255**（`/tmp/M2-a45.png` 对照）⇒ 影子画在屏幕外、形同不存在。这条路对整屏表面**彻底不通**，只能在 QML 侧画。
     **实现（终稿几何）**：`cardShadow` 是一个 `Item`，里面 `Repeater` 出 **12 条互不重叠的同心圆角环带**（`Rectangle` + 只描边的 `border.width = band`），第 i 条：`e = (i+1) * band`、`x = pad - e`、`y = pad - e + drop`、`width = card.width + 2e`、`height = card.height + 2e - drop`、`radius: card.radius + e`、`border.color: Qt.rgba(0,0,0, modelData)`。参数：`band = 4`（带宽，逻辑像素）、`drop = 4`（bar 的 offset）、`pad = 68`（宿主四周留白，必须 ≥ 带宽×条数 + 模糊衰减空间，不然最外几圈被裁成硬切）、`alphas = [0.40, 0.27, 0.21, 0.18, 0.12, 0.09, 0.05, 0.03, 0.02, 0.012, 0.008, 0.005]`（由内向外，铺满 48 逻辑像素）、`opacity: card.opacity`（卡片淡出时影子跟着淡）；整组套 `layer.enabled: true` + `layer.effect: MultiEffect { blurEnabled: true; blur: 0.22; blurMax: 40 }`。**内边界必须咬住卡片外沿**（`y` 只在外侧那几圈体现 `drop`），带子加起来只盖卡片外的 48 逻辑像素，卡片矩形内**什么都不画**。
     **跟 bar 的"重量"对齐（用户：「这个投影怎么比 bar 的还重」）**：目标不是把 `#00000080` 抄过来就完 —— 先量 bar 的**真实**剖面：把 `^omarchy-bar$` rule 里 `color "#00000080"` 临时改成 `color "#00000000"`（alpha 0 即关掉影子）、`niri msg action load-config-file`（**注意没有 `reload-config` 这个子命令**）、拍"开/关"两张，`α = 1 - on/off`（黑影子：`observed = backdrop × (1-α)`）。**bar 实测**：贴表面边沿峰值 **0.346–0.363**（声明的 0.502 ⇒ 模糊后只剩 ~0.72 倍）、半衰在 ~15 逻辑像素、~48 逻辑像素归 0 —— 也就是说 niri 那个 `softness 30` 把峰值削掉近三成、尾巴拉得很长。第一版 8 段（`[0.49 … 0.05]`）在 t=10–30 逻辑像素这段比 bar **高 0.04–0.066**（1.3–1.9 倍），这正是"看着更重"的来源；照 `α_new = α_old - (菜单实测 - bar 实测)` 迭代一轮（模糊会削峰 ⇒ 内圈还要抬一点补偿）就落到终稿那组 alpha。**终稿对照**（同一套 `1 - on/off` 算法、同一台机器，`t` 为离卡片边沿的逻辑像素）：`t=6.7 → 0.283 / bar 0.286`、`8.3 → 0.266 / 0.268`、`13.3 → 0.207 / 0.212`、`20 → 0.133 / 0.131`、`30 → 0.057 / 0.058`、`40 → 0.020 / 0.021` ⇒ **t≥7 起逐点差 ≤ 0.015**；唯一明显偏差在紧贴卡片那 1–2 像素（菜单 0.280 vs bar 0.346）—— 模糊必然把内边界抹圆，抹掉的正是"边界处的尖峰"，方向是**更淡**不是更重。想整体再轻/再重：把 `alphas` 每个数乘同一个系数即可。
