@@ -599,9 +599,25 @@ Omarchy 的构建**覆盖** Arch 的同名包。对本机的实际影响：
 **仓库 URL 的坑**：`https://pkgs.omarchy.org/stable/$arch` 是对的，但数据库文件名是 **`omarchy.db`**
 （仓库名），不是 `stable.db`。用 `curl -sI .../stable/x86_64/omarchy.db` 验活，返回 200 就说明源正常。
 
-**已装**：`omasnap 1.24.0`、`monologue 0.3.1`、`hype 0.6.0`、`signed 0.3.1`、`disktree-bin 0.11.0`
-（+ 依赖 `poppler-qt6`）。`satty` 已退役（`pkexec pacman -R satty`），`imv` 的 `<Ctrl+e>`
-已改指 `omasnap`（迁移 `1788129995` 的 sudo 步骤跑不通，这部分手工补的）。
+**装不了（2026-10-28 实测，已全部卸载）**：这 5 个里只有 **`disktree-bin` 能跑**，其余 4 个都死在
+**Qt 6.12** 上 —— 二进制硬要 `Qt_6.12` 符号，本机 `IgnorePkg` 钉着 6.11：
+
+```
+hype / signed / monologue / omasnap:
+  /usr/lib/libQt6Core.so.6: version `Qt_6.12' not found
+```
+
+`omasnap` 还多一条硬伤：**`Depends On: hyprland`**（本机跑 niri，压根不该装）。
+`signed` 连 `poppler-qt6.so.3` 一起挂。
+
+**所以已回退**：`pkexec pacman -R omasnap monologue hype signed poppler-qt6`，只留 `disktree-bin`。
+`satty` 重新装回（`pkexec pacman -S satty`），`bin/omarchy-capture-screenshot` 也恢复成
+`60663faf` 那份（上游已改成写死 `exec omasnap`，那份在本机等于截图直接坏掉）；
+顺带把编辑器默认值从 `tensaku-edit` 改成 `satty`、`--exec` 后拆成 `satty --filename <path>` 两段
+（原来拼成一整个字符串会当成一个程序名）。
+
+**结论：这四个工具要等 Qt 6.12 解钉**。解钉的代价是 bar/menu 可能黑屏（`MultiEffect` 失效，
+见上文 Qt 6.12 那段），**用户 2026-10-28 决定暂不解**，截图继续用 satty、录屏继续用 wf-recorder。
 
 **没装**：AI agent 那几个（`1786967403` Kimi、`1790863209` Grok、`1792334754` OpenClaw、
 `1792345511` T3 Code、`1790017600` 退役 Hermes）—— 用户明确跳过。
