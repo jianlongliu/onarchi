@@ -173,6 +173,70 @@ These are hardware/OS specific and **cannot be auto-detected reliably**:
 
 The overview backdrop needs no adjustment: niri draws that layer itself, so the ported `blurwallpaper` shell plugin paints a blurred wallpaper while the overview is open (see the port notes).
 
+## Upstream sync status
+
+The port currently tracks upstream `quattro` at **`bc220e70`** (2026-10-27), fast-forwarded from
+`60663faf` on 2026-10-28 — 846 commits. The overlay is **33 files / 120 hunks / 2791 lines**,
+md5 `bf04bf1432482a1df2f19d828f99e315`, and applies both ways (`git apply --check` on a pristine
+`HEAD` worktree, `git apply --reverse --check` against this machine's tree).
+
+Upstream still has **no niri support**: `grep -ri niri shell/ bin/` returns nothing at `bc220e70`,
+while Hyprland coupling grew (19 files / 54 sites → 26 files / 118 sites). Everything below exists
+because of that.
+
+### Carried through the merge
+
+| Area | State |
+|---|---|
+| Floating bar (float gap, rounded corners, frosted blur) | Grafted onto upstream's new `barStrip`. `exclusiveZone` now includes `floatGap`, so windows no longer sit a band of dead desktop below the strip |
+| Monitor resolution tier slider | Entirely local; upstream has no equivalent. Merged without loss (235 lines) |
+| Battery charge threshold (sysfs-first) | Kept, plus upstream's improvement: it resolves the battery through UPower instead of a `BAT*` glob |
+| `Niri.qml` compositor shim | 186 → 358 lines: `monitors`, `monitorFor`, `toplevels`, `refresh*`, `dispatch` |
+| `OverlayWindow.qml` | New upstream file, all overlay panels (menu, OSD, clipboard, image picker) go through it. It read `Hyprland.monitors`, which is always empty on niri, so `contentReady` never became true and every panel rendered at opacity 0 — patched to `Niri` |
+| Toast frost | Upstream narrowed the notification surface and dropped the client blur region; the layer rule carried only `xray`, so nothing was frosted. Restored as a client-side `Region` + `blur true` in the rule |
+| Apps grid frost | Upstream's new `omarchy.dock` grid spans the screen and relies on Hyprland's `ignore_alpha`. Given a client region plus an `omarchy-dock-apps` layer rule |
+| Bar icon centring | `OpticalGlyph` reported the ink centre before rotation, so the pocket's mark (which turns 90° when it opens) was placed as if it had not. `BarIconButton` also gained `contentOffsetY` for glyphs whose ink is far shorter than their line box |
+| Screenshot | Reverted to the pre-merge satty version — see "Dropped" |
+
+### Dropped, and why
+
+| Thing | Reason |
+|---|---|
+| Bar size tokens in `Style.qml` | Upstream now ships `icon-font` / `icon-slot` / `icon-canvas` / `status-slot` / `notch-height` / `icon-size` natively; the local patch was a strict subset |
+| Bar decoration beyond frost (shadow, top highlight, forced 12 px radius) | Superseded by upstream's own bar design. Accepted the overwrite |
+| OSD card surface | Upstream moved OSD onto `OverlayWindow`, which requires a full-screen surface; the card-sized variant rendered nothing |
+| Notification blur via `popupColumn` | That element no longer exists upstream; the surface is a narrow strip now |
+| `omarchy-system-{logout,reboot,shutdown}` | Upstream merged them into one `omarchy-system`; the four-line niri guard moved over |
+| `omasnap`, `monologue`, `hype`, `signed` | All four need **Qt 6.12**; this machine pins Qt 6.11 (see below). `omasnap` additionally hard-depends on `hyprland`. Only `disktree-bin` from that batch runs |
+
+### Qt stays pinned at 6.11.2
+
+`/etc/pacman.conf` holds 16 packages in `IgnorePkg`, all of them Qt or Qt-linked. The reason is
+recorded there: under Qt 6.12, `MultiEffect` blur becomes a no-op, so the bar and menu render as
+opaque black cards. Upstream's only 6.12-related commit (`b83d3df08`) is a QML palette-syntax fix,
+not a rendering repair, and `git log --grep` finds no `MultiEffect` work. Verified on 6.11.2 as a
+baseline: `MultiEffect { blurEnabled: true; blur: 1.0; blurMax: 48 }` produces a real gradient
+(104 of 150 sampled points mid-tone). Lifting the pin needs all 16 packages moved together; the
+payoff is four tools that all have working substitutes.
+
+### Open items
+
+- **91 migrations pending** out of 211. 33 need root and are machine-specific (N1x / ASUS ProArt /
+  aarch64 / Limine); 42 touch Hyprland or uwsm. Six user-facing ones have been run (bar layout split,
+  wallpaper renumbering, Fcitx theming, Chromium overlay scrollbars). The rest are tracked in
+  `docs/upstream.md` §8.23.
+- **`GDK_SCALE` is unset on niri.** `omarchy-hyprland-monitor-scaling` is what sets it upstream, and
+  that script only runs under Hyprland. GTK apps (nautilus) therefore render at 1× against a 2.0
+  output. `~/.config/niri/config.kdl` now carries `GDK_SCALE "2"` in its `environment {}` block —
+  **this requires a session restart, not a reload**, and has not been verified yet. Do not also set
+  `GDK_DPI_SCALE`; that would scale twice.
+- **WPS clipboard and DPI** are unverified. WPS is an XWayland client (`app_id: wpsoffice`) with no
+  `QT_QPA_PLATFORM` set, so it inherits whatever `xwayland-satellite` provides; `Xft.dpi` reads 192,
+  matching the 2.0 output, but whether WPS honours it is untested.
+- **Effect of the Omarchy repo on upgrades.** `[omarchy]` sits ahead of `[core]` in `pacman.conf`.
+  `omarchy-nvim` will replace `neovim` and `omarchy-power-profiles-daemon` will replace
+  `power-profiles-daemon` if those are ever installed; neither is present today.
+
 ## Why it's not a single-click guarantee
 
 The port reuses Omarchy's own install but swaps Hyprland for niri via the `hyprctl` shim and a

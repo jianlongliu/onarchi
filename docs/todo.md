@@ -37,6 +37,16 @@
 （「内屏开关」原本也归这类，2026-09-24 已做完 ⇒ 规格见 `docs/shims.md` §4，状态见
 `docs/behavior.md` 覆盖账 D 表。）
 
+## 2026-10-28 上游 FF 之后新增
+
+| # | 事 | 要动什么 | 备注 |
+|---|---|---|---|
+| 10 | **验证 `GDK_SCALE` 是否修好 GTK 应用的 DPI** | 已写入 `~/.config/niri/config.kdl` 的 `environment {}`：`GDK_SCALE "2"`。**必须重启会话**（reload 不生效） | 判据：nautilus 的字体与控件尺寸应与 bar 的 `base-size 14` 视觉一致。**不要加 `GDK_DPI_SCALE`**，会二次放大。若无效，下一步查 GTK4 是否走 `gdctl`/portal 而非环境变量 |
+| 11 | **WPS 的剪贴板与 DPI** | 待定：给 WPS 强制 `QT_QPA_PLATFORM=wayland`，或维持 XWayland 另找缩放办法 | 现状：`app_id: wpsoffice`（XWayland），未设 `QT_QPA_PLATFORM`，`Xft.dpi` 是 192 与输出 2.0 一致，但 WPS 是否认它未测。剪贴板问题大概率出在 XWayland 中转 |
+| 12 | **91 条迁移的分类处置** | 见 `docs/upstream.md` §8.23 的账 | 33 条要 root 且机型专属（N1x / ASUS / aarch64 / Limine）——本机 x86 用不上，建议整批标已跑；42 条动 Hyprland 或 uwsm，同理。已跑 6 条面向用户的 |
+| 13 | **`omarchy-nvim` / `omarchy-power-profiles-daemon` 的替换风险** | 加 `[omarchy]` 源后，这两个会覆盖 Arch 同名包 | 目前两个都没装 ⇒ 无影响。将来若装 `neovim` 要留意会被换成 omarchy 构建 |
+| 14 | **等 Qt 6.12 修好再回头拿那四个工具** | `omasnap` / `monologue` / `hype` / `signed` | 全部硬依赖 Qt 6.12；`omasnap` 还要 `hyprland`。上游 `b83d3df08` 只修了 palette 语法，没有 `MultiEffect` 修复 ⇒ 解钉前先实测 6.12 的模糊是否仍失效 |
+
 ## 本机卫生项
 
 - **未提交**：本仓库工作树里有一批本地改动没 commit，其中**混着并行会话的改动**

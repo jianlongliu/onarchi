@@ -163,6 +163,63 @@ cd onarchi
 
 总览的垫底无需调整：那一层由 niri 自己绘制，移植自带的 `blurwallpaper` 插件会在总览打开时铺一张强模糊壁纸（见移植笔记）。
 
+## 上游同步状态
+
+本移植当前跟到上游 `quattro` 的 **`bc220e70`**（2026-10-27）—— 2026-10-28 从 `60663faf` 快进，
+共 846 个提交。覆盖层 **33 文件 / 120 hunk / 2791 行**，md5 `bf04bf1432482a1df2f19d828f99e315`，
+双向可验（纯净 `HEAD` 上 `git apply --check`、本机树上 `git apply --reverse --check`）。
+
+上游**仍然没有 niri 支持**：`bc220e70` 上 `grep -ri niri shell/ bin/` 零命中，而 Hyprland 耦合反而
+加重（19 文件 54 处 → 26 文件 118 处）。下面每一条都是这个前提的产物。
+
+### 合并后保留的东西
+
+| 领域 | 状态 |
+|---|---|
+| 浮动 bar（间隙、圆角、霜化） | 接进上游新的 `barStrip`；`exclusiveZone` 现在算上 `floatGap`，窗口与条带之间不再多出一圈死桌面 |
+| 显示器分辨率档位滑块 | 完全本地，上游没有对应物；合并零丢失（235 行） |
+| 电池充电阈值（sysfs 优先） | 保留，并吸收上游改进：电池路径由 UPower 解析，不再用 `BAT*` 通配 |
+| `Niri.qml` 合成器垫片 | 186 → 358 行：`monitors`、`monitorFor`、`toplevels`、`refresh*`、`dispatch` |
+| `OverlayWindow.qml` | 上游新增文件，所有 overlay 面板（菜单、OSD、剪贴板、图片选择器）都经过它。它读 `Hyprland.monitors`，在 niri 上恒为空 ⇒ `contentReady` 永远为假 ⇒ **每个面板都以 opacity 0 渲染**。已改指 `Niri` |
+| 通知霜化 | 上游把通知表面改窄并丢了客户端区域，layer 规则只剩 `xray` ⇒ 完全无霜化。恢复为客户端 `Region` + 规则里 `blur true` |
+| Apps 网格霜化 | 上游新增的 `omarchy.dock` 网格铺满屏幕、在 Hyprland 上靠 `ignore_alpha`。补了客户端区域 + `omarchy-dock-apps` 的 layer 规则 |
+| bar 图标居中 | `OpticalGlyph` 报的是**旋转前**的墨迹中心，pocket 的标记展开时转 90° ⇒ 按没转的位置摆。另外 `BarIconButton` 新增 `contentOffsetY`，给墨迹远矮于行盒的字形用 |
+| 截图 | 退回合并前的 satty 版 —— 见下节 |
+
+### 放弃的东西，以及原因
+
+| 项 | 原因 |
+|---|---|
+| `Style.qml` 里的 bar 尺寸 token | 上游已原生提供 `icon-font` / `icon-slot` / `icon-canvas` / `status-slot` / `notch-height` / `icon-size`，本地补丁是严格子集 |
+| 霜化之外的 bar 装饰（投影、顶边高光、强制 12px 圆角） | 被上游自己的 bar 设计取代。接受覆盖 |
+| OSD 的卡片化表面 | 上游把 OSD 迁到 `OverlayWindow`，而后者要求全屏表面；卡片化版本渲染出来是空白 |
+| 经 `popupColumn` 的通知霜化 | 该元素上游已不存在，表面现在是窄条带 |
+| `omarchy-system-{logout,reboot,shutdown}` | 上游合并成一个 `omarchy-system`；四行 niri 守卫已移过去 |
+| `omasnap`、`monologue`、`hype`、`signed` | 四个都要 **Qt 6.12**，本机钉在 6.11（见下）。`omasnap` 还硬依赖 `hyprland`。同批只有 `disktree-bin` 能跑 |
+
+### Qt 钉在 6.11.2
+
+`/etc/pacman.conf` 的 `IgnorePkg` 里有 16 个包，全是 Qt 或 Qt 相关。理由就写在旁边：Qt 6.12 下
+`MultiEffect` 的模糊变成空操作，bar 和菜单会渲染成不透明黑卡。上游唯一与 6.12 相关的提交
+（`b83d3df08`）是 QML palette 语法兼容，**不是**渲染修复；`git log --grep` 也找不到 `MultiEffect`
+相关工作。6.11.2 上实测基线：`MultiEffect { blurEnabled: true; blur: 1.0; blurMax: 48 }` 有真实渐变
+（150 个采样点里 104 个中间调）。解钉需要 16 个包一起动，换来的是四个都有替代品的工具。
+
+### 未完成项
+
+- **91 条迁移待跑**（共 211 条）。33 条要 root 且是机型专属（N1x / ASUS ProArt / aarch64 / Limine）；
+  42 条动 Hyprland 或 uwsm。已跑 6 条面向用户的（bar 布局拆分、壁纸重编号、Fcitx 主题、Chromium
+  覆盖滚动条）。其余在 `docs/upstream.md` §8.23 有分类账。
+- **niri 上 `GDK_SCALE` 未设**。上游是 `omarchy-hyprland-monitor-scaling` 设的，而那个脚本只在
+  Hyprland 下跑。于是 GTK 应用（nautilus）在 2.0 输出上按 1× 渲染。`~/.config/niri/config.kdl`
+  的 `environment {}` 里已加 `GDK_SCALE "2"` —— **需要重启会话，reload 无效**，且尚未验证。
+  **不要再加 `GDK_DPI_SCALE`**，那会二次放大。
+- **WPS 的剪贴板与 DPI 未验证**。WPS 是 XWayland 客户端（`app_id: wpsoffice`），没设
+  `QT_QPA_PLATFORM`，继承 `xwayland-satellite` 提供的东西；`Xft.dpi` 读到 192、与 2.0 输出一致，
+  但 WPS 是否认它没测过。
+- **Omarchy 源对升级的影响**。`[omarchy]` 排在 `[core]` 之前。`omarchy-nvim` 会替换 `neovim`、
+  `omarchy-power-profiles-daemon` 会替换 `power-profiles-daemon`——两者目前都没装。
+
 ## 为什么它不是"一键保证"
 
 本移植复用 Omarchy 自己的安装，只是通过 `hyprctl` 垫片和 `Niri.qml` Quickshell 模型把 Hyprland 换成 niri。
