@@ -6,42 +6,56 @@ import qs.Ui
 // Bar-left replacement for omarchy.menu's logo button: the same button, drawn
 // as the Arch logo. The menu panel itself is untouched — omarchy.menu is
 // keepLoaded, so it stays mounted with its button off the bar.
+//
+// Drawn with WidgetButton rather than BarIconButton: the latter centres a
+// glyph through its own optical-bounds maths, which is built for icon fonts and
+// puts this SVG against the top edge of the slot. A plain Item with the image
+// centred in it is what the other first-party bar widgets do (see flux).
 BarWidget {
   id: root
   moduleName: "jianlongliu.arch-logo"
 
+  readonly property int markSize: Style.bar.iconSize
+
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
 
-  BarIconButton {
+  WidgetButton {
     id: button
     anchors.fill: parent
     bar: root.bar
+    labelVisible: false
+    hasVisualContent: true
+    fixedWidth: root.vertical ? -1 : root.markSize + scaledHorizontalMargin * 2
+    fixedHeight: root.vertical ? root.markSize + scaledVerticalPadding * 2 : -1
     tooltipText: "Omarchy menu"
 
-    iconComponent: Component {
-      Item {
-        Image {
-          id: logo
-          anchors.fill: parent
-          source: Qt.resolvedUrl("arch-logo.svg")
-          sourceSize.width: Math.round(width * Screen.devicePixelRatio)
-          sourceSize.height: Math.round(height * Screen.devicePixelRatio)
-          fillMode: Image.PreserveAspectFit
-          smooth: true
-          // Hidden but layered so MultiEffect can sample it as a texture.
-          // colorization multiplies by source luminance, so the SVG must be
-          // pure white or the logo renders dimmer than its neighbours.
-          visible: false
-          layer.enabled: true
-        }
+    Item {
+      id: mark
+      anchors.centerIn: parent
+      width: root.markSize
+      height: root.markSize
 
-        MultiEffect {
-          anchors.fill: parent
-          source: logo
-          colorization: 1.0
-          colorizationColor: button.foreground
-        }
+      Image {
+        id: logo
+        anchors.fill: parent
+        source: Qt.resolvedUrl("arch-logo.svg")
+        sourceSize.width: Math.round(width * Screen.devicePixelRatio)
+        sourceSize.height: Math.round(height * Screen.devicePixelRatio)
+        fillMode: Image.PreserveAspectFit
+        smooth: true
+        // Hidden but layered so MultiEffect can sample it as a texture.
+        // colorization multiplies by source luminance, so the SVG must be
+        // pure white or the logo renders dimmer than its neighbours.
+        visible: false
+        layer.enabled: true
+      }
+
+      MultiEffect {
+        anchors.fill: parent
+        source: logo
+        colorization: 1.0
+        colorizationColor: button.foreground
       }
     }
 
