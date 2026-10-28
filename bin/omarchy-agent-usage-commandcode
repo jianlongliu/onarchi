@@ -1,0 +1,392 @@
+#!/usr/bin/python3
+# omarchy:summary=Print the Command Code usage record as JSON
+# omarchy:args=[--force] [--limits-only]
+# omarchy:hidden=true
+"""Collect Command Code (GOAT) usage into one display-ready JSON record.
+
+Command Code bills one account, and its own `/usage` view is built from two
+endpoints this record reads too, both under the `/alpha` routes its CLI asks
+(they are the CLI's own, not a published contract, so a failure here costs
+the numbers, never the panel):
+
+- `/alpha/billing/credits`: the account's credit ledger. `windowLimits` holds
+  the two rolling allowances the plan meters, `fiveHour` and `weekly`, each
+  with its `used`, `cap` and `resetAt` (epoch milliseconds); `credits` holds
+  what the monthly pool has left (`monthlyCredits`, plus any purchased and
+  free credits).
+- `/alpha/billing/subscriptions`: the plan's `planId`, its status and the
+  billing period's end. The plan names the monthly pool, which Command Code
+  credits per period and measures its own bar against: GOAT 70. The pool is
+  that figure, and what is left of it is the ledger's remainder.
+
+So the record carries the three meters its own `/usage` shows — the 5-hour
+window, the weekly window, and the month's pool — and the balance the pool
+leaves. It carries no token stats: this collector reports the account's
+allowances, and every number it has is the account's rather than this
+machine's (hence `scope: account`), with no prompts or sessions to count
+(`hasPromptStats` false).
+
+Command Code authenticates with an API key (`COMMANDCODE_API_KEY`, the one
+Ante and the CLI sign in with), read from the environment, then from
+`~/.hermes/.env` (where this machine keeps it for the tools that only read
+that file), `~/.ante/auth/api_keys.json` (Ante's own store) and
+`~/.commandcode/.env`. A credential is only ever read, never written: no file
+here is refreshed.
+"""
+
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import os
+import sys
+import urllib.request
+from concurrent import futures
+from pathlib import Path
+from typing import Any
+
+# The shared collector plumbing ships with the agents panel.
+sys.dont_write_bytecode = True
+sys.path.insert(0, os.path.join(os.environ["OMARCHY_PATH"], "shell", "plugins", "agents"))
+from collectors import (  # noqa: E402
+  HttpError,
+  LimitsCache,
+  base_record as shared_base_record,
+  cache_root,  # noqa: F401 - the tests find the cached answers through it
+  emit,
+  finite,
+  number,
+  open_json,
+  read_json,
+  stamp,
+  trusted_endpoint,
+)
+
+AGENT_ID = "commandcode"
+# This account is the one Ante runs on, so the section is named the way the
+# person who owns it knows it (the CLI's own product name is Command Code).
+AGENT_NAME = "Antex"
+AUTH_HELP = "Set COMMANDCODE_API_KEY to the key your Command Code sign-in uses."
+API_BASE_URL = "https://api.commandcode.ai"
+CREDITS_PATH = "/alpha/billing/credits"
+SUBSCRIPTIONS_PATH = "/alpha/billing/subscriptions"
+
+# Command Code's monthly pool per plan, in credits, as the CLI's own plan
+# table holds it (`getPlanTotalCredits`), and the name each plan shows. A plan
+# this table doesn't know has no pool to measure a bar against, so its month
+# is left out rather than guessed.
+PLAN_CREDITS = {
+  "individual-go": 10,
+  "individual-go-v1": 10,
+  "individual-goat": 70,
+  "individual-pro": 30,
+  "individual-pro-v1": 80,
+  "individual-provider": 15,
+  "individual-max": 150,
+  "individual-ultra": 300,
+  "teams-pro": 40,
+}
+PLAN_LABELS = {
+  "individual-go": "Go",
+  "individual-go-v1": "Go",
+  "individual-goat": "GOAT",
+  "individual-pro": "Pro",
+  "individual-pro-v1": "Pro",
+  "individual-provider": "Provider",
+  "individual-max": "Max",
+  "individual-ultra": "Ultra",
+  "teams-pro": "Teams Pro",
+}
+
+
+def api_base() -> str:
+  """Command Code's API: COMMANDCODE_API_URL when a person points it
+  elsewhere (a proxy), never a URL that would carry the key in the clear."""
+  configured = os.environ.get("COMMANDCODE_API_URL", "").strip()
+  return configured.rstrip("/") if configured and trusted_endpoint(configured) else API_BASE_URL
+
+
+# ---------------------------------------------------------------- credentials
+
+
+def key_from_env_file(path: Path) -> str:
+  """COMMANDCODE_API_KEY as a dotenv file sets it, or "" when it doesn't."""
+  try:
+    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+  except OSError:
+    return ""
+  for line in lines:
+    text = line.strip()
+    if not text or text.startswith("#"):
+      continue
+    if text.startswith("export "):
+      text = text[len("export "):].strip()
+    name, _, value = text.partition("=")
+    if name.strip() != "COMMANDCODE_API_KEY":
+      continue
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+      value = value[1:-1]
+    return value.strip()
+  return ""
+
+
+def api_key() -> str:
+  """The key, from the environment first: the panel runs collectors with the
+  shell's environment, which is where Ante and the CLI both read it."""
+  from_env = os.environ.get("COMMANDCODE_API_KEY", "").strip()
+  if from_env:
+    return from_env
+  home = Path.home()
+  for path in (home / ".hermes" / ".env", home / ".commandcode" / ".env"):
+    found = key_from_env_file(path)
+    if found:
+      return found
+  # Ante's own store: the key it signs providers in with, read-only.
+  ante = read_json(home / ".ante" / "auth" / "api_keys.json")
+  return str(ante.get("COMMANDCODE_API_KEY") or "").strip()
+
+
+# ------------------------------------------------------------------- requests
+
+
+def fetch(path: str, key: str, timeout: float = 25) -> Any:
+  # Cloudflare fronts this API and refuses urllib's default User-Agent
+  # outright (error 1010, before the key is even read), so the request says
+  # what it is.
+  request = urllib.request.Request(api_base() + path, headers={
+    "Authorization": "Bearer " + key,
+    "Accept": "application/json",
+    "User-Agent": "omarchy-agent-usage/" + AGENT_ID,
+  })
+  # These answers are slow and occasionally stall past ten seconds on a
+  # proxied path, so the deadline is generous and a transport failure is
+  # retried once: the panel refreshes on a timer, and one lost answer costs a
+  # whole section. A refusal (a status) is an answer and is never repeated.
+  try:
+    return open_json(request, timeout=timeout)
+  except HttpError as error:
+    if not error.transport:
+      raise
+    return open_json(request, timeout=timeout)
+
+
+# --------------------------------------------------------------------- limits
+
+
+def reset_at(value: Any) -> str:
+  """A window's `resetAt`, which is epoch milliseconds, as an ISO instant."""
+  ms = stamp(value)
+  if ms <= 0:
+    return ""
+  try:
+    return dt.datetime.fromtimestamp(ms / 1000, dt.timezone.utc).isoformat()
+  except (OverflowError, OSError, ValueError):
+    return ""
+
+
+def window_limit(window: Any, label: str, title: str) -> dict[str, Any] | None:
+  """One rolling allowance as the panel's window: `used` of `cap` spent."""
+  if not isinstance(window, dict):
+    return None
+  used, cap = finite(window.get("used")), finite(window.get("cap"))
+  # A cap of zero is no allowance to measure: a window that says nothing is
+  # dropped rather than shown as a bar that never moves.
+  if cap <= 0:
+    return None
+  return {
+    "label": label,
+    "title": title,
+    "percent": min(1.0, max(0.0, used / cap)),
+    "resetsAt": reset_at(window.get("resetAt")),
+  }
+
+
+def plan_of(answer: Any) -> tuple[str, str, str]:
+  """The active plan's id, its label, and when the period ends."""
+  data = answer.get("data") if isinstance(answer, dict) else None
+  if isinstance(data, list):
+    data = next((entry for entry in data if isinstance(entry, dict) and entry.get("status") == "active"), None) or (data[0] if data else None)
+  if not isinstance(data, dict):
+    return "", "", ""
+  plan_id = str(data.get("planId") or "")
+  return plan_id, PLAN_LABELS.get(plan_id, plan_id), str(data.get("currentPeriodEnd") or "")
+
+
+def kept_limits(cache: LimitsCache) -> list[dict[str, Any]]:
+  """The windows a cache holds, as they read now.
+
+  A kept window whose reset has passed comes back at zero with no reset time:
+  the allowance it measured is spent and a new one has begun, which only a
+  fresh probe can date. This is applied to the answer rather than to what is
+  kept, so the cache always holds the numbers the service sent and a later
+  read can't mistake a zeroed window for a measured one.
+  """
+  now = dt.datetime.now(dt.timezone.utc)
+  out = []
+  for entry in cache.data.get("limits") if isinstance(cache.data.get("limits"), list) else []:
+    if not isinstance(entry, dict):
+      continue
+    window = dict(entry)
+    reset = str(window.get("resetsAt") or "")
+    if reset:
+      try:
+        if dt.datetime.fromisoformat(reset.replace("Z", "+00:00")) <= now:
+          window["percent"] = 0.0
+          window["resetsAt"] = ""
+      except ValueError:
+        pass
+    out.append(window)
+  return out
+
+
+def collect_limits(key: str, force: bool) -> dict[str, Any]:
+  """The account's ledger and windows, kept per key.
+
+  `live` says the numbers were measured just now (or within the reuse
+  window); a failed check keeps the last good ones and says they're stale.
+  """
+  cache = LimitsCache(AGENT_ID, key)
+  kept = kept_limits(cache)
+  kept_balance = cache.data.get("balance") if isinstance(cache.data.get("balance"), dict) else None
+  kept_plan = str(cache.data.get("tierLabel") or "")
+  result: dict[str, Any] = {
+    "limits": kept,
+    "balance": kept_balance,
+    "tierLabel": kept_plan,
+    "usageStatusText": "",
+    "authHelpText": "",
+    "stale": False,
+    "fetchedAt": cache.fetched_at if kept else 0,
+    "retryAdvised": False,
+  }
+  # A panel opened and shut repeatedly must not become a request per flick.
+  if cache.fresh(force, allow_empty=True):
+    return result
+
+  # Both answers are asked at once: either alone can be slow, and the panel
+  # waits for the record.
+  try:
+    with futures.ThreadPoolExecutor(max_workers=2) as pool:
+      credits_task = pool.submit(fetch, CREDITS_PATH, key)
+      subscriptions_task = pool.submit(fetch, SUBSCRIPTIONS_PATH, key)
+      credits = credits_task.result()
+      subscriptions = subscriptions_task.result()
+  except HttpError as error:
+    if error.status in (401, 403):
+      result["usageStatusText"] = "Sign-in expired"
+      result["authHelpText"] = "Command Code refused the API key. " + AUTH_HELP
+      return result
+    if error.transport:
+      # Nothing answered: no route, no DNS, a reset. The panel should try
+      # again sooner than its regular interval.
+      result["retryAdvised"] = True
+      result["authHelpText"] = "Couldn't reach Command Code. Retrying shortly."
+    elif error.status:
+      result["authHelpText"] = f"Command Code's billing endpoint returned status {error.status}."
+    else:
+      result["authHelpText"] = "Command Code's billing endpoint sent a reply that couldn't be read."
+    if kept or kept_balance:
+      result["stale"] = True
+    else:
+      result["usageStatusText"] = "Command Code limits unavailable"
+    return result
+
+  ledger = credits.get("credits") if isinstance(credits, dict) else None
+  ledger = dict(ledger) if isinstance(ledger, dict) else {}
+  windows = credits.get("windowLimits") if isinstance(credits, dict) else None
+  windows = windows if isinstance(windows, dict) else {}
+  plan_id, plan_label, period_end = plan_of(subscriptions)
+  ledger["planId"] = plan_id
+
+  # The titles are the whole label: the panel shows a window's title as it
+  # reads, and these three name Command Code's own allowances rather than
+  # another service's vocabulary.
+  limits = [
+    window_limit(windows.get("fiveHour"), "5 hours", "5 hours"),
+    window_limit(windows.get("weekly"), "Weekly", "Weekly"),
+  ]
+  limits = [entry for entry in limits if entry]
+
+  pool = PLAN_CREDITS.get(plan_id, 0)
+  balance = None
+  if pool > 0:
+    remaining = max(0.0, finite(ledger.get("monthlyCredits")) + finite(ledger.get("purchasedCredits")) + finite(ledger.get("freeCredits")))
+    spent = max(0.0, pool - remaining)
+    limits.append({
+      "label": "Monthly",
+      "title": "Monthly",
+      "percent": min(1.0, spent / pool),
+      "resetsAt": period_end,
+    })
+    balance = {
+      "remaining": remaining,
+      "funded": float(pool),
+      "spent": spent,
+      "currency": "USD",
+      "estimated": False,
+    }
+
+  result.update(limits=limits, balance=balance, tierLabel=plan_label, authHelpText="")
+  result["fetchedAt"] = cache.save(limits, tierLabel=plan_label, balance=balance)
+  return result
+
+
+# -------------------------------------------------------------------- record
+
+
+def base_record(**overrides: Any) -> dict[str, Any]:
+  return shared_base_record(AGENT_ID, AGENT_NAME, **{
+    # Every number comes from the account's billing ledger, which every
+    # machine on the same account reads identically: aggregating devices must
+    # not sum them.
+    "scope": "account",
+    # The billing ledger counts allowances, never prompts or sessions: the
+    # panel keeps those numbers out of today's line.
+    "hasPromptStats": False,
+    **overrides,
+  })
+
+
+def collect(force: bool = False) -> dict[str, Any]:
+  key = api_key()
+  # Without a key there is nothing to ask: this machine has never signed
+  # Command Code in, so the panel skips it.
+  if not key:
+    return base_record()
+
+  limits = collect_limits(key, force)
+  record = base_record(
+    ready=bool(limits["limits"] or limits["balance"]),
+    tierLabel=limits["tierLabel"],
+    usageStatusText=limits["usageStatusText"],
+    authHelpText=limits["authHelpText"],
+    limits=limits["limits"],
+    limitsStale=bool(limits["stale"]),
+    limitsFetchedAt=limits["fetchedAt"],
+  )
+  if limits["balance"]:
+    record["balance"] = limits["balance"]
+  if limits["retryAdvised"]:
+    record["retryAdvised"] = True
+  return record
+
+
+def main() -> int:
+  parser = argparse.ArgumentParser(description="Print the Command Code usage record as JSON")
+  parser.add_argument("--force", action="store_true", help="re-probe the ledger, ignoring the reuse window")
+  # Command Code has no local scan to reuse, so a near-limit refresh is a
+  # normal run; the flag keeps the invocation every collector takes.
+  parser.add_argument("--limits-only", action="store_true")
+  args = parser.parse_args()
+  try:
+    record = collect(args.force)
+  except Exception as error:
+    record = base_record(usageStatusText="Command Code unavailable", authHelpText="Command Code usage scan failed")
+    print(f"omarchy-agent-usage-commandcode: {type(error).__name__}", file=sys.stderr)
+  emit(record)
+  return 0
+
+
+if __name__ == "__main__":
+  raise SystemExit(main())

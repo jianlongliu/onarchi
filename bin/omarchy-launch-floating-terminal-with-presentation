@@ -8,6 +8,19 @@
 source omarchy-restart-gum
 
 cmd="$*"
-presentation_script="omarchy-show-logo; $cmd; if (( \$? != 130 )); then omarchy-show-done; fi"
+# 130 is the user bailing with Ctrl-C; anything else gets the Done/Failed prompt.
+presentation_script="omarchy-show-logo; $cmd; code=\$?; if (( code != 130 )); then omarchy-show-done \$code; fi"
 
-exec setsid uwsm-app -- xdg-terminal-exec --app-id=org.omarchy.terminal --title=Omarchy -e bash -c "$presentation_script"
+# Hyprland/uwsm session: uwsm-app + xdg-terminal-exec. niri has neither, so
+# fall back to a Wayland terminal (ghostty, matching niri's Mod+Return bind).
+if command -v uwsm-app >/dev/null 2>&1 && command -v xdg-terminal-exec >/dev/null 2>&1; then
+  exec setsid uwsm-app -- xdg-terminal-exec --app-id=org.omarchy.terminal --title=Omarchy -e bash -c "$presentation_script"
+fi
+
+for term in ghostty kitty alacritty foot; do
+  if command -v "$term" >/dev/null 2>&1; then
+    exec setsid "$term" -e bash -c "$presentation_script"
+  fi
+done
+
+exec bash -c "$presentation_script"

@@ -14,9 +14,25 @@
 # A package upgrade rewriting $OMARCHY_PATH/shell would otherwise reload it
 # against a half-written tree, and that failed reload leaves a second engine
 # generation behind that turns the next restart's IPC kill into a crash.
+#
+# Its crash handler is off for the same reason, and that is the one that has
+# actually bitten: a segfault in a text field made the handler re-exec an engine
+# of its own while this supervisor relaunched the dead one, so two engines ran
+# at once. They fought over the shell's singletons, and both tried to take the
+# session lock the dead shell had left behind -- a second lock surface for one
+# output is a fatal protocol error in the compositor, so the survivor died
+# holding the lock, and the session was left with the theme background over a
+# stranded lock: a solid red screen until the machine was rebooted. One restart
+# authority, and it is this script.
+#
+# 9>&- keeps the engine out of the supervisor's lock file: a shell holding that
+# descriptor would look like a live supervisor to the next launcher.
 run_shell() {
-  QS_DISABLE_FILE_WATCHER=1 QS_NO_RELOAD_POPUP=1 \
-    systemd-cat -t omarchy-shell -- quickshell -n -p "$OMARCHY_PATH/shell" &
+  local startup_background
+  startup_background=$(readlink -f "$HOME/.local/state/omarchy/current/background" 2>/dev/null)
+  OMARCHY_STARTUP_BACKGROUND="$startup_background" QS_DISABLE_FILE_WATCHER=1 QS_NO_RELOAD_POPUP=1 \
+    QS_DISABLE_CRASH_HANDLER=1 \
+    systemd-cat -t omarchy-shell -- quickshell -n -p "$OMARCHY_PATH/shell" 9>&- &
   shell_pid=$!
 
   local status
@@ -45,11 +61,38 @@ compositor_alive() {
   return 1
 }
 
-# Quickshell relaunches itself from its signal handlers, but Qt leaves through
-# _exit() when the Wayland connection fails, raising no signal: no crash report,
-# no relaunch, no bar. Supervise those deaths. A clean exit is a deliberate stop
-# (omarchy-restart-shell starts its own replacement); a signal here means the
-# session is going, and has to reach the shell the launcher used to exec.
+# Is the config's single instance slot taken? Quickshell refuses a second engine
+# for one config ("An instance of this configuration is already running."), and
+# that refusal is a clean exit, indistinguishable below from a deliberate stop --
+# so ask the instance registry rather than guess which one it was. The registry
+# lists an instance before it answers IPC (a shell mid-startup counts) and leaves
+# out the dead, which is what "is the slot taken" needs; an IPC ping would read a
+# starting, a wedged and a departed shell all alike, as free.
+slot_occupied() {
+  local listed
+  listed=$(quickshell list -j -p "$OMARCHY_PATH/shell" 2>/dev/null) || return 1
+  [[ $listed == \[* ]]
+}
+
+# Wait for the config's single instance slot to free before launching into it.
+# An instance that keeps running is a session with a shell, and the only party
+# that can hand the slot back is that instance dying; a supervisor that leaves in
+# the meantime leaves nothing to notice when it does.
+wait_for_slot() {
+  while slot_occupied; do
+    (( terminating )) && return 1
+    sleep 0.5
+  done
+
+  return 0
+}
+
+# Qt leaves through _exit() when the Wayland connection fails, raising no signal:
+# no crash report, no relaunch, no bar. Supervise those deaths. A signal here
+# means the session is going, and has to reach the shell the launcher used to
+# exec; a clean exit is a deliberate stop (omarchy-restart-shell starts its own
+# replacement), and the loop below is left to tell one from an instance this
+# supervisor does not own.
 terminating=0
 shell_pid=""
 
@@ -60,6 +103,32 @@ stop() {
 }
 trap stop HUP INT TERM
 
+# Exactly one supervisor per session. Two of them would each raise their own
+# engine, which is the duplicate everything above exists to prevent, and the
+# handover omarchy-restart-shell does -- stop the shell, then start a fresh
+# launcher -- is a supervisor start overlapping the old supervisor's shutdown.
+# flock goes with the process, so a supervisor that dies, cleanly or not, never
+# blocks the next one; the retry rides out that handover. A launcher that cannot
+# even open the lock file supervises unguarded rather than leave the session
+# without a shell.
+claim_supervision() {
+  local attempt runtime=${XDG_RUNTIME_DIR:-/run/user/$UID} display=${WAYLAND_DISPLAY##*/}
+
+  exec 9>"$runtime/omarchy-shell-supervisor.${display:-nosession}.lock" || return 0
+
+  for (( attempt = 0; attempt < 20; attempt++ )); do
+    flock -n 9 && return 0
+    sleep 0.25
+  done
+
+  return 1
+}
+
+if ! claim_supervision; then
+  logger -t omarchy-shell "Another Omarchy shell supervisor is running; exiting."
+  exit 0
+fi
+
 attempts=0
 window_started=$SECONDS
 
@@ -67,11 +136,23 @@ while true; do
   # A signal during the backoff only reaches the trap once the sleep is over.
   (( terminating )) && exit 0
 
+  # Never launch into a slot another engine holds.
+  wait_for_slot || exit 0
+
   run_shell
   status=$?
 
   (( terminating )) && exit 0
-  (( status == 0 )) && exit 0
+
+  if (( status == 0 )); then
+    # A clean exit is a deliberate stop (omarchy-restart-shell starts its own
+    # replacement), unless an instance this supervisor does not own holds the
+    # slot: then that one is the only shell the session has, nobody is watching
+    # it, and a session with no supervisor is how the stranded lock starts.
+    slot_occupied || exit 0
+    logger -t omarchy-shell "Another Omarchy shell instance holds the slot; supervising it."
+    continue
+  fi
 
   # Relaunching into a session already tearing down burns the attempt budget.
   compositor_alive || exit 0

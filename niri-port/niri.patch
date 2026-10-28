@@ -466,12 +466,17 @@ index 69d4c2291..95123785c 100755
    # omarchy-mise-install's wrappers run `mise use` and `mise x`, current ones on
    # lines of their own and older ones after an inline variable; either way
 diff --git a/default/omarchy/omarchy-menu.jsonc b/default/omarchy/omarchy-menu.jsonc
-index da07a04ff..3dda80f53 100644
+index da07a04..8f762b8 100644
 --- a/default/omarchy/omarchy-menu.jsonc
 +++ b/default/omarchy/omarchy-menu.jsonc
-@@ -179,9 +179,9 @@
+@@ -178,10 +178,14 @@
+   "trigger.tests.network-speedtest": {"icon":"󰓅","label":"Network Speed Test","action":"omarchy-shell shell summon omarchy.speedtest"},
    "trigger.tests.disk-speedtest": {"icon":"󰋊","label":"Disk Speed Test","action":"omarchy-shell shell summon omarchy.disk-speedtest"},
  
++  "style.avatar": {"icon":"󰀉","label":"Avatar"},
++  "style.avatar.image": {"icon":"","label":"Set From Image","action":"omarchy-avatar pick"},
++  "style.avatar.default": {"icon":"","label":"Restore Default","action":"omarchy-avatar default"},
++
    // Setup
 -  "setup.monitors": {"icon":"󰍹","label":"Monitors","action":"omarchy-launch-config-editor \"$HOME/.config/hypr/monitors.lua\""},
 -  "setup.keybindings": {"icon":"","label":"Keybindings","when":"[[ -f ~/.config/hypr/bindings.lua ]]","action":"omarchy-launch-config-editor \"$HOME/.config/hypr/bindings.lua\""},
@@ -482,7 +487,7 @@ index da07a04ff..3dda80f53 100644
    "setup.typing": {"icon":"","label":"Typing"},
    "setup.typing.keyboard": {"icon":"","label":"Keyboard Layouts","action":"omarchy-setup-keyboard"},
    "setup.typing.input": {"icon":"","label":"Input Methods","action":"omarchy-setup-input"},
-@@ -197,6 +197,8 @@
+@@ -197,6 +201,8 @@
    "setup.default.agent": {"icon":"󰚩","label":"Agent","title":"Default Agent"},
    "setup.default.agent.amp": {"icon":"","iconFont":"omarchy","label":"Amp","checked":"[[ \"$(omarchy-default-agent)\" == \"amp\" ]]","action":"omarchy-default-agent amp"},
    "setup.default.agent.agy": {"icon":"","iconFont":"omarchy","label":"Antigravity","checked":"[[ \"$(omarchy-default-agent)\" == \"agy\" ]]","action":"omarchy-default-agent agy"},
@@ -491,7 +496,7 @@ index da07a04ff..3dda80f53 100644
    "setup.default.agent.claude": {"icon":"","iconFont":"omarchy","label":"Claude","checked":"[[ \"$(omarchy-default-agent)\" == \"claude\" ]]","action":"omarchy-default-agent claude"},
    "setup.default.agent.codex": {"icon":"","iconFont":"omarchy","label":"Codex","checked":"[[ \"$(omarchy-default-agent)\" == \"codex\" ]]","action":"omarchy-default-agent codex"},
    "setup.default.agent.commandcode": {"icon":"","iconFont":"omarchy","label":"Command Code","checked":"[[ \"$(omarchy-default-agent)\" == \"commandcode\" ]]","action":"omarchy-default-agent commandcode"},
-@@ -259,14 +261,17 @@
+@@ -259,14 +265,17 @@
    "setup.security.sudoless-docker": {"icon":"󰡨","label":"Sudoless Docker","when":"omarchy-sudo-docker --configured","action":"omarchy-launch-floating-terminal-with-presentation omarchy-setup-security-sudoless-docker"},
    "setup.security.passwordless-sudo": {"icon":"󰟵","label":"Passwordless Sudo","action":"omarchy-launch-floating-terminal-with-presentation omarchy-sudo-passwordless"},
    "setup.config.git": {"icon":"","label":"Git","action":"omarchy-launch-floating-terminal-with-presentation omarchy-setup-git"},
@@ -512,7 +517,7 @@ index da07a04ff..3dda80f53 100644
    "install.ai": {"icon":"󱚤","label":"AI"},
    "install.service": {"icon":"","label":"Service"},
    "install.development": {"icon":"󰵮","label":"Development"},
-@@ -287,7 +292,7 @@
+@@ -287,7 +296,7 @@
    "install.terminal": {"icon":"","label":"Terminal"},
    "install.tui": {"icon":"","label":"TUI","action":"omarchy-launch-floating-terminal-with-presentation omarchy-tui-install"},
    "install.windows": {"icon":"󰍲","label":"Windows","when":"omarchy-hw-x86","disabled":"[[ -f $HOME/.local/share/applications/windows-vm.desktop ]]","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy-windows-vm install'"},
@@ -521,7 +526,7 @@ index da07a04ff..3dda80f53 100644
    "install.preinstalls": {"icon":"󰏓","label":"Preinstalls","disabled":"[[ ! -f $HOME/.local/state/omarchy/preinstalls-removed ]]","action":"omarchy-launch-floating-terminal-with-presentation omarchy-install-preinstalls"},
    "install.browser.chrome": {"icon":"","label":"Chrome","disabled":"omarchy-pkg-present google-chrome","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy-install-browser chrome'"},
    "install.browser.edge": {"icon":"󰇩","label":"Edge","when":"omarchy-hw-x86","disabled":"omarchy-pkg-present microsoft-edge-stable-bin","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy-install-browser edge'"},
-@@ -360,7 +365,8 @@
+@@ -360,7 +369,8 @@
    "install.development.elixir.phoenix": {"icon":"","label":"Phoenix","disabled":"compgen -G \"$HOME/.mix/archives/phx_new*\"","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy-install-dev-env phoenix'"},
  
    // Remove
@@ -531,7 +536,7 @@ index da07a04ff..3dda80f53 100644
    "remove.ai": {"icon":"󱚤","label":"AI","title":"Remove"},
    "remove.dictation": {"icon":"","label":"Dictation","when":"omarchy-pkg-present voxtype-bin || omarchy-pkg-present superwhisper-bin"},
    "remove.service": {"icon":"","label":"Services","title":"Remove"},
-@@ -446,10 +452,10 @@
+@@ -446,10 +456,10 @@
    "update.channel.rc": {"icon":"🟡","label":"RC","checked":"[[ \"$(omarchy-channel-current)\" == \"rc\" ]]","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy-channel-set rc'"},
    "update.channel.edge": {"icon":"🟠","label":"Edge","checked":"[[ \"$(omarchy-channel-current)\" == \"edge\" ]]","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy-channel-set edge'"},
    "update.channel.dev": {"icon":"🔴","label":"Dev","checked":"[[ \"$(omarchy-channel-current)\" == \"dev\" ]]","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy-channel-set dev'"},

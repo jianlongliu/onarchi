@@ -16,7 +16,7 @@ fi
 
 pkill slurp && exit 0
 
-SCREENSHOT_EDITOR="${OMARCHY_SCREENSHOT_EDITOR:-tensaku-edit}"
+SCREENSHOT_EDITOR="${OMARCHY_SCREENSHOT_EDITOR:-satty}"
 
 # Parse --editor flag from any position
 ARGS=()
@@ -70,7 +70,7 @@ case "$PROCESSING" in
     # notification outage must not report the capture itself as failed.
     omarchy-notification-send "Screenshot saved to clipboard and file" "Edit with Super + Alt + , (or click this)" \
       --image "$FILEPATH" \
-      --exec "$SCREENSHOT_EDITOR" "$FILEPATH" || true
+      --exec "$SCREENSHOT_EDITOR" --filename "$FILEPATH" || true
     ;;
   copy)
     grim -g "$SELECTION" - | wl-copy --type image/png

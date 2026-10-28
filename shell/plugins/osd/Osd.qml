@@ -126,7 +126,18 @@ Item {
   PanelWindow {
     id: panel
     visible: root.opened
-    anchors { top: true; bottom: true; left: true; right: true }
+    // Card-sized surface instead of a full-screen transparent layer: a
+    // full-screen surface would let the compositor-side background blur frost
+    // the entire display (and Quickshell's blurRegion region tracking is
+    // unreliable on niri). With the surface itself sized to the card, the
+    // layer-rule blur (effects.kdl) only ever frosts the card area.
+    anchors { left: true; right: true; bottom: true }
+    margins {
+      left: Math.max(0, Math.round((Quickshell.screens[0].width - card.width) / 2))
+      right: Math.max(0, Math.round((Quickshell.screens[0].width - card.width) / 2))
+      bottom: Style.space(67)
+    }
+    implicitHeight: card.height
     color: "transparent"
     WlrLayershell.namespace: "omarchy-osd"
     WlrLayershell.layer: WlrLayer.Overlay
@@ -140,10 +151,7 @@ Item {
       id: card
       width: card.borderLeft + root.pad + root.contentWidth + root.pad + card.borderRight
       height: card.borderTop + root.pad + Style.font.displayLarge + root.pad + card.borderBottom
-      anchors.horizontalCenter: parent.horizontalCenter
-      anchors.bottom: parent.bottom
-      anchors.bottomMargin: Style.space(67)
-      color: Util.alpha(Color.background, 0.97)
+      color: Color.menu.background
       borderSpec: Border.surfaceSpec("popups", "border", Color.popups.border, Math.max(1, Style.space(2)))
       radius: Style.cornerRadius
       opacity: root.opened ? 1 : 0
@@ -159,6 +167,7 @@ Item {
           width: root.iconWidth
           height: parent.height
           Text {
+            textFormat: Text.PlainText
             // Sit the glyph's ink flush in the column, centered when the
             // column is wider than this particular glyph.
             x: Math.round((root.iconWidth - root.iconInkWidth) / 2 - iconMetrics.tightBoundingRect.x)
@@ -186,6 +195,7 @@ Item {
           }
         }
         Text {
+          textFormat: Text.PlainText
           visible: root.message !== ""
           width: root.hasProgress ? root.valueWidth : root.messageWidth
           // The readout hugs the card edge so a short percentage doesn't leave

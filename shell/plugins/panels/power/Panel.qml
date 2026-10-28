@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Services.UPower
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "Model.js" as Model
 
@@ -18,6 +19,14 @@ Panel {
   property var profiles: []
   property string activeProfile: ""
   property int profileIndex: 0
+  property int chargeLimitIndex: 0
+  // Set the moment a preset is clicked so the highlight moves before pkexec
+  // returns — the polkit round trip costs 2-4s on this machine, which made the
+  // button look unresponsive. refresh() on exit overwrites it with the value
+  // actually read back from sysfs, so a write that silently fails unlights it.
+  property int chargePendingIndex: -1
+  // Which picker the keyboard cursor sits in: 0 = power profile, 1 = charge limit.
+  property int focusSection: 0
   property bool cursorActive: false
   readonly property bool showPercentage: setting("showPercentage", false) === true
   // With the percentage shown the button paints a text block wider than an
@@ -47,6 +56,15 @@ Panel {
     setProfile(profiles[profileIndex])
   }
 
+  function selectChargeLimitByDelta(delta) {
+    chargeLimitIndex = Model.clampIndex(chargeLimitIndex + delta, chargeLimits.length)
+  }
+
+  function activateSelectedChargeLimit() {
+    if (chargeLimitIndex < 0 || chargeLimitIndex >= chargeLimits.length) return
+    setChargeLimit(chargeLimitIndex, chargeLimits[chargeLimitIndex])
+  }
+
   function batteryIcon() {
     var device = UPower.displayDevice
     return Model.batteryIcon(device, root.discharging, upowerStates())
@@ -54,12 +72,26 @@ Panel {
 
   function modeLabel() {
     var device = UPower.displayDevice
-    return Model.modeLabel(device, root.discharging, upowerStates())
+    return Model.modeLabel(device, root.discharging, upowerStates(), Commons.I18n.t)
   }
 
   function profileIcon(name) {
     return Model.profileIcon(name)
   }
+
+  // Charge-threshold presets, mapped onto TLP's START/STOP_CHARGE_THRESH_BAT0.
+  // Protect keeps the pack off the top and matches what /etc/tlp.conf ships;
+  // Full is a one-shot — tlp setcharge only writes the runtime sysfs values, so
+  // a TLP restart or a reboot falls back to the config file.
+  readonly property var chargeLimits: [
+    { label: "Protect", start: 75, stop: 80, icon: "󰁾" },
+    { label: "Full", start: 95, stop: 100, icon: "󰂅" }
+  ]
+
+  // What the battery is holding right now as "START-STOP" — omarchy-battery-status
+  // prints the threshold field as e.g. "75-80%". A hand-set pair matches neither
+  // preset, and then neither button lights up, which is the honest answer.
+  readonly property string currentChargeLimit: String(root.batteryInfo.threshold || "").replace("%", "")
 
   readonly property bool fullyCharged: {
     var device = UPower.displayDevice
@@ -88,32 +120,32 @@ Panel {
   }
 
   readonly property color batteryFillColor: {
-    return root.bar ? root.bar.foreground : Color.foreground
+    return root.bar ? root.bar.foreground : Commons.Color.foreground
   }
 
   // Cute agent-flavored phrases shown in the hero status line, rotated on a
   // timer so the panel feels alive when current is flowing (either direction).
   readonly property var chargingPhrases: [
-    "Pumping power",
-    "Injecting electrons",
-    "Pouring juice",
-    "Amassing watts",
-    "Hoarding joules",
-    "Sucking volts",
-    "Topping reserves",
-    "Soaking amps",
-    "Inhaling kilowatts"
+    Commons.I18n.t("power.chargingPhrase1"),
+    Commons.I18n.t("power.chargingPhrase2"),
+    Commons.I18n.t("power.chargingPhrase3"),
+    Commons.I18n.t("power.chargingPhrase4"),
+    Commons.I18n.t("power.chargingPhrase5"),
+    Commons.I18n.t("power.chargingPhrase6"),
+    Commons.I18n.t("power.chargingPhrase7"),
+    Commons.I18n.t("power.chargingPhrase8"),
+    Commons.I18n.t("power.chargingPhrase9")
   ]
   readonly property var onBatteryPhrases: [
-    "Slurping power",
-    "Spending joules",
-    "Draining watts",
-    "Burning electrons",
-    "Sipping juice",
-    "Spending coulombs",
-    "Bleeding amps",
-    "Guzzling volts",
-    "Munching reserves"
+    Commons.I18n.t("power.dischargingPhrase1"),
+    Commons.I18n.t("power.dischargingPhrase2"),
+    Commons.I18n.t("power.dischargingPhrase3"),
+    Commons.I18n.t("power.dischargingPhrase4"),
+    Commons.I18n.t("power.dischargingPhrase5"),
+    Commons.I18n.t("power.dischargingPhrase6"),
+    Commons.I18n.t("power.dischargingPhrase7"),
+    Commons.I18n.t("power.dischargingPhrase8"),
+    Commons.I18n.t("power.dischargingPhrase9")
   ]
   property int phraseIndex: 0
 
@@ -126,8 +158,14 @@ Panel {
   }
   readonly property bool rotatingPhrases: activePhrases.length > 0
 
+  // The battery script's readings in the current language's digits; the
+  // time field already comes translated, so it is shown as it arrives.
+  function reading(raw) {
+    return Model.localizeReading(raw, Commons.I18n.formatNumber)
+  }
+
   readonly property string heroStatusText: {
-    if (fullyCharged) return "Fully charged"
+    if (fullyCharged) return Commons.I18n.t("power.fullyCharged")
     if (rotatingPhrases) return activePhrases[phraseIndex % activePhrases.length]
     return modeLabel()
   }
@@ -169,12 +207,24 @@ Panel {
     actionProc.running = true
   }
 
+  // pkexec so the sysfs write lands as root. It only returns without a prompt
+  // because /etc/polkit-1/rules.d/49-tlp.rules pre-authorises /usr/bin/tlp.
+  // Without that rule an unruled pkexec stalls here instead of prompting: the
+  // shell does register a polkit agent, but it fails to authenticate on this
+  // machine, so a stalled call never surfaces a password box.
+  function setChargeLimit(index, preset) {
+    if (!preset || actionProc.running) return
+    chargePendingIndex = index
+    actionProc.command = ["pkexec", "tlp", "setcharge", String(preset.start), String(preset.stop)]
+    actionProc.running = true
+  }
+
   function togglePercentage() {
     root.settings = Object.assign({}, root.settings, { showPercentage: !root.showPercentage })
     if (root.bar && root.bar.shell) root.bar.shell.updateEntryInline(root.moduleName, root.settings)
   }
 
-  IpcHandler {
+  ShellIpc {
     target: "omarchy.power"
 
     function open() { root.open() }
@@ -188,7 +238,10 @@ Panel {
   onOpenedChanged: {
     if (opened) {
       if (!batteryPresent) {
-        close()
+        // Deferred: closing here writes the very property whose change
+        // is being notified, which QML reports as a binding loop for
+        // Panel.opened on every open attempt without a battery.
+        Qt.callLater(function() { root.close() })
         return
       }
 
@@ -196,6 +249,10 @@ Panel {
       var idx = profiles.indexOf(activeProfile)
       profileIndex = idx >= 0 ? idx : 0
       cursorActive = false
+      focusSection = 0
+      // A reopened panel always states the truth, even if a click's pkexec
+      // never returned (then the pending mark would otherwise still be shown).
+      chargePendingIndex = -1
     }
   }
 
@@ -225,7 +282,10 @@ Panel {
 
   Process {
     id: actionProc
-    onExited: root.refresh()
+    onExited: {
+      root.chargePendingIndex = -1
+      root.refresh()
+    }
   }
 
   Timer { interval: 5000; running: root.opened; repeat: true; onTriggered: root.refresh() }
@@ -245,8 +305,8 @@ Panel {
   SequentialAnimation {
     id: phraseSwap
     PropertyAnimation {
-      target: heroStatus; property: "opacity"
-      to: 0.0; duration: 180; easing.type: Easing.OutQuad
+      target: panel.loadedContent ? panel.loadedContent.heroStatus : null; property: "opacity"
+      to: 0.0; duration: Style.duration(150); easing.type: Easing.OutCubic
     }
     ScriptAction {
       script: {
@@ -255,8 +315,8 @@ Panel {
       }
     }
     PropertyAnimation {
-      target: heroStatus; property: "opacity"
-      to: 1.0; duration: 260; easing.type: Easing.InQuad
+      target: panel.loadedContent ? panel.loadedContent.heroStatus : null; property: "opacity"
+      to: 1.0; duration: Style.duration(200); easing.type: Easing.OutCubic
     }
   }
 
@@ -268,7 +328,7 @@ Panel {
     function onRotatingPhrasesChanged() {
       if (!root.rotatingPhrases) {
         phraseSwap.stop()
-        heroStatus.opacity = 1.0
+        if (panel.loadedContent) panel.loadedContent.heroStatus.opacity = 1.0
       }
     }
   }
@@ -277,9 +337,10 @@ Panel {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: root.showPercentage && !vertical
-      ? Math.round(root.batteryFraction * 100) + "% " + root.batteryIcon()
-      : root.batteryIcon()
+    // The percentage rides in labelText so it sits at the far right edge of the
+    // slot instead of trailing the icon inline (2026-09-26, user).
+    text: root.batteryIcon()
+    labelText: root.showPercentage && !vertical ? Commons.I18n.formatNumber(Math.round(root.batteryFraction * 100)) + "%" : ""
     slotSize: Style.bar.iconSlot * (root.showPercentage && !vertical ? 2 : 1)
     tooltipText: ""
     onPressed: function(b) {
@@ -295,19 +356,31 @@ Panel {
     owner: root
     bar: root.bar
     open: root.opened && root.batteryPresent
-    focusTarget: keyCatcher
+    focusTarget: panel.loadedContent
     contentWidth: panel.fittedContentWidth(Style.space(380))
-    contentHeight: panel.fittedContentHeight(column.implicitHeight)
+    contentHeight: panel.fittedContentHeight(panel.loadedContentHeight)
 
-    PanelKeyCatcher {
+    content: PanelKeyCatcher {
       id: keyCatcher
+      property alias heroStatus: heroStatus
       anchors.fill: parent
+      implicitHeight: column.implicitHeight
+      // Vertical moves hop between the two pickers; horizontal moves walk the
+      // buttons inside whichever picker currently holds the cursor.
       onMoveRequested: function(dx, dy) {
         if (!root.cursorActive) { root.cursorActive = true; return }
-        if (dx !== 0) root.selectProfileByDelta(dx)
-        else if (dy !== 0) root.selectProfileByDelta(dy)
+        if (dy !== 0) {
+          root.focusSection = root.focusSection === 0 ? 1 : 0
+        } else if (dx !== 0) {
+          if (root.focusSection === 0) root.selectProfileByDelta(dx)
+          else root.selectChargeLimitByDelta(dx)
+        }
       }
-      onActivateRequested: if (root.cursorActive) root.activateSelectedProfile()
+      onActivateRequested: {
+        if (!root.cursorActive) return
+        if (root.focusSection === 0) root.activateSelectedProfile()
+        else root.activateSelectedChargeLimit()
+      }
       onCloseRequested: root.close()
       onTabRequested: function(direction) { root.switchPanel(direction) }
 
@@ -325,6 +398,7 @@ Panel {
 
           Text {
             id: heroIcon
+            textFormat: Text.PlainText
             text: root.batteryIcon()
             color: root.bar.foreground
             font.family: root.bar.fontFamily
@@ -332,7 +406,7 @@ Panel {
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
 
-            Behavior on color { ColorAnimation { duration: 200 } }
+            Behavior on color { ColorAnimation { duration: Style.duration(200) } }
           }
 
           Column {
@@ -345,7 +419,8 @@ Panel {
             spacing: Style.space(2)
 
             Text {
-              text: "Battery"
+              text: Commons.I18n.t("power.battery")
+              textFormat: Text.PlainText
               color: root.bar.foreground
               font.family: root.bar.fontFamily
               font.pixelSize: Style.font.title
@@ -356,6 +431,7 @@ Panel {
 
             Text {
               id: heroStatus
+              textFormat: Text.PlainText
               text: root.heroStatusText.toUpperCase()
               color: Qt.darker(root.bar.foreground, 1.4)
               font.family: root.bar.fontFamily
@@ -369,7 +445,8 @@ Panel {
 
           Text {
             id: heroPercent
-            text: root.batteryInfo.percentage || "—"
+            textFormat: Text.PlainText
+            text: root.reading(root.batteryInfo.percentage) || "—"
             color: root.bar.foreground
             font.family: root.bar.fontFamily
             font.pixelSize: Style.font.displayLarge
@@ -377,7 +454,7 @@ Panel {
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
 
-            Behavior on color { ColorAnimation { duration: 200 } }
+            Behavior on color { ColorAnimation { duration: Style.duration(200) } }
           }
         }
 
@@ -402,16 +479,16 @@ Panel {
             color: root.batteryFillColor
             width: Math.max(barTrack.height, barTrack.width * root.batteryFraction)
 
-            Behavior on width { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
-            Behavior on color { ColorAnimation { duration: 220 } }
+            Behavior on width { NumberAnimation { duration: Style.duration(320); easing.type: Easing.OutCubic } }
+            Behavior on color { ColorAnimation { duration: Style.duration(220) } }
 
             // Subtle pulse while charging — visible signal that energy is flowing in.
             SequentialAnimation on opacity {
-              running: root.charging && !root.fullyCharged && root.opened
+              running: root.charging && !root.fullyCharged && root.opened && !Style.reduceMotion
               loops: Animation.Infinite
               alwaysRunToEnd: true
-              NumberAnimation { from: 1.0; to: 0.55; duration: 950; easing.type: Easing.InOutSine }
-              NumberAnimation { from: 0.55; to: 1.0; duration: 950; easing.type: Easing.InOutSine }
+              NumberAnimation { from: 1.0; to: 0.55; duration: Style.duration(950); easing.type: Easing.InOutSine }
+              NumberAnimation { from: 0.55; to: 1.0; duration: Style.duration(950); easing.type: Easing.InOutSine }
             }
           }
         }
@@ -430,20 +507,20 @@ Panel {
           Column {
             width: (parent.width - parent.spacing) / 2
             spacing: Style.spacing.labelGap
-            InfoPair { label: "Battery size"; value: root.batteryInfo.size || "" }
-            InfoPair { label: "Charge cycles"; value: root.batteryInfo.cycles || "—" }
+            InfoPair { label: Commons.I18n.t("power.batterySize"); value: root.reading(root.batteryInfo.size) }
+            InfoPair { label: Commons.I18n.t("power.chargeCycles"); value: root.reading(root.batteryInfo.cycles) || "—" }
           }
 
           Column {
             width: (parent.width - parent.spacing) / 2
             spacing: Style.spacing.labelGap
             InfoPair {
-              label: root.chargeThresholdActive ? "Charge limit" : (root.discharging ? "Time left" : "Time to full")
-              value: root.chargeThresholdActive ? (root.batteryInfo.threshold || "-") : (root.batteryFlowIdle ? "-" : (root.batteryInfo.time || "—"))
+              label: root.chargeThresholdActive ? Commons.I18n.t("power.chargeLimit") : (root.discharging ? Commons.I18n.t("power.timeLeft") : Commons.I18n.t("power.timeToFull"))
+              value: root.chargeThresholdActive ? (root.reading(root.batteryInfo.threshold) || "-") : (root.batteryFlowIdle ? "-" : (root.batteryInfo.time || "—"))
             }
             InfoPair {
-              label: root.chargeThresholdActive ? "Battery state" : (root.discharging ? "Discharging" : "Charging")
-              value: root.chargeThresholdActive ? "Holding" : (root.batteryFull ? "-" : (root.batteryInfo.rate || ""))
+              label: root.chargeThresholdActive ? Commons.I18n.t("power.batteryState") : (root.discharging ? Commons.I18n.t("power.discharging") : Commons.I18n.t("power.charging"))
+              value: root.chargeThresholdActive ? Commons.I18n.t("power.holding") : (root.batteryFull ? "-" : root.reading(root.batteryInfo.rate))
             }
           }
         }
@@ -458,7 +535,7 @@ Panel {
           spacing: Style.space(10)
 
           PanelSectionHeader {
-            text: "POWER PROFILE"
+            text: Commons.I18n.t("power.powerProfile")
             foreground: root.bar.foreground
             fontFamily: root.bar.fontFamily
           }
@@ -480,7 +557,7 @@ Panel {
                 width: profileRow.cellWidth
                 iconText: root.profileIcon(String(modelData))
                 iconSize: Style.font.title
-                text: String(modelData).charAt(0).toUpperCase() + String(modelData).slice(1)
+                text: Model.profileLabel(modelData, Commons.I18n.t)
                 fontSize: Style.font.bodySmall
                 foreground: root.bar.foreground
                 fontFamily: root.bar.fontFamily
@@ -488,12 +565,91 @@ Panel {
                 verticalPadding: Style.spacing.controlPaddingY + Style.space(2)
                 bordered: true
                 active: root.activeProfile === modelData
-                hasCursor: root.cursorActive && root.profileIndex === index
+                hasCursor: root.cursorActive && root.focusSection === 0 && root.profileIndex === index
                 onClicked: root.setProfile(modelData)
                 onHovered: function(h) {
                   if (h) {
                     root.cursorActive = true
                     root.profileIndex = index
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        // ---------- Charge limit picker ----------
+        PanelSeparator {
+          foreground: root.bar.foreground
+        }
+
+        Column {
+          width: parent.width
+          spacing: Style.space(10)
+
+          // Header plus a right-aligned readout of what the pack is actually
+          // holding, so the section states the current value itself instead of
+          // leaving it to be inferred from which button is lit.
+          Item {
+            width: parent.width
+            implicitHeight: Math.max(chargeHeader.implicitHeight, chargeNow.implicitHeight)
+
+            PanelSectionHeader {
+              id: chargeHeader
+              text: "CHARGE LIMIT"
+              foreground: root.bar.foreground
+              fontFamily: root.bar.fontFamily
+              anchors.left: parent.left
+              anchors.verticalCenter: parent.verticalCenter
+            }
+
+            Text {
+              id: chargeNow
+              text: "now " + (root.batteryInfo.threshold || "—")
+              textFormat: Text.PlainText
+              color: chargeHeader.color
+              font.family: chargeHeader.font.family
+              font.pixelSize: chargeHeader.font.pixelSize
+              font.bold: true
+              anchors.right: parent.right
+              anchors.verticalCenter: parent.verticalCenter
+            }
+          }
+
+          Row {
+            id: chargeRow
+            width: parent.width
+            spacing: Style.space(6)
+
+            readonly property real cellWidth: root.chargeLimits.length > 0
+              ? (width - spacing * (root.chargeLimits.length - 1)) / root.chargeLimits.length
+              : 0
+
+            Repeater {
+              model: root.chargeLimits
+              Button {
+                required property var modelData
+                required property int index
+                width: chargeRow.cellWidth
+                iconText: modelData.icon
+                iconSize: Style.font.title
+                text: modelData.label + " " + modelData.stop + "%"
+                fontSize: Style.font.bodySmall
+                foreground: root.bar.foreground
+                fontFamily: root.bar.fontFamily
+                horizontalPadding: Style.spacing.controlPaddingX
+                verticalPadding: Style.spacing.controlPaddingY + Style.space(2)
+                bordered: true
+                active: root.chargePendingIndex >= 0
+                  ? root.chargePendingIndex === index
+                  : root.currentChargeLimit === (modelData.start + "-" + modelData.stop)
+                hasCursor: root.cursorActive && root.focusSection === 1 && root.chargeLimitIndex === index
+                onClicked: root.setChargeLimit(index, modelData)
+                onHovered: function(h) {
+                  if (h) {
+                    root.cursorActive = true
+                    root.focusSection = 1
+                    root.chargeLimitIndex = index
                   }
                 }
               }
@@ -517,6 +673,7 @@ Panel {
   }
 
   component InfoLabel: Text {
+    textFormat: Text.PlainText
     color: root.bar.foreground
     opacity: 0.6
     font.family: root.bar.fontFamily
@@ -524,6 +681,7 @@ Panel {
   }
 
   component InfoValue: Text {
+    textFormat: Text.PlainText
     color: root.bar.foreground
     font.family: root.bar.fontFamily
     font.pixelSize: Style.font.bodySmall
