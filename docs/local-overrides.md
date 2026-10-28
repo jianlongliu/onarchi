@@ -571,6 +571,47 @@ cp /tmp/niri.patch ~/.config/omarchy/niri-port/niri.patch              # 重放�
 
 ---
 
+## 8.1 Omarchy 官方源已加入（2026-10-28）
+
+**为什么加**：`omasnap`（截屏）、`monologue`（摄像头录制）、`hype`（Markdown 演示）、`signed`（PDF 签名）、
+`disktree-bin`（磁盘用量）这 5 个工具**只在 Omarchy 自家仓库**，Arch 官方没有。之前一直装不了，就是因为没配源。
+
+**配置**（`/etc/pacman.conf`，备份 `pacman.conf.bak-20261028-*`）：
+
+```
+[omarchy]
+Server = https://pkgs.omarchy.org/stable/$arch
+
+[core]
+...
+```
+
+**插在 `[core]` 之前**（照上游 `default/pacman/pacman-stable.conf` 的顺序）—— 上游这么排是为了让
+Omarchy 的构建**覆盖** Arch 的同名包。对本机的实际影响：
+
+- `omarchy-nvim` 会替代 `neovim`、`omarchy-power-profiles-daemon` 会替代 `power-profiles-daemon`。
+  **本机目前都没装这两个**，所以暂时无影响；但将来 `pacman -Syu` 若有人装过官方版，会被换成 omarchy 版。
+- `IgnorePkg` 那 16 个 Qt 包仍然生效（源顺序不影响 IgnorePkg）。
+
+**Key**：`pacman-key --recv-keys 40DFB630FF42BCFFB047046CF0134EE680CAC571 --keyserver keyserver.ubuntu.com`
+（`keys.openpgp.org` 当时返回 `End of file`，换 ubuntu 那个才通；导入后 `pacman-key --list-keys` 显示 `[full]` 即可）。
+
+**仓库 URL 的坑**：`https://pkgs.omarchy.org/stable/$arch` 是对的，但数据库文件名是 **`omarchy.db`**
+（仓库名），不是 `stable.db`。用 `curl -sI .../stable/x86_64/omarchy.db` 验活，返回 200 就说明源正常。
+
+**已装**：`omasnap 1.24.0`、`monologue 0.3.1`、`hype 0.6.0`、`signed 0.3.1`、`disktree-bin 0.11.0`
+（+ 依赖 `poppler-qt6`）。`satty` 已退役（`pkexec pacman -R satty`），`imv` 的 `<Ctrl+e>`
+已改指 `omasnap`（迁移 `1788129995` 的 sudo 步骤跑不通，这部分手工补的）。
+
+**没装**：AI agent 那几个（`1786967403` Kimi、`1790863209` Grok、`1792334754` OpenClaw、
+`1792345511` T3 Code、`1790017600` 退役 Hermes）—— 用户明确跳过。
+
+**回退**：删掉 `/etc/pacman.conf` 里 `[omarchy]` 那两行 + `pacman -Sy`；已装的 5 个包
+`pkexec pacman -R omasnap monologue hype signed disktree-bin`。原文件在
+`/etc/pacman.conf.bak-20261028-*`。
+
+---
+
 ## 9. 一句话回退索引
 
 | 想撤销 | 命令 |
