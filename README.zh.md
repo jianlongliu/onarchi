@@ -1,4 +1,4 @@
-# Omarchy on niri
+# Onarchi - Omarchy on niri
 
 > **English → [README.md](README.md)**
 

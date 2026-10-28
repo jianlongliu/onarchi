@@ -1,4 +1,4 @@
-# Omarchy on niri
+# Onarchi - Omarchy on niri
 
 > **简体中文 → [README.zh.md](README.zh.md)**
 
