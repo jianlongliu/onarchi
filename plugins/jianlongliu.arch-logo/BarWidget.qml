@@ -15,7 +15,13 @@ BarWidget {
   id: root
   moduleName: "jianlongliu.arch-logo"
 
-  readonly property int markSize: Style.bar.iconSize
+  // iconCanvas, not iconSize: iconSize is the size a *glyph* is drawn at, where
+  // the font's own ink already fills the box. The Arch mark's path leaves a
+  // margin inside its 256x256 viewBox, so at the glyph size it read lighter
+  // than every icon beside it -- 22 units of ink against the battery's 25, and
+  // visibly small next to the tray. The canvas puts it level with its
+  // neighbours; anything larger (tried 24) overshoots them.
+  readonly property int markSize: Style.bar.iconCanvas
 
   implicitWidth: button.implicitWidth
   implicitHeight: button.implicitHeight
