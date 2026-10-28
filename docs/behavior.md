@@ -639,8 +639,9 @@ Omarchy 有两层配置，只有层1在 niri 上真正生效：
       （其中 `qs ipc` 进程启动 ~50ms）+ QML ~68ms（建 75 个 delegate 占 15~25ms）+ 首帧合成 ~90ms。
       异步不伤观感：开窗 320ms 与 1.5s 两张截图逐像素平均差 0.03（差 >8 的像素仅 0.1%），切片不缺图。
     - **冷缓存不用管**：行缓存按**目录 mtime** 失效，换主题后首次双击本要 ~600ms 重建；上游 `omarchy-theme-set`
-      结尾已有 `omarchy-theme-switcher --preload` + `omarchy-theme-bg-cache &` 兜底（实测后台重建 553ms、
-      之后脚本段 30ms）。`omarchy-theme-bg-set`（换壁纸）不动主题背景目录，不会让缓存失效。
+      结尾只跑 `omarchy-theme-bg-cache &` 焐热壁纸路径的缩略图（`--cache-only`），**不再预热主题行**——
+      2026-09-27 起主题行由壳层自己持有，打开时立刻渲染（原来那行 `omarchy-theme-switcher --preload` 已随
+      `24f124312` 删掉）。`omarchy-theme-bg-set`（换壁纸）不动主题背景目录，不会让缓存失效。
     - 改完必须 `omarchy-restart-shell`：`omarchy-launch-shell` 用 `QS_DISABLE_FILE_WATCHER=1` 起 quickshell，
       **QML 没有热重载**；QML 的 `console.log` 落在 `journalctl -t omarchy-shell`（查时序比截图准）。
     - **2026-09-20 续：用户纠正"不是切换，是打开那个 picker"，于是分层量了一遍** ——
@@ -652,8 +653,8 @@ Omarchy 有两层配置，只有层1在 niri 上真正生效：
       **修正一个曾经的误判**：不是"每次壳层启动重编译 shader" —— Qt 有磁盘着色器缓存
       `~/.cache/qtshadercache-x86_64-little_endian-lp64`（44K/3 文件，反复开 picker 不再写 = 命中），
       重启后重付的只是管线创建 + 纹理/FBO 分配，比编译轻。
-      **不对称（壁纸比主题更明显的原因）**：主题路径带 `--lazy-thumbnails`，且 `omarchy-theme-set:402` 换完主题会
-      `omarchy-theme-switcher --preload` 焐热；壁纸路径（`omarchy-theme-bg-switcher`）**两样都没有** —— 永远冷启动。
+      **不对称（壁纸比主题更明显的原因）**：主题路径带 `--lazy-thumbnails`，且主题行在壳层常驻、每次打开
+      刷新一遍；壁纸路径（`omarchy-theme-bg-switcher`）两样都没有 —— 永远冷启动。
     - **2026-09-20 新增：登录后台预热（用户「如果开机做预热可以延迟吗?」→「搞」）**。
       `~/.config/systemd/user/omarchy-picker-warmup.service`（软链进 `graphical-session.target.wants/`，
       照 `omarchy-crash-watch.service` 的式样：`After=/PartOf=graphical-session.target`、
@@ -666,11 +667,21 @@ Omarchy 有两层配置，只有层1在 niri 上真正生效：
       （systemd 支持在命令里做变量展开，实测生效）—— 预热会同步 fan-out `nproc` 个 vipsthumbnail，
       会话刚起来时跟它抢盘不划算；**② 不抢资源**：`Nice=19` + `IOSchedulingClass=idle`；
       **③ 可关**：`toggles/picker-warmup-off` 存在即跳过（沿用 crash-capture 的约定，不用 disable 单元）。
-      脚本做三件事：`omarchy-theme-switcher --preload`（顺手重建主题预览软链）、
+      脚本做三件事：`omarchy-theme-switcher --print-rows`（顺手重建主题预览软链）、
       `omarchy-menu-images --preload --selected … <主题 backgrounds> <用户 backgrounds/$theme_name>`
       （**参数必须与 `omarchy-theme-bg-switcher` 一字不差**，否则行集不同 = 白热；已核对 md5 键
       `b618dc51…` 同一份 74 行 rows 缓存）、`cat` 一遍 `*.jpg` 把 18M 缩略图拉进页缓存。
       **顺序有讲究**：QML 只保留最后一次 preload 的行集，所以壁纸那条必须放最后。
+      **⚠ 主题那条只能是 `--print-rows`，不能是 `--preload`**：上游 2026-09-27（`24f124312`
+      "Make the theme picker open instantly"）把 `omarchy-theme-switcher` 的 `--preload` 换成了
+      `--print-rows`（主题行改由壳层自己持有、打开时立刻渲染）。继续传 `--preload` 不报错，
+      只是被当未知参数忽略，脚本于是走到底部的 `exec omarchy-menu-images` —— **真的把选择器打开**：
+      登录约 45 秒后主题选择器自己盖在屏幕中央等选择，而且它等的是选择结果，不会自己消失。
+      症状是"重启后屏幕中央突然多出一张主题预览卡"，别误判成渲染坏 / GPU / 主题包问题。
+      `--print-rows` 只重建行数据并打印，不召唤 UI。
+      验法：手动跑 `~/bin/omarchy-picker-warmup`，`warmup: theme` 应是几十毫秒、退出码 0，且
+      `niri msg layers | grep image-selector` 为空；若 `theme` 那段飙到十几秒、图层里出现
+      `omarchy-image-selector`，就是又退回了会弹窗的档位。
       **实测**（`systemctl --user start --no-block`）：45.16s 后执行、`Result=success`、
       三段 `theme 113ms / background 98ms / thumbnails 10ms`；`touch toggles/picker-warmup-off` 后
       `ConditionResult=no` 直接跳过。**它省不掉首帧渲染**（`preload` 只装数据不画，`card.visible=false`

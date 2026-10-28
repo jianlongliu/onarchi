@@ -23,7 +23,12 @@ warm() {
   printf 'warmup: %-10s %6d ms\n' "$label" "$((ended - started))" >&2
 }
 
-warm theme omarchy-theme-switcher --preload
+# 主题预热必须用 --print-rows：上游 2026-09-27（24f124312 "Make the theme
+# picker open instantly"）删掉了 omarchy-theme-switcher 的 --preload，未知参数
+# 被忽略后脚本一路走到 exec omarchy-menu-images，等于真的打开选择器——登录约
+# 45 秒后主题选择器自己盖在屏幕中央等选择，而不是静默预热。--print-rows 只重建
+# 索引/缩略图行并打印，不召唤 UI。
+warm theme omarchy-theme-switcher --print-rows
 
 # Order matters: the shell keeps only the last preloaded row set in memory, so
 # the background picker goes last. Its arguments must stay identical to
