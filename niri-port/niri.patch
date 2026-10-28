@@ -1,10 +1,10 @@
 diff --git a/bin/omarchy-agent b/bin/omarchy-agent
-index e35bcf04..dbc35095 100755
+index ec632b983..d799827aa 100755
 --- a/bin/omarchy-agent
 +++ b/bin/omarchy-agent
-@@ -130,6 +130,14 @@ pi)
-   command=(pi)
-   [[ -n ${prompt:-} ]] && command+=("$prompt")
+@@ -197,6 +197,14 @@ commandcode)
+   command=(commandcode --yolo)
+   [[ -n ${prompt:-} ]] && command+=(-- "$prompt")
    ;;
 +ante)
 +  # --yolo is Ante's spelling of "don't stop to ask" (shorthand for
@@ -18,39 +18,147 @@ index e35bcf04..dbc35095 100755
    echo "Unsupported default agent: $agent" >&2
    exit 1
 diff --git a/bin/omarchy-battery-status b/bin/omarchy-battery-status
-index cc0a6024..0d044e2b 100755
+index 7f642e620..9776dec36 100755
 --- a/bin/omarchy-battery-status
 +++ b/bin/omarchy-battery-status
-@@ -62,11 +62,14 @@ power_rate=$(awk -v rate="${power_rate_raw:-0}" 'BEGIN {
+@@ -81,17 +81,18 @@ power_rate=$(awk -v rate="${power_rate_raw:-0}" 'BEGIN {
    print rounded
  }')
  state=$(awk '/state/ { print $2; exit }' <<<"$battery_info")
 -threshold_start=$(awk '/charge-start-threshold:/ { gsub(/%/, "", $2); print int($2); exit }' <<<"$battery_info")
 -threshold_end=$(awk '/charge-end-threshold:/ { gsub(/%/, "", $2); print int($2); exit }' <<<"$battery_info")
--
--[[ -z $threshold_end ]] && threshold_end=$(cat "$power_supply_path"/BAT*/charge_control_end_threshold 2>/dev/null | head -1)
--[[ -z $threshold_start ]] && threshold_start=$(cat "$power_supply_path"/BAT*/charge_control_start_threshold 2>/dev/null | head -1)
-+# sysfs first: UPower latches charge-*-threshold when it sets the device up and
-+# never re-reads it, so its copy goes stale the moment anything calls
-+# `tlp setcharge` — the panel then keeps showing (and lighting) the old pair.
-+threshold_start=$(cat "$power_supply_path"/BAT*/charge_control_start_threshold 2>/dev/null | head -1)
-+threshold_end=$(cat "$power_supply_path"/BAT*/charge_control_end_threshold 2>/dev/null | head -1)
-+
-+[[ -z $threshold_end ]] && threshold_end=$(awk '/charge-end-threshold:/ { gsub(/%/, "", $2); print int($2); exit }' <<<"$battery_info")
-+[[ -z $threshold_start ]] && threshold_start=$(awk '/charge-start-threshold:/ { gsub(/%/, "", $2); print int($2); exit }' <<<"$battery_info")
  
- ac_online=false
- for supply in "$power_supply_path"/*; do
+-# Read the thresholds from the battery UPower resolved rather than a BAT* glob,
+-# which misses every battery with another name.
+-[[ -n $threshold_end || ! -r $battery_path/charge_control_end_threshold ]] || threshold_end=$(<"$battery_path/charge_control_end_threshold")
+-[[ -n $threshold_start || ! -r $battery_path/charge_control_start_threshold ]] || threshold_start=$(<"$battery_path/charge_control_start_threshold")
++# sysfs first, UPower second. UPower latches charge-*-threshold when it sets the
++# device up and never re-reads it, so its copy goes stale the moment anything
++# calls `tlp setcharge` -- the panel then keeps showing (and lighting) the old
++# pair. The battery UPower resolved is preferred over a BAT* glob, which misses
++# every battery with another name.
++threshold_start=$(cat "$battery_path/charge_control_start_threshold" 2>/dev/null) || :
++threshold_end=$(cat "$battery_path/charge_control_end_threshold" 2>/dev/null) || :
+ # The time to full counts to this battery's own limit, never another one's.
+ charge_limit=${threshold_end:-100}
+-[[ -n $threshold_end ]] || threshold_end=$(cat "$power_supply_path"/BAT*/charge_control_end_threshold 2>/dev/null | head -1)
+-[[ -n $threshold_start ]] || threshold_start=$(cat "$power_supply_path"/BAT*/charge_control_start_threshold 2>/dev/null | head -1)
++[[ -n $threshold_start ]] || threshold_start=$(awk '/charge-start-threshold:/ { gsub(/%/, "", $2); print int($2); exit }' <<<"$battery_info")
++[[ -n $threshold_end ]] || threshold_end=$(awk '/charge-end-threshold:/ { gsub(/%/, "", $2); print int($2); exit }' <<<"$battery_info")
+ 
+ # Time left is the energy left over the draw shown beside it, so the two always
+ # agree; charging counts up to the charge limit. UPower's own estimate averages
+diff --git a/bin/omarchy-capture-screenshot b/bin/omarchy-capture-screenshot
+index 745bee2d4..ec5d3e60b 100755
+--- a/bin/omarchy-capture-screenshot
++++ b/bin/omarchy-capture-screenshot
+@@ -2,26 +2,81 @@
+ 
+ # omarchy:summary=Take a screenshot
+ # omarchy:group=capture
+-# omarchy:args=[smart|region|windows|fullscreen|scroll] [copy|save]
++# omarchy:args=[smart|region|windows|fullscreen] [slurp|copy|save] [--editor=<name>]
+ # omarchy:examples=omarchy screenshot | omarchy capture screenshot region
+ # omarchy:aliases=omarchy screenshot
+ 
+-if [[ -n ${OMARCHY_SCREENSHOT_DIR:-} && -z ${OMASNAP_SCREENSHOT_DIR:-} ]]; then
+-  export OMASNAP_SCREENSHOT_DIR="$OMARCHY_SCREENSHOT_DIR"
++[[ -f ~/.config/user-dirs.dirs ]] && source ~/.config/user-dirs.dirs
++OUTPUT_DIR="${OMARCHY_SCREENSHOT_DIR:-${XDG_PICTURES_DIR:-$HOME/Pictures}}"
++
++if [[ ! -d $OUTPUT_DIR ]]; then
++  mkdir -p "$OUTPUT_DIR"
++  omarchy-notification-send "Created screenshot directory: $OUTPUT_DIR" -t 2000
+ fi
+ 
+-# --notify announces saved shots with Open and Edit buttons instead of a
+-# preview. Omasnap reads that toast's text from this catalog itself:
+-#   omarchy-i18n capture.screenshotSaved, omarchy-i18n capture.screenshotSavedCopied,
+-#   omarchy-i18n capture.screenshotOpen, omarchy-i18n capture.screenshotEdit
+-omasnap_args=(--notify)
++pkill slurp && exit 0
++
++SCREENSHOT_EDITOR="${OMARCHY_SCREENSHOT_EDITOR:-satty}"
++
++# Parse --editor flag from any position
++ARGS=()
+ for arg in "$@"; do
+-  case "$arg" in
+-    copy) omasnap_args+=(--copy) ;;
+-    save) omasnap_args+=(--save) ;;
+-    slurp) ;;
+-    *) omasnap_args+=("$arg") ;;
+-  esac
++  if [[ $arg == --editor=* ]]; then
++    SCREENSHOT_EDITOR="${arg#--editor=}"
++  else
++    ARGS+=("$arg")
++  fi
+ done
++set -- "${ARGS[@]}"
++
++MODE="${1:-smart}"
++PROCESSING="${2:-slurp}"
++
++# The picker leaves the screen freeze running (PID on its first output line)
++# so grim captures the frozen overlay rather than live content shifting
++# during teardown.
++#
++# Software-composited cursors (Hyprland's fallback on GPUs without working
++# hardware cursors) are baked into the frames grim captures, so force
++# hardware cursors until after grim runs and restore the setting on exit.
++NO_HW_CURSORS=$(hyprctl getoption cursor:no_hardware_cursors -j | jq '.int')
++
++set_no_hw_cursors() {
++  hyprctl eval "hl.config({ cursor = { no_hardware_cursors = $1 } })" &>/dev/null ||
++    hyprctl keyword cursor:no_hardware_cursors "$1" &>/dev/null
++}
++
++cleanup() {
++  [[ -n $FREEZE_PID ]] && kill $FREEZE_PID 2>/dev/null
++  set_no_hw_cursors "$NO_HW_CURSORS"
++}
++trap cleanup EXIT
++
++set_no_hw_cursors 0
++{ read -r FREEZE_PID; read -r SELECTION; } < <(omarchy-capture-region "$MODE" --keep-freeze)
++
++[[ -z $SELECTION ]] && exit 0
++
++FILENAME="screenshot-$(date +'%Y-%m-%d_%H-%M-%S').png"
++FILEPATH="$OUTPUT_DIR/$FILENAME"
++
++case "$PROCESSING" in
++  slurp)
++    grim -g "$SELECTION" "$FILEPATH" || exit 1
++    echo "$FILEPATH"
++    wl-copy --type image/png <"$FILEPATH"
+ 
+-exec omasnap "${omasnap_args[@]}"
++    # Best-effort: the screenshot is already saved and on the clipboard, so a
++    # notification outage must not report the capture itself as failed.
++    omarchy-notification-send "Screenshot saved to clipboard and file" "Edit with Super + Alt + , (or click this)" \
++      --image "$FILEPATH" \
++      --exec "$SCREENSHOT_EDITOR" --filename "$FILEPATH" || true
++    ;;
++  copy)
++    grim -g "$SELECTION" - | wl-copy --type image/png
++    ;;
++  save)
++    grim -g "$SELECTION" "$FILEPATH" || exit 1
++    echo "$FILEPATH"
++    ;;
++esac
 diff --git a/bin/omarchy-default-agent b/bin/omarchy-default-agent
-index eb2ef7fb..f235102c 100755
+index 69d4c2291..b7227babf 100755
 --- a/bin/omarchy-default-agent
 +++ b/bin/omarchy-default-agent
 @@ -1,7 +1,7 @@
  #!/bin/bash
  
  # omarchy:summary=Set and launch the default coding agent
--# omarchy:args=[pi|omp|opencode|ori|claude|codex|grok|openclaw|agy|hermes|copilot|crush|cursor-agent|muse]
-+# omarchy:args=[pi|omp|opencode|ori|claude|codex|grok|openclaw|agy|hermes|copilot|crush|cursor-agent|muse|ante]
+-# omarchy:args=[pi|omp|opencode|ori|claude|codex|grok|openclaw|agy|hermes|copilot|crush|cursor-agent|muse|kimi|qwen|dsh|mcode|kiro-cli|freebuff|kilo|devin|amp|commandcode]
++# omarchy:args=[pi|omp|opencode|ori|claude|codex|grok|openclaw|agy|hermes|copilot|crush|cursor-agent|muse|kimi|qwen|dsh|mcode|kiro-cli|freebuff|kilo|devin|amp|commandcode|ante]
  # omarchy:examples=omarchy default agent | omarchy default agent codex | omarchy default agent claude
  
  installing=false
@@ -59,20 +167,20 @@ index eb2ef7fb..f235102c 100755
  case "$1" in
  pi) agent="pi"; name="Pi" ;;
 +ante) agent="ante"; name="Ante"; agent_self_managed=true ;;
- omp | oh-my-pi) agent="omp"; name="Oh My Pi"; agent_package="github:can1357/oh-my-pi" ;;
+ omp | oh-my-pi) agent="omp"; name="Oh My Pi"; agent_package="oh-my-pi" ;;
  opencode | open-code) agent="opencode"; name="OpenCode" ;;
- ori | openrouter) agent="ori"; name="Ori"; agent_package="github:OpenRouterLabs/ori-releases" ;;
-@@ -43,7 +44,7 @@ muse | muse-code | musecode)
-   ;;
- cursor | cursor-agent) agent="cursor-agent"; name="Cursor CLI" ;;
+ ori | openrouter) agent="ori"; name="Ori"; agent_package="ori" ;;
+@@ -65,7 +66,7 @@ devin | devin-cli)
+ amp | ampcode) agent="amp"; name="Amp" ;;
+ commandcode | command-code | cmdc) agent="commandcode"; name="Command Code"; agent_package="npm:command-code" ;;
  *)
--  echo "Usage: omarchy-default-agent <pi|omp|opencode|ori|claude|codex|grok|openclaw|agy|hermes|copilot|crush|cursor-agent|muse>"
-+  echo "Usage: omarchy-default-agent <pi|omp|opencode|ori|claude|codex|grok|openclaw|agy|hermes|copilot|crush|cursor-agent|muse|ante>"
+-  echo "Usage: omarchy-default-agent <pi|omp|opencode|ori|claude|codex|grok|openclaw|agy|hermes|copilot|crush|cursor-agent|muse|kimi|qwen|dsh|mcode|kiro-cli|freebuff|kilo|devin|amp|commandcode>"
++  echo "Usage: omarchy-default-agent <pi|omp|opencode|ori|claude|codex|grok|openclaw|agy|hermes|copilot|crush|cursor-agent|muse|kimi|qwen|dsh|mcode|kiro-cli|freebuff|kilo|devin|amp|commandcode|ante>"
    exit 1
    ;;
  esac
-@@ -61,6 +62,12 @@ if [[ -n ${agent_installer:-} ]]; then
-   # inside the menu action instead.
+@@ -88,6 +89,12 @@ if [[ -n ${agent_installer:-} ]]; then
+   # minutes-long install inside the menu action instead.
    agent_present() { "$agent_installer" --check; }
    agent_install() { "$agent_installer" --now; }
 +elif [[ -n ${agent_self_managed:-} ]]; then
@@ -82,27 +190,27 @@ index eb2ef7fb..f235102c 100755
 +  agent_present() { omarchy-cmd-present "$agent"; }
 +  agent_install() { agent_present; }
  else
-   # Anything at the wrapper's path other than the wrapper is the user's own
-   # install, such as the symlink Cursor's installer leaves. A mise copy would
+   # omarchy-mise-install's wrappers run `mise use` and `mise x`, current ones on
+   # lines of their own and older ones after an inline variable; either way
 diff --git a/bin/omarchy-launch-editor b/bin/omarchy-launch-editor
-index 8a69dabd..2b665839 100755
+index cbf12c787..a4497a748 100755
 --- a/bin/omarchy-launch-editor
 +++ b/bin/omarchy-launch-editor
-@@ -29,6 +29,11 @@ nvim | vim | nano | micro | hx | helix | fresh)
+@@ -32,6 +32,11 @@ nvim | vim | nano | micro | hx | helix | fresh)
    fi
    ;;
  *)
--  exec setsid uwsm-app -- "$editor" "$@"
+-  exec setsid uwsm-app -- "$editor" -- "$@"
 +  # Hyprland/uwsm session: uwsm-app wraps the editor. niri has no uwsm, so
 +  # fall back to launching the editor directly on the Wayland session.
-+  if command -v uwsm-app >/dev/null 2>&1; then
-+    exec setsid uwsm-app -- "$editor" "$@"
++  if omarchy-cmd-present uwsm-app; then
++    exec setsid uwsm-app -- "$editor" -- "$@"
 +  fi
 +  exec setsid "$editor" "$@"
    ;;
  esac
 diff --git a/bin/omarchy-launch-floating-terminal-with-presentation b/bin/omarchy-launch-floating-terminal-with-presentation
-index 4497ff0d..c4670d5d 100755
+index 4497ff0dd..c4670d5dd 100755
 --- a/bin/omarchy-launch-floating-terminal-with-presentation
 +++ b/bin/omarchy-launch-floating-terminal-with-presentation
 @@ -11,4 +11,16 @@ cmd="$*"
@@ -123,8 +231,141 @@ index 4497ff0d..c4670d5d 100755
 +done
 +
 +exec bash -c "$presentation_script"
+diff --git a/bin/omarchy-launch-shell b/bin/omarchy-launch-shell
+index 6bc7c8911..03d2e25fc 100755
+--- a/bin/omarchy-launch-shell
++++ b/bin/omarchy-launch-shell
+@@ -14,11 +14,25 @@
+ # A package upgrade rewriting $OMARCHY_PATH/shell would otherwise reload it
+ # against a half-written tree, and that failed reload leaves a second engine
+ # generation behind that turns the next restart's IPC kill into a crash.
++#
++# Its crash handler is off for the same reason, and that is the one that has
++# actually bitten: a segfault in a text field made the handler re-exec an engine
++# of its own while this supervisor relaunched the dead one, so two engines ran
++# at once. They fought over the shell's singletons, and both tried to take the
++# session lock the dead shell had left behind -- a second lock surface for one
++# output is a fatal protocol error in the compositor, so the survivor died
++# holding the lock, and the session was left with the theme background over a
++# stranded lock: a solid red screen until the machine was rebooted. One restart
++# authority, and it is this script.
++#
++# 9>&- keeps the engine out of the supervisor's lock file: a shell holding that
++# descriptor would look like a live supervisor to the next launcher.
+ run_shell() {
+   local startup_background
+   startup_background=$(readlink -f "$HOME/.local/state/omarchy/current/background" 2>/dev/null)
+   OMARCHY_STARTUP_BACKGROUND="$startup_background" QS_DISABLE_FILE_WATCHER=1 QS_NO_RELOAD_POPUP=1 \
+-    systemd-cat -t omarchy-shell -- quickshell -n -p "$OMARCHY_PATH/shell" &
++    QS_DISABLE_CRASH_HANDLER=1 \
++    systemd-cat -t omarchy-shell -- quickshell -n -p "$OMARCHY_PATH/shell" 9>&- &
+   shell_pid=$!
+ 
+   local status
+@@ -47,11 +61,38 @@ compositor_alive() {
+   return 1
+ }
+ 
+-# Quickshell relaunches itself from its signal handlers, but Qt leaves through
+-# _exit() when the Wayland connection fails, raising no signal: no crash report,
+-# no relaunch, no bar. Supervise those deaths. A clean exit is a deliberate stop
+-# (omarchy-restart-shell starts its own replacement); a signal here means the
+-# session is going, and has to reach the shell the launcher used to exec.
++# Is the config's single instance slot taken? Quickshell refuses a second engine
++# for one config ("An instance of this configuration is already running."), and
++# that refusal is a clean exit, indistinguishable below from a deliberate stop --
++# so ask the instance registry rather than guess which one it was. The registry
++# lists an instance before it answers IPC (a shell mid-startup counts) and leaves
++# out the dead, which is what "is the slot taken" needs; an IPC ping would read a
++# starting, a wedged and a departed shell all alike, as free.
++slot_occupied() {
++  local listed
++  listed=$(quickshell list -j -p "$OMARCHY_PATH/shell" 2>/dev/null) || return 1
++  [[ $listed == \[* ]]
++}
++
++# Wait for the config's single instance slot to free before launching into it.
++# An instance that keeps running is a session with a shell, and the only party
++# that can hand the slot back is that instance dying; a supervisor that leaves in
++# the meantime leaves nothing to notice when it does.
++wait_for_slot() {
++  while slot_occupied; do
++    (( terminating )) && return 1
++    sleep 0.5
++  done
++
++  return 0
++}
++
++# Qt leaves through _exit() when the Wayland connection fails, raising no signal:
++# no crash report, no relaunch, no bar. Supervise those deaths. A signal here
++# means the session is going, and has to reach the shell the launcher used to
++# exec; a clean exit is a deliberate stop (omarchy-restart-shell starts its own
++# replacement), and the loop below is left to tell one from an instance this
++# supervisor does not own.
+ terminating=0
+ shell_pid=""
+ 
+@@ -62,6 +103,32 @@ stop() {
+ }
+ trap stop HUP INT TERM
+ 
++# Exactly one supervisor per session. Two of them would each raise their own
++# engine, which is the duplicate everything above exists to prevent, and the
++# handover omarchy-restart-shell does -- stop the shell, then start a fresh
++# launcher -- is a supervisor start overlapping the old supervisor's shutdown.
++# flock goes with the process, so a supervisor that dies, cleanly or not, never
++# blocks the next one; the retry rides out that handover. A launcher that cannot
++# even open the lock file supervises unguarded rather than leave the session
++# without a shell.
++claim_supervision() {
++  local attempt runtime=${XDG_RUNTIME_DIR:-/run/user/$UID} display=${WAYLAND_DISPLAY##*/}
++
++  exec 9>"$runtime/omarchy-shell-supervisor.${display:-nosession}.lock" || return 0
++
++  for (( attempt = 0; attempt < 20; attempt++ )); do
++    flock -n 9 && return 0
++    sleep 0.25
++  done
++
++  return 1
++}
++
++if ! claim_supervision; then
++  logger -t omarchy-shell "Another Omarchy shell supervisor is running; exiting."
++  exit 0
++fi
++
+ attempts=0
+ window_started=$SECONDS
+ 
+@@ -69,11 +136,23 @@ while true; do
+   # A signal during the backoff only reaches the trap once the sleep is over.
+   (( terminating )) && exit 0
+ 
++  # Never launch into a slot another engine holds.
++  wait_for_slot || exit 0
++
+   run_shell
+   status=$?
+ 
+   (( terminating )) && exit 0
+-  (( status == 0 )) && exit 0
++
++  if (( status == 0 )); then
++    # A clean exit is a deliberate stop (omarchy-restart-shell starts its own
++    # replacement), unless an instance this supervisor does not own holds the
++    # slot: then that one is the only shell the session has, nobody is watching
++    # it, and a session with no supervisor is how the stranded lock starts.
++    slot_occupied || exit 0
++    logger -t omarchy-shell "Another Omarchy shell instance holds the slot; supervising it."
++    continue
++  fi
+ 
+   # Relaunching into a session already tearing down burns the attempt budget.
+   compositor_alive || exit 0
 diff --git a/bin/omarchy-launch-tui b/bin/omarchy-launch-tui
-index bd67c64c..57f76102 100755
+index bd67c64ca..57f761020 100755
 --- a/bin/omarchy-launch-tui
 +++ b/bin/omarchy-launch-tui
 @@ -10,4 +10,16 @@ else
@@ -146,7 +387,7 @@ index bd67c64c..57f76102 100755
 +
 +exec "$1" "${@:2}"
 diff --git a/bin/omarchy-refresh-hyprland b/bin/omarchy-refresh-hyprland
-index 6549c693..73028840 100755
+index 6549c6935..730288404 100755
 --- a/bin/omarchy-refresh-hyprland
 +++ b/bin/omarchy-refresh-hyprland
 @@ -2,6 +2,14 @@
@@ -164,69 +405,12 @@ index 6549c693..73028840 100755
  omarchy-refresh-config hypr/.luarc.json
  omarchy-refresh-config hypr/autostart.lua
  omarchy-refresh-config hypr/bindings.lua
-diff --git a/bin/omarchy-system-logout b/bin/omarchy-system-logout
-index cb0fd660..815c2145 100755
---- a/bin/omarchy-system-logout
-+++ b/bin/omarchy-system-logout
-@@ -4,6 +4,11 @@
- # omarchy:examples=omarchy logout | omarchy system logout
- # omarchy:aliases=omarchy logout
- 
-+# niri port: standardised via omarchy-niri-system (OSD + graceful close + dispatch).
-+if [[ ${XDG_CURRENT_DESKTOP:-} == niri ]]; then
-+  exec omarchy-niri-system logout
-+fi
-+
- nohup bash -c "sleep 2 && uwsm stop" >/dev/null 2>&1 &
- 
- omarchy-osd -i logout -m "Logging out" -d 5000
-diff --git a/bin/omarchy-system-reboot b/bin/omarchy-system-reboot
-index 4d2b6c86..9e84b323 100755
---- a/bin/omarchy-system-reboot
-+++ b/bin/omarchy-system-reboot
-@@ -4,6 +4,11 @@
- # omarchy:examples=omarchy reboot | omarchy system reboot
- # omarchy:aliases=omarchy reboot
- 
-+# niri port: standardised via omarchy-niri-system (OSD + graceful close + dispatch).
-+if [[ ${XDG_CURRENT_DESKTOP:-} == niri ]]; then
-+  exec omarchy-niri-system reboot
-+fi
-+
- # Schedule the reboot in the user manager so closing the terminal's systemd
- # scope cannot terminate it before it runs.
- systemd-run --user --collect --quiet --on-active="2s" --timer-property=AccuracySec=100ms systemctl reboot --no-wall || exit 1
-diff --git a/bin/omarchy-system-shutdown b/bin/omarchy-system-shutdown
-index 0143760e..38a78a60 100755
---- a/bin/omarchy-system-shutdown
-+++ b/bin/omarchy-system-shutdown
-@@ -4,6 +4,11 @@
- # omarchy:examples=omarchy shutdown | omarchy system shutdown
- # omarchy:aliases=omarchy shutdown
- 
-+# niri port: standardised via omarchy-niri-system (OSD + graceful close + dispatch).
-+if [[ ${XDG_CURRENT_DESKTOP:-} == niri ]]; then
-+  exec omarchy-niri-system shutdown
-+fi
-+
- # Schedule the shutdown in the user manager so closing the terminal's systemd
- # scope cannot terminate it before it runs.
- systemd-run --user --collect --quiet --on-active="2s" --timer-property=AccuracySec=100ms systemctl poweroff --no-wall || exit 1
 diff --git a/bin/omarchy-theme-set b/bin/omarchy-theme-set
-index 782b4ba7..1a95bdeb 100755
+index 6fc1d9443..11c8f4396 100755
 --- a/bin/omarchy-theme-set
 +++ b/bin/omarchy-theme-set
-@@ -135,7 +135,7 @@ set_theme_background_link() {
- }
- 
- set_theme_background() {
--  local new_background new_background_snapshot
-+  local new_background new_background_snapshot old_background
- 
-   if [[ -z $CHOSEN_THEME_BACKGROUND || ! -f $CHOSEN_THEME_BACKGROUND ]]; then
-     if ! choose_theme_background; then
-@@ -151,6 +151,13 @@ set_theme_background() {
-     new_background_snapshot=$(snapshot_background_path "$new_background" "next")
+@@ -266,6 +266,13 @@ set_theme_background() {
+     fi
    fi
  
 +  # niri port: the snapshots above are unlinked a few seconds after the switch,
@@ -239,7 +423,7 @@ index 782b4ba7..1a95bdeb 100755
    if [[ -f $OLD_BACKGROUND_SNAPSHOT && -f $new_background_snapshot ]]; then
      shell_ipc background themeTransition "$OLD_BACKGROUND_SNAPSHOT" "$new_background_snapshot" "$new_background" "$colors_payload" "$shell_payload" || \
        shell_ipc shell applyTheme "$colors_payload" "$shell_payload" || true
-@@ -160,7 +167,7 @@ set_theme_background() {
+@@ -275,7 +282,7 @@ set_theme_background() {
        shell_ipc shell applyTheme "$colors_payload" "$shell_payload" || true
      (sleep 3; rm -f "$new_background_snapshot") &
    else
@@ -248,30 +432,24 @@ index 782b4ba7..1a95bdeb 100755
        shell_ipc shell applyTheme "$colors_payload" "$shell_payload" || true
      if [[ -f $OLD_BACKGROUND_SNAPSHOT ]]; then
        (sleep 3; rm -f "$OLD_BACKGROUND_SNAPSHOT") &
-@@ -325,7 +332,11 @@ if [[ $THEME_HEADLESS != "1" && $OMARCHY_THEME_SKIP_BACKGROUND != "1" ]]; then
+@@ -452,7 +459,11 @@ if [[ $THEME_HEADLESS != "1" && $OMARCHY_THEME_SKIP_BACKGROUND != "1" ]]; then
    # Resolve the staged choice while the old theme still exists. Video changes
    # switch directly to the durable path in QML, so neither side needs a copy.
    if choose_staged_theme_background; then
--    if background_transition_uses_snapshots "$CHOSEN_THEME_BACKGROUND"; then
+-    if [[ $PREVIOUS_THEME_NAME != "$THEME_NAME" && ! -f $HOME/.local/state/omarchy/toggles/background-intros-off ]] &&
 +    # niri port: snapshot files are unlinked a few seconds after the switch and
 +    # the shell reads the path asynchronously, so it can be left showing a path
 +    # that no longer exists (black desktop). Skip them entirely on niri and pass
 +    # the durable background files instead (see set_theme_background).
-+    if [[ ${XDG_CURRENT_DESKTOP:-} != niri ]] && background_transition_uses_snapshots "$CHOSEN_THEME_BACKGROUND"; then
-       OLD_BACKGROUND_SNAPSHOT=$(snapshot_current_background)
-     else
-       BACKGROUND_TRANSITION_SNAPSHOTS=false
++    if [[ ${XDG_CURRENT_DESKTOP:-} != niri && $PREVIOUS_THEME_NAME != "$THEME_NAME" && ! -f $HOME/.local/state/omarchy/toggles/background-intros-off ]] &&
+       [[ $(hyprctl -j getoption animations:enabled 2>/dev/null | jq -r '.bool') == "true" ]]; then
+       THEME_BACKGROUND_INTRO=$(omarchy-theme-bg-boot-intro --resolve-only "$STAGED_THEME_BACKGROUND")
+     fi
 diff --git a/bin/omarchy-update b/bin/omarchy-update
-index 1738ebff..9c29db60 100755
+index 0a871493a..45261e141 100755
 --- a/bin/omarchy-update
 +++ b/bin/omarchy-update
-@@ -1,4 +1,4 @@
--#!/bin/bash
-+#!/bin/bash -p
- 
- # omarchy:summary=Update Omarchy and system packages
- # omarchy:alias=omarchy up
-@@ -6,27 +6,115 @@
+@@ -6,6 +6,16 @@
  # omarchy:examples=omarchy update | omarchy update -y
  # omarchy:requires-sudo=true
  
@@ -285,188 +463,25 @@ index 1738ebff..9c29db60 100755
 +  exec "$HOME/bin/omarchy-update" "$@"
 +fi
 +
-+if [[ $- != *p* ]]; then
-+  echo "Refusing an unsafe Bash startup." >&2
-+  exit 126
-+fi
-+
-+security_entrypoint=$(/usr/bin/readlink -e -- "${BASH_SOURCE[0]}") || exit 126
-+source "${security_entrypoint%/*}/omarchy-security-functions" || exit 126
-+omarchy_security_require_privileged_bash_startup || exit 126
- set -e
-+omarchy_security_sanitize_bash_environment "$0" "$@"
-+omarchy_security_require_source_root "$0"
-+# Logging and lock acquisition re-exec this command with a sanitized PATH.
-+# Preserve the caller's path only for the later hook/mise phases.
-+user_path=${OMARCHY_UPDATE_USER_PATH:-$PATH}
-+unset OMARCHY_UPDATE_USER_PATH
-+# Traps first, so a signal or failure during the entry revocation still
-+# exits through the cleanup path. Starting cold means the single password
-+# prompt below always belongs to this update, never to an earlier session.
-+omarchy_security_install_sudo_cleanup_traps
-+omarchy_security_revoke_sudo_timestamp || exit 1
+ if [[ $- != *p* ]]; then
+   echo "Refusing an unsafe Bash startup." >&2
+   exit 126
+@@ -26,6 +36,9 @@ unset OMARCHY_UPDATE_USER_PATH
+ # prompt below always belongs to this update, never to an earlier session.
+ omarchy_security_install_sudo_cleanup_traps
+ omarchy_security_revoke_sudo_timestamp || exit 1
 +# Validate the no-update wrapper up front: the AUR phase depends on it. Every
 +# other phase shares the one authorization, so it stays off PATH until then.
 +omarchy_security_enable_no_update_sudo
-+PATH="$OMARCHY_PATH/bin:/usr/bin:/usr/sbin:/bin:/sbin"
-+unset OMARCHY_SUDO_NO_UPDATE
-+# Helpers that manage their own sudo boundary leave this authorization to us.
-+export PATH OMARCHY_UPDATE_SUDO_SESSION=1
-+
-+update_stay_awake_stopped=0
-+sudo_keepalive_pid=""
-+
-+# Ask for the password once, then keep sudo's timestamp fresh so long package
-+# downloads, migrations, hooks, and mise never outlast it and prompt again.
-+# Authorize by running a command rather than sudo -v: under the default
-+# verifypw=all, -v prompts even when passwordless sudo is enabled.
-+authorize_update() {
-+  /usr/bin/sudo /usr/bin/true || return 1
-+
-+  local update_pid=$$
-+  (
-+    [[ -z ${OMARCHY_UPDATE_LOCK_FD:-} ]] || exec {OMARCHY_UPDATE_LOCK_FD}>&-
-+    sleep_pid=""
-+    trap - EXIT HUP INT
-+    trap '[[ -z $sleep_pid ]] || kill "$sleep_pid" 2>/dev/null; exit 0' TERM
-+    while :; do
-+      sleep 60 &
-+      sleep_pid=$!
-+      wait "$sleep_pid"
-+      kill -0 "$update_pid" 2>/dev/null || exit 0
-+      /usr/bin/sudo -n /usr/bin/true 2>/dev/null || exit 0
-+    done
-+  ) &
-+  sudo_keepalive_pid=$!
-+}
-+
-+end_update_authorization() {
-+  if [[ -n $sudo_keepalive_pid ]]; then
-+    kill "$sudo_keepalive_pid" 2>/dev/null || true
-+    wait "$sudo_keepalive_pid" 2>/dev/null || true
-+    sudo_keepalive_pid=""
-+  fi
-+  omarchy_security_revoke_sudo_timestamp
-+}
-+
-+cleanup_update() {
-+  local status=$?
-+  trap - EXIT HUP INT TERM
-+  if ! end_update_authorization; then
-+    echo "Could not invalidate sudo before update cleanup." >&2
-+    omarchy_security_exit_with_revoked_sudo 1
-+  fi
-+  if (( update_stay_awake_stopped == 0 )); then
-+    omarchy-update-stay-awake stop || status=1
-+  fi
-+  omarchy_security_exit_with_revoked_sudo "$status"
-+}
- 
- if [[ -z ${OMARCHY_UPDATE_LOGGED:-} ]]; then
-   script_command=$(printf '%q ' "$0" "$@")
--  exec env OMARCHY_UPDATE_LOGGED=1 script -qefc "$script_command" "/tmp/omarchy-update.log"
-+  exec env OMARCHY_UPDATE_LOGGED=1 OMARCHY_UPDATE_USER_PATH="$user_path" script -qefc "$script_command" "/tmp/omarchy-update.log"
- fi
- 
- if ! omarchy-update-lock held; then
--  exec omarchy-update-lock run "$0" "$@"
-+  exec env OMARCHY_UPDATE_USER_PATH="$user_path" omarchy-update-lock run "$0" "$@"
- fi
- 
- trap 'echo ""; echo -e "\033[0;31mSomething went wrong during the update!\n\nPlease review the output above carefully, correct the error, and retry the update.\n\nIf you need assistance, get help from the community at https://omarchy.org/discord\033[0m"' ERR
--trap 'omarchy-update-stay-awake stop' EXIT
-+trap cleanup_update EXIT
-+omarchy_security_install_signal_exit_traps
- 
- omarchy-update-requires-free-space
- 
--# -y is a promise not to ask anything. Steps that would need an answer report
--# and move on instead of waiting on a prompt nobody is here to give.
-+# -y suppresses Omarchy confirmation prompts; sudo authorization is still
-+# required. Interactive review steps report and move on instead of waiting.
- [[ ${1:-} != "-y" ]] || export OMARCHY_UPDATE_UNATTENDED=1
- 
- if [[ ${1:-} == "-y" ]] || omarchy-update-confirm; then
-+  authorize_update
-+
-   # Before the snapshot: the cache is on the snapshotted subvolume, so pruning
-   # after it frees nothing until that snapshot ages out.
-   omarchy-update-pkg-prune
-@@ -39,6 +127,7 @@ if [[ ${1:-} == "-y" ]] || omarchy-update-confirm; then
- 
-   omarchy-update-stay-awake start
- 
-+  # Preserve the established development-checkout update ordering.
-   omarchy-update-dev
-   omarchy-update-keyring
- 
-@@ -46,20 +135,36 @@ if [[ ${1:-} == "-y" ]] || omarchy-update-confirm; then
-   # them, so everything below waits on this finishing. An upgrade that stopped
-   # takes the update with it rather than migrating against what is still on disk.
-   omarchy-update-system-pkgs
-+
-   omarchy-migrate
--  omarchy-hook post-update
--  omarchy-update-aur-pkgs
--  omarchy-update-mise
-   omarchy-update-orphan-pkgs
- 
-   omarchy-update-analyze-logs
-   omarchy-update-status
- 
--  # Release update-owned inhibitors before offering a reboot. A confirmed
--  # reboot can terminate this process before its EXIT trap gets a chance to
--  # remove the persistent Stay Awake marker.
-+  # Service restart helpers can need sudo. The reboot-only phase below
-+  # performs no privileged work.
-+  omarchy-update-restart --services-only
-+
-+  # Hooks and mise run with the caller's PATH so user-installed tools resolve.
-+  PATH="$user_path" "$OMARCHY_PATH/bin/omarchy-hook" post-update
-+  PATH="$user_path" "$OMARCHY_PATH/bin/omarchy-update-mise"
-+
-+  # AUR builds run third-party PKGBUILD code, so they go last and never see the
-+  # update's authorization: revoke it, then authenticate each sudo call with
-+  # the no-update wrapper, for yay and any bare sudo a PKGBUILD runs, so an AUR
-+  # install prompts without caching anything.
-+  end_update_authorization
-+  PATH="$OMARCHY_PATH/default/omarchy/sudo-no-update:$PATH" OMARCHY_SUDO_NO_UPDATE=1 omarchy-update-aur-pkgs
-+  omarchy_security_revoke_sudo_timestamp
-+
-+  # The sleep inhibitor covers AUR builds, hooks and mise as well; releasing it
-+  # needs no privilege because the held command already dropped to this user.
-+  # Release it before offering a reboot: a confirmed reboot can terminate this
-+  # process before its EXIT trap gets a chance to remove the persistent Stay
-+  # Awake marker.
-   omarchy-update-stay-awake stop
--  trap - EXIT
-+  update_stay_awake_stopped=1
- 
--  omarchy-update-restart
-+  "$OMARCHY_PATH/bin/omarchy-update-restart" --reboot-only
- fi
+ PATH="$OMARCHY_PATH/bin:/usr/bin:/usr/sbin:/bin:/sbin"
+ unset OMARCHY_SUDO_NO_UPDATE
+ # Helpers that manage their own sudo boundary leave this authorization to us.
 diff --git a/default/omarchy/omarchy-menu.jsonc b/default/omarchy/omarchy-menu.jsonc
-index 2ee24576..a109d2be 100644
+index da07a04ff..ffc67eb84 100644
 --- a/default/omarchy/omarchy-menu.jsonc
 +++ b/default/omarchy/omarchy-menu.jsonc
-@@ -108,9 +108,10 @@
-   "style.bar": {"icon":"󰍜","label":"Menu Bar"},
-   "style.bar.position": {"icon":"","label":"Position"},
-   "style.bar.transparency": {"icon":"󰂵","label":"Transparency","action":"omarchy-bar transparent toggle"},
--  "style.hyprland": {"icon":"","label":"Hyprland","action":"omarchy-launch-config-editor \"$HOME/.config/hypr/looknfeel.lua\""},
-+  "style.hyprland": {"icon":"","label":"Niri","action":"omarchy-launch-config-editor \"$HOME/.config/niri/config.kdl\""},
-   "style.screensaver": {"icon":"󱄄","label":"Screensaver"},
-   "style.about": {"icon":"","label":"About"},
-+  "style.avatar": {"icon":"󰀉","label":"Avatar"},
-   "style.bar.position.top": {"icon":"󰁝","label":"Top","action":"omarchy-bar position top"},
-   "style.bar.position.bottom": {"icon":"󰁅","label":"Bottom","action":"omarchy-bar position bottom"},
-   "style.bar.position.left": {"icon":"󰁍","label":"Left","action":"omarchy-bar position left"},
-@@ -121,11 +122,13 @@
-   "style.screensaver.text": {"icon":"","label":"Edit Text","action":"omarchy-branding-screensaver text"},
-   "style.screensaver.image": {"icon":"","label":"Set From Image","action":"omarchy-branding-screensaver image"},
-   "style.screensaver.default": {"icon":"","label":"Restore Default","action":"omarchy-branding-screensaver reset"},
-+  "style.avatar.image": {"icon":"","label":"Set From Image","action":"omarchy-avatar pick"},
-+  "style.avatar.default": {"icon":"","label":"Restore Default","action":"omarchy-avatar default"},
+@@ -179,9 +179,9 @@
+   "trigger.tests.disk-speedtest": {"icon":"󰋊","label":"Disk Speed Test","action":"omarchy-shell shell summon omarchy.disk-speedtest"},
  
    // Setup
 -  "setup.monitors": {"icon":"󰍹","label":"Monitors","action":"omarchy-launch-config-editor \"$HOME/.config/hypr/monitors.lua\""},
@@ -474,34 +489,41 @@ index 2ee24576..a109d2be 100644
 -  "setup.input": {"icon":"","label":"Input","when":"[[ -f ~/.config/hypr/input.lua ]]","action":"omarchy-launch-config-editor \"$HOME/.config/hypr/input.lua\""},
 +  "setup.monitors": {"icon":"󰍹","label":"Monitors","action":"omarchy-launch-config-editor \"$HOME/.config/niri/monitor.kdl\""},
 +  "setup.keybindings": {"icon":"","label":"Keybindings","action":"omarchy-launch-config-editor \"$HOME/.config/niri/binds.kdl\""},
-+  "setup.input": {"icon":"","label":"Input","action":"omarchy-launch-config-editor \"$HOME/.config/niri/input.kdl\""},
-   "setup.network": {"icon":"󰛳","label":"Network","aliases":["network"]},
-   "setup.network.dns": {"icon":"󰇖","label":"DNS","aliases":["dns"]},
-   "setup.network.dns.dhcp": {"icon":"󰩟","label":"DHCP","checked":"[[ \"$(omarchy-dns)\" == \"DHCP\" ]]","action":"omarchy-dns DHCP"},
-@@ -184,15 +187,18 @@
-   "setup.security.sshd": {"icon":"󰣀","label":"SSHD","action":"omarchy-launch-floating-terminal-with-presentation omarchy-setup-security-sshd"},
-   "setup.security.passwordless-sudo": {"icon":"󰟵","label":"Passwordless Sudo","action":"omarchy-launch-floating-terminal-with-presentation omarchy-sudo-passwordless"},
++  "setup.input": {"icon":"","label":"Input","action":"omarchy-launch-config-editor \"$HOME/.config/niri/input.kdl\""},
+   "setup.typing": {"icon":"","label":"Typing"},
+   "setup.typing.keyboard": {"icon":"","label":"Keyboard Layouts","action":"omarchy-setup-keyboard"},
+   "setup.typing.input": {"icon":"","label":"Input Methods","action":"omarchy-setup-input"},
+@@ -259,14 +259,17 @@
    "setup.security.sudoless-docker": {"icon":"󰡨","label":"Sudoless Docker","when":"omarchy-sudo-docker --configured","action":"omarchy-launch-floating-terminal-with-presentation omarchy-setup-security-sudoless-docker"},
+   "setup.security.passwordless-sudo": {"icon":"󰟵","label":"Passwordless Sudo","action":"omarchy-launch-floating-terminal-with-presentation omarchy-sudo-passwordless"},
+   "setup.config.git": {"icon":"","label":"Git","action":"omarchy-launch-floating-terminal-with-presentation omarchy-setup-git"},
 -  "setup.config.hyprland": {"icon":"","label":"Hyprland","action":"omarchy-launch-config-editor \"$HOME/.config/hypr/hyprland.lua\""},
 -  "setup.config.hyprsunset": {"icon":"","label":"Hyprsunset","action":"omarchy-launch-config-editor ~/.config/hypr/hyprsunset.conf && omarchy-restart-hyprsunset"},
-+  "setup.config.hyprland": {"icon":"","label":"Niri","action":"omarchy-launch-config-editor \"$HOME/.config/niri/config.kdl\""},
++  "setup.config.hyprland": {"icon":"","label":"Niri","action":"omarchy-launch-config-editor \"$HOME/.config/niri/config.kdl\""},
 +  "setup.config.hyprsunset": {"icon":"","label":"Hyprsunset","when":"false","action":"omarchy-launch-config-editor ~/.config/hypr/hyprsunset.conf && omarchy-restart-hyprsunset"},
    "setup.config.xcompose": {"icon":"󰞅","label":"XCompose","action":"omarchy-launch-config-editor ~/.XCompose && omarchy-restart-xcompose"},
-   "setup.direct-boot": {"icon":"","label":"Direct Boot","action":"omarchy-launch-floating-terminal-with-presentation omarchy-setup-direct-boot"},
+   "setup.direct-boot": {"icon":"","label":"Direct Boot","when":"! omarchy-hw-aarch64-apple && [[ ! -f /etc/limine-entry-tool.d/zz-omarchy-dgx-spark.conf ]]","action":"omarchy-launch-floating-terminal-with-presentation omarchy-setup-direct-boot"},
    "setup.reset": {"icon":"󰑓","label":"Reset Computer","when":"[[ $(findmnt -no FSTYPE /) == btrfs ]]","action":"omarchy-launch-floating-terminal-with-presentation omarchy-system-factory-reset"},
  
    // Install
 -  "install.package": {"icon":"󰣇","label":"Package","action":"xdg-terminal-exec --app-id=org.omarchy.terminal omarchy-pkg-install"},
--  "install.aur": {"icon":"󰣇","label":"AUR","action":"xdg-terminal-exec --app-id=org.omarchy.terminal omarchy-pkg-aur-install"},
-+  // niri port: these two skip the presentation wrapper and call xdg-terminal-exec directly, which a
++  // niri port: these skip the presentation wrapper and call xdg-terminal-exec directly, which a
 +  // machine without that package answers with silence. Keep them on it when it is there, and fall
 +  // back to the port's ghostty shim inside omarchy-launch-floating-terminal-with-presentation when it is not.
 +  "install.package": {"icon":"󰣇","label":"Package","action":"if command -v xdg-terminal-exec >/dev/null 2>&1; then xdg-terminal-exec --app-id=org.omarchy.terminal omarchy-pkg-install; else omarchy-launch-floating-terminal-with-presentation omarchy-pkg-install; fi"},
-+  "install.aur": {"icon":"󰣇","label":"AUR","action":"if command -v xdg-terminal-exec >/dev/null 2>&1; then xdg-terminal-exec --app-id=org.omarchy.terminal omarchy-pkg-aur-install; else omarchy-launch-floating-terminal-with-presentation omarchy-pkg-aur-install; fi"},
    "install.ai": {"icon":"󱚤","label":"AI"},
    "install.service": {"icon":"","label":"Service"},
    "install.development": {"icon":"󰵮","label":"Development"},
-@@ -284,7 +290,8 @@
+@@ -287,7 +290,7 @@
+   "install.terminal": {"icon":"","label":"Terminal"},
+   "install.tui": {"icon":"","label":"TUI","action":"omarchy-launch-floating-terminal-with-presentation omarchy-tui-install"},
+   "install.windows": {"icon":"󰍲","label":"Windows","when":"omarchy-hw-x86","disabled":"[[ -f $HOME/.local/share/applications/windows-vm.desktop ]]","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy-windows-vm install'"},
+-  "install.aur": {"icon":"󰣇","label":"AUR","action":"xdg-terminal-exec --app-id=org.omarchy.terminal omarchy-pkg-aur-install"},
++  "install.aur": {"icon":"󰣇","label":"AUR","action":"if command -v xdg-terminal-exec >/dev/null 2>&1; then xdg-terminal-exec --app-id=org.omarchy.terminal omarchy-pkg-aur-install; else omarchy-launch-floating-terminal-with-presentation omarchy-pkg-aur-install; fi"},
+   "install.preinstalls": {"icon":"󰏓","label":"Preinstalls","disabled":"[[ ! -f $HOME/.local/state/omarchy/preinstalls-removed ]]","action":"omarchy-launch-floating-terminal-with-presentation omarchy-install-preinstalls"},
+   "install.browser.chrome": {"icon":"","label":"Chrome","disabled":"omarchy-pkg-present google-chrome","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy-install-browser chrome'"},
+   "install.browser.edge": {"icon":"󰇩","label":"Edge","when":"omarchy-hw-x86","disabled":"omarchy-pkg-present microsoft-edge-stable-bin","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy-install-browser edge'"},
+@@ -360,7 +363,8 @@
    "install.development.elixir.phoenix": {"icon":"","label":"Phoenix","disabled":"compgen -G \"$HOME/.mix/archives/phx_new*\"","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy-install-dev-env phoenix'"},
  
    // Remove
@@ -509,9 +531,9 @@ index 2ee24576..a109d2be 100644
 +  // Same xdg-terminal-exec fallback as install.package above.
 +  "remove.package": {"icon":"󰣇","label":"Package","action":"if command -v xdg-terminal-exec >/dev/null 2>&1; then xdg-terminal-exec --app-id=org.omarchy.terminal omarchy-pkg-remove; else omarchy-launch-floating-terminal-with-presentation omarchy-pkg-remove; fi"},
    "remove.ai": {"icon":"󱚤","label":"AI","title":"Remove"},
+   "remove.dictation": {"icon":"","label":"Dictation","when":"omarchy-pkg-present voxtype-bin || omarchy-pkg-present superwhisper-bin"},
    "remove.service": {"icon":"","label":"Services","title":"Remove"},
-   "remove.development": {"icon":"󰵮","label":"Development","title":"Remove"},
-@@ -364,10 +371,10 @@
+@@ -446,10 +450,10 @@
    "update.channel.rc": {"icon":"🟡","label":"RC","checked":"[[ \"$(omarchy-channel-current)\" == \"rc\" ]]","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy-channel-set rc'"},
    "update.channel.edge": {"icon":"🟠","label":"Edge","checked":"[[ \"$(omarchy-channel-current)\" == \"edge\" ]]","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy-channel-set edge'"},
    "update.channel.dev": {"icon":"🔴","label":"Dev","checked":"[[ \"$(omarchy-channel-current)\" == \"dev\" ]]","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy-channel-set dev'"},
@@ -520,16 +542,16 @@ index 2ee24576..a109d2be 100644
    "update.process.shell": {"icon":"󰍜","label":"Shell","action":"omarchy-restart-shell"},
 -  "update.config.hyprland": {"icon":"","label":"Hyprland","action":"omarchy-launch-floating-terminal-with-presentation omarchy-refresh-hyprland"},
 -  "update.config.hyprsunset": {"icon":"","label":"Hyprsunset","action":"omarchy-launch-floating-terminal-with-presentation omarchy-refresh-hyprsunset"},
-+  "update.config.hyprland": {"icon":"","label":"Niri Theme","action":"omarchy-niri-apply-theme"},
++  "update.config.hyprland": {"icon":"","label":"Niri Theme","action":"omarchy-niri-apply-theme"},
 +  "update.config.hyprsunset": {"icon":"","label":"Hyprsunset","when":"false","action":"omarchy-launch-floating-terminal-with-presentation omarchy-refresh-hyprsunset"},
    "update.config.plymouth": {"icon":"󱣴","label":"Plymouth","action":"omarchy-launch-floating-terminal-with-presentation omarchy-refresh-plymouth"},
    "update.config.tmux": {"icon":"","label":"Tmux","action":"omarchy-launch-floating-terminal-with-presentation omarchy-refresh-tmux"},
    "update.config.shell": {"icon":"󰍜","label":"Shell","action":"omarchy-launch-floating-terminal-with-presentation omarchy-refresh-shell"},
 diff --git a/shell/Commons/Style.qml b/shell/Commons/Style.qml
-index ec61252b..ec2ee7df 100644
+index 6016cce4a..0447e970e 100644
 --- a/shell/Commons/Style.qml
 +++ b/shell/Commons/Style.qml
-@@ -403,9 +403,16 @@ QtObject {
+@@ -427,6 +427,11 @@ QtObject {
          if (key === "base-size") nextBase = ival
          else fontOut[key] = ival
        } else if (section === "bar") {
@@ -540,26 +562,46 @@ index ec61252b..ec2ee7df 100644
 +        // accept only the two size keys and silently swallow the rest.
          if (key === "scale-with-font") {
            nextBarScaleWithFont = boolToken(raw, nextBarScaleWithFont)
--        } else if (key === "size-horizontal" || key === "size-vertical") {
-+        } else if (key === "size-horizontal" || key === "size-vertical"
-+                   || key === "icon-slot" || key === "icon-canvas"
-+                   || key === "icon-font" || key === "status-slot") {
-           var b = parseInt(raw, 10)
-           if (isFinite(b)) barOut[key] = b
-         }
+         } else if (key === "size-horizontal" || key === "size-vertical" || key === "notch-height"
 diff --git a/shell/Commons/qmldir b/shell/Commons/qmldir
-index 4bfd0b78..17edf0c8 100644
+index 8dff741ad..d567934ff 100644
 --- a/shell/Commons/qmldir
 +++ b/shell/Commons/qmldir
-@@ -1,5 +1,6 @@
- module qs.Commons
- singleton Border 1.0 Border.qml
- singleton Color 1.0 Color.qml
+@@ -6,6 +6,7 @@ singleton I18n 1.0 I18n.qml
+ singleton InputDevices 1.0 InputDevices.qml
+ singleton IpcRegistry 1.0 IpcRegistry.qml
+ singleton InputMethodState 1.0 InputMethodState.qml
 +singleton Niri 1.0 Niri.qml
  singleton Style 1.0 Style.qml
+ singleton UntypedInput 1.0 UntypedInput.qml
  singleton Util 1.0 Util.qml
+diff --git a/shell/Ui/BarIconButton.qml b/shell/Ui/BarIconButton.qml
+index 8516395fd..0a43c0c0e 100644
+--- a/shell/Ui/BarIconButton.qml
++++ b/shell/Ui/BarIconButton.qml
+@@ -12,6 +12,11 @@ WidgetButton {
+   readonly property real visualIconSize: Style.bar.iconSize
+   readonly property real canvasSize: Math.max(visualIconSize, opticalSize)
+   property string labelText: ""
++  // Nudge the drawn icon off the slot's centre. Glyphs whose ink is much
++  // shorter than their line box -- the pocket's three dots, six pixels tall in
++  // a forty-pixel slot -- read as too high even though their ink box is exactly
++  // centred, because the eye compares them with the taller marks beside them.
++  property real contentOffsetY: 0
+   property bool debugOpticalBounds: Quickshell.env("OMARCHY_DEBUG_BAR_ICONS") === "1"
+   // A label shifts the icon within the centered group.
+   readonly property real opticalCenterErrorX:
+@@ -37,7 +42,7 @@ WidgetButton {
+     id: content
+     // Exact coordinates preserve the center of odd-width slots.
+     x: (root.width - width) / 2
+-    y: (root.height - height) / 2
++    y: (root.height - height) / 2 + root.contentOffsetY
+     // The icon draws here rather than in WidgetButton's own label, so it takes
+     // the press scale here too.
+     scale: root.pressScale
 diff --git a/shell/Ui/KeyboardPanel.qml b/shell/Ui/KeyboardPanel.qml
-index b2fb218f..e8a6f95a 100644
+index d2c03e91e..49094c203 100644
 --- a/shell/Ui/KeyboardPanel.qml
 +++ b/shell/Ui/KeyboardPanel.qml
 @@ -1,6 +1,8 @@
@@ -569,9 +611,9 @@ index b2fb218f..e8a6f95a 100644
  import Quickshell.Wayland
 +import Quickshell.Wayland._BackgroundEffect
  import qs.Commons
+ import qs.Commons as Commons
  
- // Layer-shell popup attached to a bar widget icon, designed for
-@@ -82,6 +84,13 @@ PanelWindow {
+@@ -126,6 +128,13 @@ PanelWindow {
    color: "transparent"
    exclusionMode: ExclusionMode.Ignore
  
@@ -585,7 +627,7 @@ index b2fb218f..e8a6f95a 100644
    WlrLayershell.namespace: "omarchy-keyboard-panel"
    WlrLayershell.layer: WlrLayer.Overlay
    // Keyboard focus follows `open` (NOT `visible`). The window remains
-@@ -376,6 +385,90 @@ PanelWindow {
+@@ -502,6 +511,90 @@ PanelWindow {
  
    // --- card ----------------------------------------------------------------
  
@@ -675,15 +717,94 @@ index b2fb218f..e8a6f95a 100644
 +
    BorderSurface {
      id: card
-     x: root.cardOrigin.x
+     x: root.morphed(root.morphFrom.x, root.cardOrigin.x)
+diff --git a/shell/Ui/OpticalGlyph.qml b/shell/Ui/OpticalGlyph.qml
+index ea2fdeba3..f8288d3b2 100644
+--- a/shell/Ui/OpticalGlyph.qml
++++ b/shell/Ui/OpticalGlyph.qml
+@@ -21,8 +21,30 @@ Item {
+   readonly property real paintedWidth: tightWidth * paintedScale
+   readonly property real paintedHeight: tightHeight * paintedScale
+   readonly property real horizontalCorrection: glyph.implicitWidth / 2 - (glyphMetrics.tightBoundingRect.x + tightWidth / 2)
+-  readonly property real paintedCenterX: glyph.x + (glyphMetrics.tightBoundingRect.x + tightWidth / 2) * paintedScale
+-  readonly property real paintedCenterY: glyph.y + (glyph.baselineOffset + glyphMetrics.tightBoundingRect.y + tightHeight / 2) * paintedScale
++  // The ink centre, in this item's coordinates, *after* the rotation above has
++  // been applied. Callers (BarIconButton) use these to line the glyph up on the
++  // bar; reporting the unrotated point made a rotated glyph (the pocket's mark
++  // turns 90 degrees when it opens) read as off-centre by the offset between
++  // the two.
++  readonly property real _inkCenterX: glyph.x + (glyphMetrics.tightBoundingRect.x + tightWidth / 2) * paintedScale
++  readonly property real _inkCenterY: glyph.y + (glyph.baselineOffset + glyphMetrics.tightBoundingRect.y + tightHeight / 2) * paintedScale
++  readonly property real _rotationRadians: root.rotation * Math.PI / 180
++  readonly property real paintedCenterX: {
++    if (root.rotation === 0) return _inkCenterX
++    var dx = _inkCenterX - root.width / 2
++    var dy = _inkCenterY - root.height / 2
++    var c = Math.cos(_rotationRadians)
++    var s = Math.sin(_rotationRadians)
++    return root.width / 2 + dx * c - dy * s
++  }
++  readonly property real paintedCenterY: {
++    if (root.rotation === 0) return _inkCenterY
++    var dx = _inkCenterX - root.width / 2
++    var dy = _inkCenterY - root.height / 2
++    var c = Math.cos(_rotationRadians)
++    var s = Math.sin(_rotationRadians)
++    return root.height / 2 + dx * s + dy * c
++  }
+   readonly property real baselineY: glyph.y + glyph.baselineOffset * paintedScale
+ 
+   TextMetrics {
+diff --git a/shell/Ui/OverlayWindow.qml b/shell/Ui/OverlayWindow.qml
+index e0b3c322b..ded86cfa3 100644
+--- a/shell/Ui/OverlayWindow.qml
++++ b/shell/Ui/OverlayWindow.qml
+@@ -3,6 +3,7 @@ import Quickshell
+ import Quickshell.Hyprland
+ import Quickshell.Wayland
+ import qs.Commons as Commons
++import qs.Commons
+ 
+ // Map a fresh fullscreen surface on each open. Keep its first frames
+ // transparent until Qt receives the output's scale, so it opens sharp without
+@@ -17,7 +18,7 @@ PanelWindow {
+ 
+   property var targetScreen: null
+   readonly property var targetMonitor: {
+-    var monitors = Hyprland.monitors.values
++    var monitors = Niri.monitors.values
+     for (var i = 0; i < monitors.length; i++) {
+       if (targetScreen && monitors[i].name === targetScreen.name) return monitors[i]
+     }
+@@ -42,7 +43,7 @@ PanelWindow {
+   }
+ 
+   function focusedScreen() {
+-    var monitor = Hyprland.focusedMonitor
++    var monitor = Niri.focusedMonitor
+     var name = monitor ? String(monitor.name || "") : ""
+     for (var i = 0; i < Quickshell.screens.length; i++) {
+       if (Quickshell.screens[i].name === name) return Quickshell.screens[i]
+@@ -54,9 +55,9 @@ PanelWindow {
+   // scale can lag behind Qt. Refresh on opening and on scale changes while open.
+   onShownChanged: {
+     targetScreen = shown ? focusedScreen() : null
+-    if (shown) Hyprland.refreshMonitors()
++    if (shown) Niri.refreshMonitors()
+   }
+-  onDevicePixelRatioChanged: if (shown) Hyprland.refreshMonitors()
++  onDevicePixelRatioChanged: if (shown) Niri.refreshMonitors()
+ 
+   Connections {
+     target: Quickshell
 diff --git a/shell/plugins/background/Background.qml b/shell/plugins/background/Background.qml
-index dea93a4c..96b26b69 100644
+index a05f110cf..88db8ec53 100644
 --- a/shell/plugins/background/Background.qml
 +++ b/shell/plugins/background/Background.qml
-@@ -27,6 +27,13 @@ Item {
-   property string pendingColorsRaw: ""
-   property string pendingShellRaw: ""
-   property real revealProgress: 1
+@@ -55,6 +55,27 @@ Item {
+     return true
+   }
+ 
 +  // Latched true the first time a wallpaper frame is actually decoded and on
 +  // screen. A cold session spends most of its startup here -- every layer
 +  // exists long before this image is painted -- so anyone holding something
@@ -691,10 +812,24 @@ index dea93a4c..96b26b69 100644
 +  // duration. Latched rather than live: a later theme switch must not read as
 +  // "the shell is still starting".
 +  property bool paintedOnce: false
- 
-   // Injected by the first-party service loader; used to reach the lock and idle
-   // services so playback can stop whenever nothing can see the wallpaper.
-@@ -152,7 +159,15 @@ Item {
++
++  // Stop a video wallpaper's decoding whenever it is covered. Qt's FFmpeg
++  // engine drives its own clock, so an unseen player keeps decoding until it
++  // is told not to — a locked laptop would otherwise decode until it died.
++  readonly property var lockService: shell && shell.services ? shell.firstPartyServiceFor("omarchy.lock") : null
++  readonly property var idleService: shell && shell.services ? shell.firstPartyServiceFor("omarchy.idle") : null
++  readonly property var batteryService: shell && shell.services ? shell.firstPartyServiceFor("omarchy.battery") : null
++  readonly property bool lockActive: lockService ? lockService.locked : false
++  readonly property bool screensaverActive: idleService ? idleService.screensaverWindowCount > 0 : false
++  readonly property bool powerSaverActive: batteryService ? batteryService.powerSaverOnBattery : false
++  // A lock or a screensaver covers every output, so it is decided once here.
++  // Fullscreen is decided per output below, because it only covers its own.
++  readonly property bool sessionObscured: lockActive || screensaverActive
++
+   function isVideo(path) {
+     return Util.isVideoPath(path)
+   }
+@@ -248,7 +269,15 @@ Item {
      id: readlinkProc
      command: ["readlink", "-f", root.currentBackgroundLink]
      stdout: StdioCollector {
@@ -711,115 +846,53 @@ index dea93a4c..96b26b69 100644
      }
    }
  
-@@ -267,6 +282,7 @@ Item {
-         playbackEnabled: !root.sessionObscured && !root.powerSaverActive && !panel.fullscreenHere
-         audioEnabled: panel.firstScreen
+@@ -415,6 +444,7 @@ Item {
+         onFailedChanged: if (failed) root.recoverBackground(path)
          onReadyChanged: {
+           panel.readyFrames = 0
 +          if (ready) root.paintedOnce = true
            if (ready && root.finishingTransition) {
              root.incomingBackground = ""
              root.oldBackground = ""
 diff --git a/shell/plugins/bar/Bar.qml b/shell/plugins/bar/Bar.qml
-index be9fece4..e979f2b9 100644
+index d89fe9752..eab5292af 100644
 --- a/shell/plugins/bar/Bar.qml
 +++ b/shell/plugins/bar/Bar.qml
-@@ -1,7 +1,7 @@
- import Quickshell
--import Quickshell.Hyprland
+@@ -2,6 +2,7 @@ import Quickshell
+ import Quickshell.Hyprland
  import Quickshell.Io
  import Quickshell.Wayland
 +import Quickshell.Wayland._BackgroundEffect
  import QtQuick
+ import QtQuick.Effects
  import QtQuick.Layouts
- import qs.Commons
-@@ -12,29 +12,29 @@ Item {
-   id: root
- 
-   // The omarchy-shell host injects omarchyPath from OMARCHY_PATH.
--  property string omarchyPath: Quickshell.env("OMARCHY_PATH")
-+  //
-+  // NOT `required`: a cloned bar loads via Loader.source (a URL), which
-+  // can't supply initial property values at construction the way the
-+  // built-in bar's sourceComponent can. configureBar() in shell.qml sets
-+  // these three immediately after construction instead. Workaround for
-+  // https://github.com/basecamp/omarchy/issues/8007, reported upstream as
-+  // fixed (properly, via Loader initialProperties) by
-+  // https://github.com/basecamp/omarchy/pull/8146. Once that PR ships in a
-+  // stable release, drop this comment and restore `required` on all three.
-+  property string omarchyPath: ""
-   // Injected by the host shell so bar slots can resolve enabled widgets.
--  property var barWidgetRegistry: fallbackBarWidgetRegistry
--  // Read-only registry view for third-party full bars; the built-in bar does
--  // not otherwise need it, but declaring it keeps clone construction atomic.
--  property var pluginRegistry: null
-+  property var barWidgetRegistry: null
-   // Injected by the host shell every time shell.json is reloaded. Holds the
-   // `bar:` subtree: position, centerAnchor, layout. The host owns file IO;
-   // the bar just renders whatever it's handed. The bar font follows the
-   // OS-level fontconfig monospace binding — it is not stored in shell.json.
--  property var barConfig: ({})
-+  property var barConfig: null
-   // Injected by the host shell. Used for shell-wide actions such as opening
-   // settings and persisting inline widget state.
-   property var shell: null
-   // Manifest for the active bar option. Present for custom bars and useful for
-   // diagnostics; the built-in bar does not otherwise need it.
-   property var manifest: null
--  QtObject {
--    id: fallbackBarWidgetRegistry
--    property var widgets: ({})
--    property int revision: 0
--    function metadataFor(id) { return null }
--  }
-   // Mirrors the on-disk `bar-off` flag so the user can hide the bar without
-   // killing the entire shell. Hidden panels stay mapped but park off-screen
-   // without an exclusion zone; updated by the FileView watcher further down.
-@@ -79,6 +79,63 @@ Item {
-   property bool foregroundAnimationEnabled: true
-   property color background: Color.bar.background
-   property color urgent: Color.bar.active
-+  // Gap (px) between the bar surface and the screen edges/monitor sides it
-+  // floats away from, and the corner radius (px) of the floating bar shape.
-+  // Configurable via shell.json's `bar:` entry (floatGap / cornerRadius).
-+  // When floatGap isn't set explicitly, it's auto-detected from Hyprland's
-+  // own `general:gaps_out` (see gapsOutProbe below), so the bar's floating
-+  // margin matches the gap already used between windows and the screen
-+  // edge instead of an arbitrary constant. See applyBarConfig().
+@@ -51,6 +52,44 @@ Item {
+     layout: { left: [], centerBegin: [], center: [], centerEnd: [], right: [] }
+   })
+   property var layoutConfig: fallbackBarConfig.layout
++  // niri port: the bar floats off the screen edge instead of sitting flush
++  // against it, with rounded corners. Configurable through shell.json's `bar:`
++  // entry (`floatGap` / `cornerRadius` / `noRoundedOnNoGaps`); when floatGap is
++  // absent the gap comes from the compositor's own outer gap, so the strip lines
++  // up with the spacing the windows already use.
 +  property real configuredFloatGap: -1
 +  property real autoDetectedGap: 8
 +  readonly property real floatGap: configuredFloatGap >= 0 ? configuredFloatGap : autoDetectedGap
-+  // Falls back to the shell's own Style.cornerRadius (which already mirrors
-+  // Hyprland's decoration:rounding live -- see Commons/Style.qml) instead of
-+  // a fixed constant, so the floating bar's corners match whatever rounding
-+  // the rest of the shell -- and any window -- is currently using, including
-+  // a live change from a plugin like Omablur, with no polling of our own.
 +  property real configuredCornerRadius: -1
 +  readonly property real barCornerRadius: configuredCornerRadius >= 0 ? configuredCornerRadius : Style.cornerRadius
-+  // When true (default), a zero gap -- e.g. Omarchy's "no gaps" toggle --
-+  // squares the bar off instead of leaving it rounded while flush against
-+  // the screen edge. Set false to always use barCornerRadius regardless of
-+  // the current gap.
 +  property bool noRoundedOnNoGaps: true
 +  readonly property real effectiveCornerRadius: (noRoundedOnNoGaps && floatGap <= 0) ? 0 : barCornerRadius
 +  property string gapsOutProbeBuffer: ""
 +
-+  // Reads Hyprland's configured outer gap at startup, and again on every
-+  // config reload -- e.g. Omarchy's "no gaps" toggle
-+  // (omarchy-hyprland-window-gaps-toggle) just swaps a Lua flag file and
-+  // runs `hyprctl reload`, which changes general:gaps_out without
-+  // restarting the shell. hyprctl reports the gap as a CSS-style shorthand
-+  // ("top right bottom left"); Omarchy/Hyprland setups almost always set
-+  // all four to the same value, so the first number is used. Falls back to
-+  // autoDetectedGap's previous value if a probe fails for any reason
-+  // (hyprctl missing, unexpected output, etc.).
++  // Hyprland reports the outer gap as a CSS-style shorthand; niri has no such
++  // query, so the probe keeps the configured default and shell.json's explicit
++  // `floatGap` stays the source of truth.
 +  function refreshGapsOut() {
 +    if (gapsOutProbe.running) return
 +    gapsOutProbeBuffer = ""
 +    gapsOutProbe.running = true
 +  }
 +
-+  // niri port: no Hyprland configreloaded event here. The probe runs once at
-+  // startup and the float gap comes from shell.json's explicit `floatGap`.
 +  Process {
 +    id: gapsOutProbe
 +    command: ["hyprctl", "-j", "getoption", "general:gaps_out"]
@@ -833,260 +906,35 @@ index be9fece4..e979f2b9 100644
 +        // Keep the previous value; a broken probe shouldn't break the bar.
 +      }
 +    }
-+    Component.onCompleted: root.refreshGapsOut()
 +  }
- 
-   Behavior on barForeground { enabled: root.foregroundAnimationEnabled; ColorAnimation { duration: 420; easing.type: Easing.InOutCubic } }
-   Behavior on background { ColorAnimation { duration: 420; easing.type: Easing.InOutCubic } }
-@@ -109,223 +166,6 @@ Item {
-   property var barMoveScreen: null
-   property var clickTargets: []
-   property var moduleSlots: []
--  property var pluginBarApis: ({})
--  property var pluginObjectOwners: []
--
--  Component {
--    id: pluginBarApiComponent
--    PluginBarApi { }
--  }
--
--  function publicLayoutConfig() {
--    return JSON.parse(JSON.stringify(root.layoutConfig || {}))
--  }
--
--  function bindPluginBarApi(api) {
--    if (!api) return
--    api.foreground = Qt.binding(function() { return root.foreground })
--    api.barForeground = Qt.binding(function() { return root.barForeground })
--    api.background = Qt.binding(function() { return root.background })
--    api.urgent = Qt.binding(function() { return root.urgent })
--    api.fontFamily = Qt.binding(function() { return root.fontFamily })
--    api.position = Qt.binding(function() { return root.position })
--    api.vertical = Qt.binding(function() { return root.vertical })
--    api.barSize = Qt.binding(function() { return root.barSize })
--    api.transparent = Qt.binding(function() { return root.transparent })
--    api.foregroundAnimationEnabled = Qt.binding(function() { return root.foregroundAnimationEnabled })
--    api.centerSectionRevealHeld = Qt.binding(function() { return root.centerSectionRevealHeld })
--    api._centerHoverRevealSuppressed = Qt.binding(function() { return root.centerHoverRevealSuppressed })
--    root.syncPluginBarApiObjects(api)
--  }
--
--  function syncPluginBarApiObjects(api) {
--    if (!api) return
--    api.activePopout = root.pluginOwnsBarObject(api.pluginId, root.activePopout)
--      ? root.activePopout : (root.activePopout ? api.foreignPopoutMarker : null)
--    api.clickTargets = root.pluginClickTargets(api.pluginId)
--    api.layoutConfig = root.publicLayoutConfig()
--  }
--
--  function pluginObjectRecord(target) {
--    for (var i = 0; i < pluginObjectOwners.length; i++) {
--      var record = pluginObjectOwners[i]
--      if (record && record.target === target) return record
--    }
--    return null
--  }
--
--  function markPluginObject(pluginId, target, role) {
--    var key = String(pluginId || "")
--    if (!key || !target) return false
--    var record = root.pluginObjectRecord(target)
--    if (record && record.pluginId !== key) return false
--    var next = []
--    for (var i = 0; i < pluginObjectOwners.length; i++) {
--      var existing = pluginObjectOwners[i]
--      if (!existing || existing.target !== target) next.push(existing)
--    }
--    var updated = record || { target: target, pluginId: key, clickTarget: false, popout: false }
--    updated[role] = true
--    next.push(updated)
--    pluginObjectOwners = next
--    return true
--  }
--
--  function unmarkPluginObject(pluginId, target, role) {
--    var key = String(pluginId || "")
--    var next = []
--    for (var i = 0; i < pluginObjectOwners.length; i++) {
--      var record = pluginObjectOwners[i]
--      if (!record || record.target !== target || record.pluginId !== key) {
--        next.push(record)
--        continue
--      }
--      record[role] = false
--      if (record.clickTarget || record.popout) next.push(record)
--    }
--    pluginObjectOwners = next
--  }
--
--  function pluginOwnsBarObject(pluginId, target) {
--    var record = target ? root.pluginObjectRecord(target) : null
--    return !!record && record.pluginId === String(pluginId || "")
--  }
--
--  function pluginClickTargets(pluginId) {
--    var out = []
--    for (var i = 0; i < root.clickTargets.length; i++) {
--      var target = root.clickTargets[i]
--      if (root.pluginOwnsBarObject(pluginId, target)) out.push(target)
--    }
--    return out
--  }
--
--  function syncAllPluginBarApiObjects() {
--    for (var id in pluginBarApis) root.syncPluginBarApiObjects(pluginBarApis[id])
--  }
--
--  function registerPluginClickTarget(pluginId, target) {
--    if (!root.markPluginObject(pluginId, target, "clickTarget")) return
--    root.registerClickTarget(target)
--  }
--
--  function unregisterPluginClickTarget(pluginId, target) {
--    if (!root.pluginOwnsBarObject(pluginId, target)) return
--    root.unregisterClickTarget(target)
--    root.unmarkPluginObject(pluginId, target, "clickTarget")
--  }
--
--  function requestPluginPopout(pluginId, owner) {
--    if (!root.markPluginObject(pluginId, owner, "popout")) return
--    root.requestPopout(owner)
--  }
--
--  function releasePluginPopout(pluginId, owner) {
--    if (!root.pluginOwnsBarObject(pluginId, owner)) return
--    root.releasePopout(owner)
--    root.unmarkPluginObject(pluginId, owner, "popout")
--  }
--
--  function pluginBarApiFor(pluginId, moduleName, registered) {
--    var key = String(pluginId || "")
--    if (!key) return null
--
--    var pluginShell = null
--    if (registered && root.shell && typeof root.shell.pluginShellForId === "function") {
--      // Only the trusted built-in bar receives ShellRoot and can request a
--      // service-capable facade for the widget it is instantiating.
--      pluginShell = root.shell.pluginShellForId(moduleName)
--    } else if (root.shell && typeof root.shell.pluginShellForBarEntry === "function") {
--      // Replacement bars receive a service-less entry facade. Giving an
--      // untrusted bar a generic facade factory would let it retrieve another
--      // third-party plugin's live service object.
--      pluginShell = root.shell.pluginShellForBarEntry(key, moduleName)
--    }
--
--    if (pluginBarApis[key]) {
--      pluginBarApis[key].shell = pluginShell
--      return pluginBarApis[key]
--    }
--
--    var api = pluginBarApiComponent.createObject(null, {
--      pluginId: key,
--      moduleName: String(moduleName || ""),
--      shell: pluginShell,
--      _showTooltip: function(target, text) { root.showTooltip(target, text) },
--      _hideTooltip: function(target) { root.hideTooltip(target) },
--      _registerClickTarget: function(target) { root.registerPluginClickTarget(key, target) },
--      _unregisterClickTarget: function(target) { root.unregisterPluginClickTarget(key, target) },
--      _requestPopout: function(owner) { root.requestPluginPopout(key, owner) },
--      _releasePopout: function(owner) { root.releasePluginPopout(key, owner) },
--      _switchPanelFrom: function(owner, direction) { return root.switchPanelFrom(owner, direction) },
--      _targetBelongsToWindow: function(target, window) { return root.targetBelongsToWindow(target, window) },
--      _moduleWidgets: function(requestedId) {
--        return String(requestedId || "") === String(moduleName || "")
--          ? root.moduleWidgets(moduleName) : []
--      },
--      _run: function(command) { root.run(command) },
--      _setCenterHoverRevealSuppressed: function(value) {
--        root.centerHoverRevealSuppressed = !!value
--      }
--    })
--    if (!api) return null
--    root.bindPluginBarApi(api)
--
--    var next = ({})
--    for (var id in pluginBarApis) next[id] = pluginBarApis[id]
--    next[key] = api
--    pluginBarApis = next
--    return api
--  }
--
--  function pluginBarApiUsed(pluginId) {
--    for (var i = 0; i < moduleSlots.length; i++) {
--      var slot = moduleSlots[i]
--      if (slot && slot.pluginApiId === pluginId) return true
--    }
--    return false
--  }
--
--  function releasePluginObjects(pluginId) {
--    var owned = pluginObjectOwners.slice()
--    for (var i = 0; i < owned.length; i++) {
--      var record = owned[i]
--      if (!record || record.pluginId !== pluginId) continue
--      if (record.clickTarget) root.unregisterClickTarget(record.target)
--      if (record.popout && root.activePopout === record.target) root.releasePopout(record.target)
--    }
--    pluginObjectOwners = pluginObjectOwners.filter(function(record) {
--      return record && record.pluginId !== pluginId
--    })
--  }
--
--  function prunePluginBarApis() {
--    var next = ({})
--    for (var id in pluginBarApis) {
--      var api = pluginBarApis[id]
--      if (root.pluginBarApiUsed(id)) {
--        next[id] = api
--        continue
--      }
--      root.releasePluginObjects(id)
--      if (api && typeof api.destroy === "function") api.destroy()
--    }
--    pluginBarApis = next
--  }
--
--  onActivePopoutChanged: syncAllPluginBarApiObjects()
--  onClickTargetsChanged: syncAllPluginBarApiObjects()
--  onLayoutConfigChanged: syncAllPluginBarApiObjects()
--  onModuleSlotsChanged: Qt.callLater(prunePluginBarApis)
--
--  Component.onDestruction: {
--    for (var id in pluginBarApis) {
--      root.releasePluginObjects(id)
--      if (pluginBarApis[id] && typeof pluginBarApis[id].destroy === "function")
--        pluginBarApis[id].destroy()
--    }
--    pluginBarApis = ({})
--  }
- 
-   function registerClickTarget(target) {
-     if (!target || clickTargets.indexOf(target) !== -1) return
-@@ -584,6 +424,16 @@ Item {
-     position = normalizePosition(config.position)
-     setRequestedTransparency(config.transparent === true)
-     centerAnchor = Util.canonicalWidgetId(config.centerAnchor || "")
-+    // Clamped: shell.json is user-editable, and these feed straight into
-+    // layer-shell margins / a Rectangle radius. Not an unbounded-allocation
-+    // risk the way a Repeater count is, but an extreme value (a stray extra
-+    // zero) can still push the bar off-screen or into a degenerate shape,
-+    // so bound them to a sane range rather than trusting either verbatim.
++
+   property bool requestedTransparent: false
+   property bool useTransparentForeground: false
+   property bool transparent: false
+@@ -749,7 +788,7 @@ Item {
+   // The physical mode Hyprland reports for a screen, as hyprctl monitors does.
+   // Qt's whole-number devicePixelRatio can't rebuild it at a fractional scale.
+   function panelModeFor(screen) {
+-    var monitor = screen ? Hyprland.monitorFor(screen) : null
++    var monitor = screen ? Niri.monitorFor(screen) : null
+     return monitor ? ({
+       width: monitor.width,
+       height: monitor.height,
+@@ -811,6 +850,12 @@ Item {
+     // moves and whatever its settings, so a config write builds just the
+     // widgets it adds (layoutWidgets).
+     layoutConfig = normalizeLayout(config.layout)
++    // niri port: the floating geometry, read from the same `bar:` subtree.
 +    configuredFloatGap = typeof config.floatGap === "number"
 +      ? Math.max(0, Math.min(200, config.floatGap)) : -1
 +    configuredCornerRadius = typeof config.cornerRadius === "number"
-+      ? Math.max(0, Math.min(200, config.cornerRadius)) : -1
++      ? Math.max(0, Math.min(64, config.cornerRadius)) : -1
 +    noRoundedOnNoGaps = config.noRoundedOnNoGaps !== false
- 
-     // layoutEntries feeds plain JS arrays to the module Repeaters, and QML
-     // cannot diff those: reassigning layoutConfig rebuilds every widget on
-@@ -710,11 +560,11 @@ Item {
-     return window && window.screen ? String(window.screen.name || "") : ""
+     barConfigSerial++
    }
  
--  // The output Hyprland has focused, which is where a keyboard-summoned panel
--  // belongs. Empty until Hyprland reports one, which leaves panel routing on
-+  // The output the compositor has focused, which is where a keyboard-summoned
-+  // panel belongs. Empty until there is one, which leaves panel routing on
+@@ -926,7 +971,7 @@ Item {
+   // belongs. Empty until Hyprland reports one, which leaves panel routing on
    // its per-monitor fallback rather than guessing at an output.
    function focusedScreenName() {
 -    var monitor = Hyprland.focusedMonitor
@@ -1094,486 +942,98 @@ index be9fece4..e979f2b9 100644
      return monitor ? String(monitor.name || "") : ""
    }
  
-@@ -807,6 +657,224 @@ Item {
- 
-   Component.onCompleted: applyBarConfig()
- 
-+  // ---- boot reveal -------------------------------------------------------
-+  //
-+  // A real login starts the shell on a wallpaper that is already there, and the
-+  // bar's own first ~1s is nothing anyone wants to watch: glyphs shape, icons
-+  // load, the frosted fill pops in mid-layout. So the bar's surface stays off
-+  // the screen for that moment, then appears whole.
-+  //
-+  // Whole, and deliberately not floated in. niri paints the blur for the region
-+  // it was handed by itself: the frost is a compositor effect, not the client's
-+  // pixels, so it shows even where the surface draws nothing at all. A bar that
-+  // slides into place therefore lands as an empty frosted rectangle with the
-+  // bar chasing it down -- two bars, and the second one is the ugly half. Nor
-+  // can the region follow the slide (measured: a region bound to the moved item
-+  // left the screen with it and the frost never came back). A surface that
-+  // appears in one piece has neither problem.
-+  //
-+  // Only a real login arms this. The session wrapper drops a marker in the
-+  // runtime directory, the host shell reads it there and pushes the flag down
-+  // onto whichever bar is configured -- this plugin sees only a restricted
-+  // shell API, so it cannot reach the marker itself -- and the host removes the
-+  // marker as it reads it, so restarting the shell while working on it never
-+  // hides the bar.
-+  property bool bootRevealArmed: false
-+  onBootRevealArmedChanged: if (bootRevealArmed) root.armBootReveal()
-+
-+  // Whether the bar may be on screen at all. True from the start unless a real
-+  // login armed the reveal, so an ordinary restart changes nothing.
-+  property bool bootRevealShown: true
-+
-+  // A fixed hold was always wrong by some amount: the shell assembles itself at
-+  // whatever speed the machine feels like, and the slowest part is not the bar
-+  // or a widget but the wallpaper, which the background service decodes
-+  // asynchronously and paints well after every layer exists. So hold until that
-+  // service says a wallpaper frame is up, with a floor so a fast machine does
-+  // not blink the card, and a ceiling so a broken one cannot hide the bar
-+  // forever.
-+  readonly property int bootHoldMs: 600
-+  readonly property int bootHoldMaxMs: 6000
-+  // Pushed by the host, which owns the handle to the background service -- a
-+  // plugin bar only ever sees a restricted shell API and cannot look it up
-+  // itself. Defaults to true so the plugin still behaves sensibly if some other
-+  // host loads it without pushing anything.
-+  property bool bootRevealPainted: true
-+  readonly property bool wallpaperPainted: root.bootRevealPainted
-+
-+  // A small timer, not an animation: nothing of ours is on screen to drive
-+  // frames while it runs.
-+  function armBootReveal() {
-+    root.bootRevealShown = false
-+    bootHoldTimer.start()
-+  }
-+
-+  function finishBootReveal() {
-+    if (!root.wallpaperPainted) return
-+    bootHoldTimer.stop()
-+    bootHoldPoll.stop()
-+    root.bootRevealShown = true
-+  }
-+
-+  Timer {
-+    id: bootHoldTimer
-+    interval: root.bootHoldMs
-+    onTriggered: {
-+      bootHoldPoll.start()
-+      root.finishBootReveal()
-+    }
-+  }
-+
-+  Timer {
-+    id: bootHoldPoll
-+    interval: 100
-+    repeat: true
-+    onTriggered: root.finishBootReveal()
-+  }
-+
-+  // Safety net: whatever happens above, the bar must never stay off screen.
-+  Timer {
-+    interval: root.bootHoldMaxMs
-+    running: !root.bootRevealShown
-+    onTriggered: {
-+      bootHoldPoll.stop()
-+      root.bootRevealShown = true
-+    }
-+  }
-+
-+  // While the bar is held back the desktop is wallpaper and nothing else, which
-+  // reads as "nothing is happening" -- so say something. Same shape as the
-+  // shutdown toast, with the brain the menu uses for its Learn entry. It lives
-+  // here instead of going through the host's osd plugin: that plugin pays about
-+  // a second to load on the first show of a session, which lands the toast
-+  // after the bar instead of before it.
-+  Variants {
-+    model: Quickshell.screens
-+
-+    delegate: Component {
-+      BootBannerPanel {
-+        required property var modelData
-+
-+        screen: modelData
-+      }
-+    }
-+  }
-+
-+  component BootBannerPanel: PanelWindow {
-+    id: bootBannerPanel
-+
-+    readonly property bool bannerUp: root.bootRevealArmed && !root.bootRevealShown
-+    // These are the osd plugin's own numbers (plugins/osd/Osd.qml, the card its
-+    // shutdown toast is drawn in), so the two come out the same size: pad 16 on
-+    // every side, two thirds of that between glyph and message, card 67 off the
-+    // bottom edge. Note Style.space(px) is a scaled pixel value, not a step
-+    // index -- space(16) is not the 16th step.
-+    readonly property int bannerPad: Style.space(16)
-+    readonly property int bannerGap: Math.round(Style.space(16) * 2 / 3)
-+    readonly property int bannerRowHeight: Style.font.displayLarge
-+    // Nerd Font glyphs draw well outside their monospace cell, so that card
-+    // measures its icon column by ink rather than by advance width. Measuring
-+    // by the cell instead is worth about 10px of extra card.
-+    readonly property int bannerInk: Math.ceil(bannerIconMetrics.tightBoundingRect.width)
-+    readonly property int bannerMessageWidth: Math.ceil(bannerMessageMetrics.advanceWidth)
-+    readonly property int bannerScreenWidth: bootBannerPanel.modelData ? bootBannerPanel.modelData.width : 0
-+
-+    TextMetrics {
-+      id: bannerIconMetrics
-+
-+      font.family: Style.font.family
-+      font.pixelSize: Style.font.displayLarge
-+      text: "󰧑"
-+    }
-+
-+    TextMetrics {
-+      id: bannerMessageMetrics
-+
-+      font.family: Style.font.family
-+      font.bold: true
-+      font.pixelSize: Style.font.title
-+      text: "Thinking…"
-+    }
-+
-+    // Parked just below the screen edge while idle, and always mapped: the
-+    // first show then costs a margin change (~20ms) instead of building a layer
-+    // surface and shaping the glyph, which measured ~1s here -- long enough to
-+    // land the card after the bar rather than before it. The bar parks for the
-+    // same reason.
+@@ -1714,8 +1759,16 @@ Item {
+     visible: !remapGuard.remapping && (cutoutWaitOver || !cutoutPending)
+     // An explicit zone instead of Auto: the reserved area stays the strip's
+     // thickness though the window spans its screen.
 +    //
-+    // The surface is card-sized rather than a full-width strip because this
-+    // card borrows the osd card's `blur true` layer rule (effects.kdl) so the
-+    // two are frosted alike, and niri frosts the whole surface a rule matches:
-+    // a full-width strip under that rule would frost the entire display. That
-+    // is why the card is centred with side margins instead of anchored edge to
-+    // edge.
-+    visible: true
-+    color: "transparent"
-+    exclusionMode: ExclusionMode.Ignore
-+    WlrLayershell.namespace: "omarchy-boot-banner"
-+    WlrLayershell.layer: WlrLayer.Overlay
-+    WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-+    mask: Region {}
-+
-+    anchors {
-+      bottom: true
-+      left: true
-+      right: true
-+    }
-+
-+    implicitHeight: bannerPill.height
-+    margins {
-+      left: Math.max(0, Math.round((bannerScreenWidth - bannerPill.width) / 2))
-+      right: Math.max(0, Math.round((bannerScreenWidth - bannerPill.width) / 2))
-+      bottom: bannerUp ? Style.space(67) : -(bannerPill.height + Style.space(67) + 40)
-+    }
-+
-+    BorderSurface {
-+      id: bannerPill
-+      width: bannerPill.borderLeft + bannerPad + bannerInk + bannerGap + bannerMessageWidth + bannerPad + bannerPill.borderRight
-+      height: bannerPill.borderTop + bannerPad + bannerRowHeight + bannerPad + bannerPill.borderBottom
-+      // The osd card's own fill, alpha and all: the layer rule for this
-+      // namespace frosts it exactly like that card.
-+      color: Color.menu.background
-+      borderSpec: Border.surfaceSpec("popups", "border", Color.popups.border, Math.max(1, Style.space(2)))
-+      radius: Style.cornerRadius
-+
-+      Row {
-+        id: bannerRow
-+        anchors.fill: parent
-+        anchors.topMargin: bannerPill.borderTop + bannerPad
-+        anchors.rightMargin: bannerPill.borderRight + bannerPad
-+        anchors.bottomMargin: bannerPill.borderBottom + bannerPad
-+        anchors.leftMargin: bannerPill.borderLeft + bannerPad
-+        spacing: bannerGap
-+
-+        Item {
-+          width: bannerInk
-+          height: parent.height
-+
-+          Text {
-+            textFormat: Text.PlainText
-+            // Sit the glyph's ink flush in the column, like the osd card does.
-+            x: Math.round((bannerInk - bannerIconMetrics.tightBoundingRect.width) / 2 - bannerIconMetrics.tightBoundingRect.x)
-+            anchors.verticalCenter: parent.verticalCenter
-+            text: "󰧑"
-+            font: bannerIconMetrics.font
-+            color: Color.popups.text
-+          }
-+        }
-+
-+        Text {
-+          textFormat: Text.PlainText
-+          width: bannerMessageWidth
-+          anchors.verticalCenter: parent.verticalCenter
-+          text: "Thinking…"
-+          font: bannerMessageMetrics.font
-+          color: Color.popups.text
-+        }
-+      }
-+    }
-+  }
-+
-   // Revealing the indicators widens their section, which can slide a neighbour
-   // under a stationary pointer. Collapsing on that un-hover would move it back
-   // out and re-open the peek, so hold until the pointer leaves the bar.
-@@ -825,10 +893,6 @@ Item {
-     if (barHoverCount === 0) centerSectionRevealTimer.restart()
-   }
++    // niri port: the zone has to include the gap the strip floats by. The
++    // reserved area is measured from the screen edge, but the strip sits
++    // floatGap inside it, so reserving only `thickness` leaves the compositor
++    // packing windows right under the strip: niri still adds its own 8px outer
++    // gap on top, and the two together read as a band of dead desktop between
++    // the bar and every window. Reserving both makes the gap around the bar
++    // equal to the gap around every other window.
+     exclusionMode: root.barHidden ? ExclusionMode.Ignore : ExclusionMode.Normal
+-    exclusiveZone: thickness
++    exclusiveZone: thickness + root.floatGap
  
--  function setCenterHoverRevealSuppressed(value) {
--    centerHoverRevealSuppressed = !!value
--  }
--
-   Timer {
-     id: centerSectionRevealTimer
-     interval: 120
-@@ -1103,6 +1167,13 @@ Item {
-   FileView {
-     path: root.stateHome + "/omarchy/current"
-     watchChanges: true
-+    // Only the change notification matters here -- scheduleTransparent-
-+    // ForegroundRefresh() recomputes via a separate Process, never this
-+    // view's own text/data. This path is user-writable and predictable, so
-+    // without preload: false, replacing it (or symlinking it) with an
-+    // arbitrarily large regular file would make the shell load the whole
-+    // thing into memory with no size ceiling.
-+    preload: false
-     printErrors: false
-     onFileChanged: root.scheduleTransparentForegroundRefresh()
-   }
-@@ -1174,25 +1245,15 @@ Item {
-   FileView {
-     path: root.home + "/.local/state/omarchy/toggles"
-     watchChanges: true
-+    // Same reasoning as the /omarchy/current watcher above: only the change
-+    // notification is used (it re-runs barHiddenProbe, a separate Process,
-+    // to check for the bar-off flag), so this view never needs to load
-+    // whatever's actually at this user-writable, predictable path.
-+    preload: false
-     printErrors: false
-     onFileChanged: barHiddenProbe.running = true
-   }
- 
--  // The directory watch can permanently stop delivering events after flag
--  // changes land in quick succession, stranding the bar off screen until the
--  // shell restarts. `omarchy-toggle-bar` nudges this after flipping the flag
--  // so the probe re-reads it even when the watch has gone quiet.
--  IpcHandler {
--    target: "omarchy.bar"
--
--    // Start rather than restart: a probe already in flight was launched by the
--    // directory watch after the flag flipped, so its answer is current, and
--    // killing it here can swallow the result entirely.
--    function syncHidden(): void {
--      barHiddenProbe.running = true
--    }
--  }
--
-   Variants {
-     model: Quickshell.screens
- 
-@@ -1239,7 +1300,9 @@ Item {
-     // reveal has to rebuild them — new surface, re-shaped glyphs, re-uploaded
-     // textures — which measures ~150ms against ~20ms to tear down. Parking
-     // keeps the surface alive, so showing is only a margin change.
--    visible: !remapGuard.remapping
-+    // The bar's own remap guard and the boot reveal both want the surface
-+    // gone, and QML refuses an object that sets the same property twice, so
-+    // they share one binding here.
-     exclusionMode: root.barHidden ? ExclusionMode.Ignore : ExclusionMode.Auto
- 
-     ScreenMoveRemap {
-@@ -1247,11 +1310,27 @@ Item {
-       window: barWindow
-     }
- 
-+    // The edge the bar is anchored to (its `position`) and the two
-+    // perpendicular edges get the gap -- those all border open desktop or
-+    // screen edge. The edge opposite `position` gets none: that's the side
-+    // facing the tiled windows, which already have their own Hyprland gap
-+    // right up against the bar's exclusion zone, so adding floatGap there
-+    // on top of it just makes that side look bigger than the other three.
-+    function innerEdge() {
-+      if (root.position === "top") return "bottom"
-+      if (root.position === "bottom") return "top"
-+      if (root.position === "left") return "right"
-+      return "left"
-+    }
-+    function marginFor(edge) {
-+      return edge === innerEdge() ? 0 : root.floatGap
-+    }
-+
-     margins {
--      top: root.barHidden && root.position === "top" ? -root.barSize : 0
--      bottom: root.barHidden && root.position === "bottom" ? -root.barSize : 0
--      left: root.barHidden && root.position === "left" ? -root.barSize : 0
--      right: root.barHidden && root.position === "right" ? -root.barSize : 0
-+      top: marginFor("top") + (root.barHidden && root.position === "top" ? -root.barSize : 0)
-+      bottom: marginFor("bottom") + (root.barHidden && root.position === "bottom" ? -root.barSize : 0)
-+      left: marginFor("left") + (root.barHidden && root.position === "left" ? -root.barSize : 0)
-+      right: marginFor("right") + (root.barHidden && root.position === "right" ? -root.barSize : 0)
-     }
- 
-     anchors {
-@@ -1263,11 +1342,86 @@ Item {
- 
-     implicitWidth: root.vertical ? root.barSize : 0
-     implicitHeight: root.vertical ? 0 : root.barSize
--    color: root.transparent ? "transparent" : root.background
-+    // The surface itself stays fully transparent; barBackground below draws
-+    // the actual (roundable) fill, so the corners cut outside its radius
-+    // show through to the desktop instead of being a square window.
-+    color: "transparent"
-     surfaceFormat.opaque: false
+     // While this window's widget or bar-move drag is live, the whole surface
+     // takes input (mask below), so the pointer never leaves the bar surface
+@@ -1789,6 +1842,21 @@ Item {
      WlrLayershell.namespace: "omarchy-bar"
      WlrLayershell.layer: WlrLayer.Top
  
-+    // The whole reveal: off the screen, then on it. Nothing moves -- see
-+    // the boot reveal notes above for why a slide cannot work.
-+    visible: root.bootRevealShown && !remapGuard.remapping
-+
-+    // niri port: hand niri the bar's own rounded rect as the blur region, so the
-+    // frost follows the rounded shape instead of the full surface rectangle --
-+    // blurring that rectangle smears the bar's fill out through its transparent
-+    // corners into a halo (niri samples the composited scene; Hyprland fixes the
-+    // same thing with `ignore_alpha` and niri has no equivalent).
-+    // The blur region must not move, so it tracks a stationary stand-in instead
-+    // of the sliding visual: niri blurs the rectangle it is handed, and the bar
-+    // begins the reveal parked above the top edge -- a region sampled there is
-+    // off-screen, and it takes the frost with it. Same geometry as the bar at
-+    // rest (the bar fills the surface); only ever a shape, never a colour.
-+    Rectangle {
-+      id: barBlurAnchor
-+      anchors.fill: parent
-+      // niri port (2026-10-04): the frost region the compositor masks out is a
-+      // HARD edge -- niri's background-effect region has no antialiasing, and
-+      // because the fill under it is only ~46% alpha that hard cut is what the
-+      // eye sees, no matter what the fill does. Inset the frost 2px so the
-+      // fill's own (antialiased) rounded edge is the visible silhouette and the
-+      // compositor's staircase sits inside it -- see docs/visual.md.
-+      anchors.margins: 2
++    // niri port: hand niri the strip's own rounded rect as the blur region. The
++    // surface spans its screen (so the exclusive zone and the drag input region
++    // keep working), which on Hyprland is harmless because `ignore_alpha` keeps
++    // the clear rest unblurred -- niri has no equivalent, so without this the
++    // whole display would frost. Blurring the strip's plain rectangle instead
++    // would smear its fill out through the transparent corners, hence the
++    // radius; the 2px inset keeps the compositor's hard-edged mask inside the
++    // fill's own antialiased silhouette.
++    BackgroundEffect.blurRegion: Region {
++      // Inset by 2px so the compositor's hard-edged mask lands inside the fill's
++      // own antialiased rounded silhouette rather than outlining it.
++      item: barBlurAnchor
 +      radius: Math.max(0, root.effectiveCornerRadius - 2)
-+      color: "transparent"
 +    }
 +
-+    BackgroundEffect.blurRegion: Region { item: barBlurAnchor; radius: root.effectiveCornerRadius }
-+
-+
-+
-+    Rectangle {
-+      id: barBackground
-+      anchors.fill: parent
-+      antialiasing: true
-+      radius: root.effectiveCornerRadius
-+      // The theme's own background color can carry its own baked-in alpha
-+      // (shell.toml's [bar] background-alpha); forcing it to 1 here first
-+      // means Style.shellOpacity below is an absolute result, not a
-+      // multiplier on top of an already-translucent color -- shellOpacity a
-+      // plugin never touches still reaching exactly opaque.
-+      //
-+      // niri port: keep that alpha instead. niri only blurs behind a surface
-+      // that is not fully opaque, so with the alpha forced to 1 the bar had
-+      // nothing to show through and the frost stayed invisible.
-+      color: root.transparent ? "transparent"
-+        : Qt.rgba(root.background.r, root.background.g, root.background.b,
-+                  root.background.a > 0 ? root.background.a : 1)
-+      // Style.shellOpacity is a shared token a plugin like Omablur sets when
-+      // it turns blur on/off -- blur only renders behind a surface that isn't
-+      // fully opaque. Only applies when the background is actually drawn:
-+      // `transparent` already means "nothing to see here" and takes priority.
-+      // niri port: this Omarchy version has no shellOpacity token, so fall
-+      // back to fully opaque instead of assigning undefined to a double.
-+      opacity: root.transparent ? 1
-+        : (typeof Style.shellOpacity === "number" ? Style.shellOpacity : 1)
-+      Behavior on radius { NumberAnimation { duration: 420; easing.type: Easing.InOutCubic } }
-+      Behavior on color { ColorAnimation { duration: 420; easing.type: Easing.InOutCubic } }
-+      Behavior on opacity { NumberAnimation { duration: 420; easing.type: Easing.InOutCubic } }
-+    }
-+
-+    Rectangle {
-+      id: barTopHighlight
-+      visible: !root.transparent
-+      x: root.vertical ? 0 : Math.round(root.effectiveCornerRadius)
-+      y: root.vertical ? Math.round(root.effectiveCornerRadius) : 0
-+      width: root.vertical ? 1 : Math.max(0, parent.width - Math.round(root.effectiveCornerRadius) * 2)
-+      height: root.vertical ? Math.max(0, parent.height - Math.round(root.effectiveCornerRadius) * 2) : 1
-+      color: Qt.rgba(root.barForeground.r, root.barForeground.g, root.barForeground.b, 0.10)
-+    }
-+
-     Loader {
-       anchors.fill: parent
-       sourceComponent: root.vertical ? verticalBar : horizontalBar
-@@ -1335,9 +1489,14 @@ Item {
- 
-         Text {
-           id: tooltipLabel
--          textFormat: Text.PlainText
-           anchors.centerIn: parent
-           text: root.tooltipText
-+          // The shared tooltip renders whatever any widget hands it,
-+          // including window titles and StatusNotifier tooltip text --
-+          // both set by other applications, not this shell. Force plain
-+          // text so Qt's default Text.AutoText can't interpret embedded
-+          // rich-text markup (e.g. <img>) from an untrusted source.
-+          textFormat: Text.PlainText
-           color: Color.tooltip.text
-           font.family: root.fontFamily
-           font.pixelSize: Style.font.body
-@@ -1778,9 +1937,6 @@ Item {
-     readonly property string moduleName: root.entryId(entry)
-     readonly property var moduleSettings: root.entrySettings(entry)
-     readonly property string customType: root.customModuleType(entry)
--    readonly property var registryMetadata: root.barWidgetRegistry.metadataFor(root.canonicalWidgetId(moduleName))
--    readonly property bool firstParty: registryMetadata && registryMetadata.firstParty === true
--    readonly property string pluginApiId: registered ? root.canonicalWidgetId(moduleName) : "bar-entry:" + moduleName
-     // Re-evaluate when the registry mutates (Component reference changes,
-     // plugin enabled/disabled, etc.). Reading the `widgets` property creates
-     // the binding dependency — the wrapped function call alone wouldn't.
-@@ -1999,8 +2155,7 @@ Item {
-     function injectProps() {
-       var target = activeItem
-       if (!target) return
--      if ("bar" in target) target.bar = firstParty
--        ? root : root.pluginBarApiFor(pluginApiId, moduleName, registered)
-+      if ("bar" in target) target.bar = root
-       if ("moduleName" in target) target.moduleName = moduleName
-       if ("settings" in target) target.settings = moduleSettings
+     // Idle, only the strip takes input, so the clear expanse passes clicks
+     // through to the windows and desktop below.
+     mask: dragActive ? null : stripInputRegion
+@@ -1798,17 +1866,42 @@ Item {
+       item: barStrip
      }
-diff --git a/shell/plugins/bar/LICENSE b/shell/plugins/bar/LICENSE
-new file mode 100644
-index 00000000..e4cb7017
---- /dev/null
-+++ b/shell/plugins/bar/LICENSE
-@@ -0,0 +1,21 @@
-+MIT License
+ 
++    // A stationary stand-in at the strip's resting geometry, declared before the
++    // strip itself: niri blurs the rectangle it is handed, so the region must not
++    // ride the boot reveal's animation.
++    Item {
++      id: barBlurAnchor
++      x: root.position === "right" ? parent.width - barWindow.thickness - root.floatGap : root.floatGap
++      y: root.position === "bottom" ? parent.height - barWindow.thickness - root.floatGap : root.floatGap
++      width: root.vertical ? barWindow.thickness : Math.max(0, parent.width - root.floatGap * 2)
++      height: root.vertical ? Math.max(0, parent.height - root.floatGap * 2) : barWindow.thickness
++      visible: false
++    }
 +
-+Copyright (c) 2026 Charlieras262
-+
-+Permission is hereby granted, free of charge, to any person obtaining a copy
-+of this software and associated documentation files (the "Software"), to deal
-+in the Software without restriction, including without limitation the rights
-+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-+copies of the Software, and to permit persons to whom the Software is
-+furnished to do so, subject to the following conditions:
-+
-+The above copyright notice and this permission notice shall be included in all
-+copies or substantial portions of the Software.
-+
-+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-+SOFTWARE.
+     // The bar itself, along its screen edge.
+     Item {
+       id: barStrip
+ 
+-      x: root.position === "right" ? parent.width - barWindow.thickness : 0
+-      y: root.position === "bottom" ? parent.height - barWindow.thickness : 0
+-      width: root.vertical ? barWindow.thickness : parent.width
+-      height: root.vertical ? parent.height : barWindow.thickness
++      // niri port: the strip floats inside the (always full-screen) surface
++      // instead of hugging the screen edge. The anchored edge and the two
++      // perpendicular ones take the gap; the edge facing the tiled windows keeps
++      // none, because those already sit behind their own compositor gap and a
++      // second one there just makes that side look thicker than the other three.
++      x: {
++        if (root.position === "right") return parent.width - barWindow.thickness - root.floatGap
++        return root.floatGap
++      }
++      y: {
++        if (root.position === "bottom") return parent.height - barWindow.thickness - root.floatGap
++        return root.floatGap
++      }
++      width: root.vertical ? barWindow.thickness : Math.max(0, parent.width - root.floatGap * 2)
++      height: root.vertical ? Math.max(0, parent.height - root.floatGap * 2) : barWindow.thickness
+ 
+       Rectangle {
+         anchors.fill: parent
++        antialiasing: true
++        radius: root.effectiveCornerRadius
+         color: root.transparent ? "transparent" : (root.glassy ? root.glassBackground : root.background)
+       }
+ 
 diff --git a/shell/plugins/bar/README.md b/shell/plugins/bar/README.md
-index 5741c5f3..5c612d9f 100644
+index 939990c79..5c612d9f8 100644
 --- a/shell/plugins/bar/README.md
 +++ b/shell/plugins/bar/README.md
-@@ -1,180 +1,184 @@
+@@ -1,189 +1,184 @@
 -# Omarchy bar
 +# Floating Bar
  
@@ -1603,20 +1063,20 @@ index 5741c5f3..5c612d9f 100644
 +bar matches the gap Hyprland already puts between windows and the screen
 +edge instead of introducing a second, inconsistent gap value.
  
--The bar config lives under the `bar:` key of [`~/.config/omarchy/shell.json`](../../README.md#shelljson-shape). Out of the box the shell uses [`config/omarchy/shell.json`](../../../config/omarchy/shell.json). Once you customize anything via the bar gestures, `omarchy bar ...`, or by editing shell.json directly, your file is canonical — there is no deep-merge.
+-The bar config lives under the `bar:` key of [`~/.config/omarchy/shell.json`](../../../docs/omarchy-shell.md#shelljson). Out of the box the shell uses [`config/omarchy/shell.json`](../../../config/omarchy/shell.json). Once you customize anything via the bar gestures, `omarchy bar ...`, or by editing shell.json directly, your file is canonical — there is no deep-merge.
 +## Install
  
--The bar is configured directly on the bar itself: drag empty bar space (or click-and-hold) to move the bar to another screen edge, double-left-click empty center-bar space to toggle transparency, and drag widgets to reorder them. The `omarchy bar position`, `omarchy bar transparent`, `omarchy bar move`, and `omarchy bar set` commands do the same from scripts. Enable or disable widgets with `omarchy plugin enable` and `omarchy plugin disable` (widget ids come from `omarchy plugin list`).
+-The bar is configured directly on the bar itself: drag empty bar space (or click-and-hold) to move the bar to another screen edge, double-left-click empty center-bar space to cycle the bar background from clear to glassy to opaque, and drag widgets to reorder them. The `omarchy bar position`, `omarchy bar background`, `omarchy bar move`, and `omarchy bar set` commands do the same from scripts. Enable or disable widgets with `omarchy plugin enable` and `omarchy plugin disable` (widget ids come from `omarchy plugin list`).
 +```bash
 +omarchy plugin add https://github.com/Charlieras262/omarchy-floating-bar.git --enable
 +```
 +
 +`omarchy plugin update` later pulls new versions the same way any
 +git-managed plugin does.
++
++## Configure
  
 -Example `shell.json` (bar subtree only shown):
-+## Configure
-+
 +Optional, set on the bar's own entry in `~/.config/omarchy/shell.json`
 +(same place `position` and `transparent` already live):
  
@@ -1625,18 +1085,20 @@ index 5741c5f3..5c612d9f 100644
 -  "version": 1,
    "bar": {
 -    "position": "top",
--    "transparent": false,
--    "centerAnchor": "omarchy.clock",
+-    "background": "opaque",
 -    "layout": {
 -      "left": [
 -        { "id": "omarchy.menu" },
 -        { "id": "omarchy.spacer", "size": 12 },
 -        { "id": "omarchy.workspaces" }
 -      ],
+-      "centerBegin": [
+-        { "id": "omarchy.media" }
+-      ],
 -      "center": [
--        { "id": "omarchy.media" },
 -        { "id": "omarchy.clock", "format": "HH:mm" }
 -      ],
+-      "centerEnd": [],
 -      "right": [
 -        { "id": "omarchy.audio" },
 -        { "id": "omarchy.power" }
@@ -1649,7 +1111,7 @@ index 5741c5f3..5c612d9f 100644
  }
  ```
  
--`centerAnchor` pins one center module to the exact horizontal/vertical center and flanks others around it. Set to an empty string to disable anchoring (the center list is centered as a group).
+-`center` is a box in the middle of the bar whose modules are centered as one group on the exact horizontal/vertical center. `centerBegin` and `centerEnd` hang off the box's two edges and move out as it grows; with the box empty they meet in the middle of the bar.
 -
 -## Module catalogue
 -
@@ -1658,7 +1120,7 @@ index 5741c5f3..5c612d9f 100644
 -| Name | What it does | Interactions |
 -|---|---|---|
 -| `omarchy.menu` | Omarchy menu launcher | left = menu · right = terminal |
--| `omarchy.workspaces` | Hyprland workspace switcher | left = focus workspace |
+-| `omarchy.workspaces` | Hyprland workspace switcher; the focused workspace shows its layout | left = focus workspace, or cycle the focused one's layout |
 -| `omarchy.clock` | Date/time label + popup with a month grid, ISO week numbers, and month stepping | left = popup · right = cycle label format · middle = timezone selector |
 -| `omarchy.media` | MPRIS now-playing — scrolling track + artist, cover-art popup | left = play/pause · middle = next · scroll = prev/next · right = popup |
 -| `omarchy.indicators` | Manual state indicators | left = indicator action |
@@ -1674,6 +1136,22 @@ index 5741c5f3..5c612d9f 100644
 -| `omarchy.power` | Battery/AC icon + popup with battery stats, power profiles, and system info | left = popup · right = toggle percentage |
 -| `omarchy.bluetooth` | Bluetooth icon + popup with device list, connect/disconnect, battery | left = popup · right = toggle radio |
 -| `omarchy.monitor` | Brightness and laptop display controls | left = popup |
+-
+-The `omarchy.indicators` widget loads individual bar indicators from `indicators/`. Omit `items` (or set it to an empty array) to show all indicators in the default order, or set `items` to a subset such as `["Dnd", "Reminder", "NightLight"]`. Set `alwaysShow` to `true` to keep inactive indicators visible instead of revealing them only on hover. Multiple `omarchy.indicators` instances are allowed, so different sections can show different subsets.
+-
+-## Orientation
+-
+-All widgets work in `top`, `bottom`, `left`, and `right` positions. Popups anchor on the side opposite the bar edge, sliding into the workspace. Vertical bars use 28px width; widgets that show text fall back to compact icon-only forms (e.g. `media` hides its scrolling label).
+-
+-## Icon geometry
+-
+-Use `BarIconButton` from `qs.Ui` for bar icons. It fits the visible glyph bounds to `Style.bar.iconSize` and centers them on both axes. It preserves each glyph's aspect ratio. Set `labelText` for an adjacent text label, such as the battery percentage.
+-
+-The `[bar]` section of a theme's `shell.toml` supplies the shared dimensions. `icon-size` sets the visual target, with a default of 12 logical pixels. `icon-canvas` sets the canvas, with a default of 16 logical pixels. `icon-slot` and `status-slot` set the button extent. These dimensions follow the font scale unless `scale-with-font` is false.
+-
+-Custom `iconComponent` content also fits the shared target. Its source dimensions can be 15px or another size. The bar measures its glyph, image, or vector bounds and applies one scale without changing its aspect ratio. A source `iconSize` override does not change the rendered target. Image padding remains part of an application's tray asset.
+-
+-Custom text bounds include text alignment and padding. The bar applies each shape's fill mode and alignment to `Shape.boundingRect`. Canvas and shader icons use their item bounds. Set their item size to match their artwork.
 +| Key | Type | Default | Description |
 +|---|---|---|---|
 +| `cornerRadius` | number (px) | *(auto)* | Corner radius of the floating bar. If omitted, it follows Omarchy's own `Style.cornerRadius` — which already mirrors `decoration:rounding` live — so the bar's corners match every popup panel and any window, including a live change from a plugin like [Omablur](https://github.com/Charlieras262/omarchy-omablur). Set it explicitly to override that. |
@@ -1698,7 +1176,7 @@ index 5741c5f3..5c612d9f 100644
 +omarchy bar reset
 +```
  
--The `omarchy.indicators` widget loads individual bar indicators from `indicators/`. Omit `items` (or set it to an empty array) to show all indicators in the default order, or set `items` to a subset such as `["Dnd", "Reminder", "NightLight"]`. Set `alwaysShow` to `true` to keep inactive indicators visible instead of revealing them only on hover. Multiple `omarchy.indicators` instances are allowed, so different sections can show different subsets.
+-`WidgetButton` also uses the shared renderer for a single icon glyph. This covers custom command widgets and existing plugins that use `WidgetButton` with a different `fontSize`. Text labels retain their text size. Custom widgets must use `WidgetButton` or `BarIconButton` for this icon contract.
 +A `"kind": "bar"` plugin doesn't show up in `omarchy menu plugin
 +enable/disable`, and `omarchy plugin disable` doesn't apply to it either --
 +that's an Omarchy-wide rule for anything that replaces the whole bar
@@ -1706,25 +1184,37 @@ index 5741c5f3..5c612d9f 100644
 +this plugin. A bar option isn't a toggle, it's one of several mutually
 +exclusive choices, switched with `omarchy bar use <id>`:
  
--## Orientation
+-## Custom user modules
 +```bash
 +omarchy bar use charlieras262.floating-bar   # switch to this bar
 +omarchy bar reset                            # switch back to the stock bar
 +```
  
--All widgets work in `top`, `bottom`, `left`, and `right` positions. Popups anchor on the side opposite the bar edge, sliding into the workspace. Vertical bars use 28px width; widgets that show text fall back to compact icon-only forms (e.g. `media` hides its scrolling label).
+-The schema accepts arbitrary module ids that you provide. Set `type` to `command` for shell-driven output or `qml` for a custom QML widget. Both still go under `bar.layout.<section>` in `shell.json`.
 +Switching back this way keeps the plugin installed, so switching to it
 +again later doesn't need a reinstall.
  
--## Custom user modules
+-Command module:
 +## Remove
  
--The schema accepts arbitrary module ids that you provide. Set `type` to `command` for shell-driven output or `qml` for a custom QML widget. Both still go under `bar.layout.<section>` in `shell.json`.
+-```json
+-{
+-  "version": 1,
+-  "bar": {
+-    "layout": {
+-      "right": [
+-        { "id": "omarchy.tray" },
+-        { "id": "vpn", "type": "command", "exec": "~/.config/omarchy/bar/scripts/vpn-status", "interval": 5, "tooltip": "VPN", "onClick": "nm-connection-editor" },
+-        { "id": "omarchy.audio" }
+-      ]
+-    }
+-  }
+-}
 +```bash
 +omarchy plugin remove charlieras262.floating-bar
-+```
+ ```
  
--Command module:
+-The command may print plain text or Waybar-style JSON, for example:
 +This removes the plugin's files and switches the bar back to the stock
 +`omarchy.bar`.
 +
@@ -1791,35 +1281,13 @@ index 5741c5f3..5c612d9f 100644
 +`shell/plugins/notifications/Service.qml`, change
  
 -```json
--{
--  "version": 1,
--  "bar": {
--    "layout": {
--      "right": [
--        { "id": "omarchy.tray" },
--        { "id": "vpn", "type": "command", "exec": "~/.config/omarchy/bar/scripts/vpn-status", "interval": 5, "tooltip": "VPN", "onClick": "nm-connection-editor" },
--        { "id": "omarchy.audio" }
--      ]
--    }
--  }
--}
+-{"text":"󰌆","tooltip":"Work VPN","class":"active"}
 +```qml
 +readonly property int barClearance: liveBarSize + Style.gapsOut
  ```
  
--The command may print plain text or Waybar-style JSON, for example:
-+to
- 
--```json
--{"text":"󰌆","tooltip":"Work VPN","class":"active"}
-+```qml
-+readonly property real barEdgeMargin: shell && shell.bar && shell.bar.barHidden !== undefined
-+  && shell.bar.floatGap !== undefined ? Math.max(0, Number(shell.bar.floatGap) || 0) : 0
-+readonly property int barClearance: liveBarSize + barEdgeMargin + Style.gapsOut
- ```
- 
 -QML module:
-+`shell/Ui/KeyboardPanel.qml`, change
++to
  
 -```json
 -{
@@ -1834,13 +1302,15 @@ index 5741c5f3..5c612d9f 100644
 -  }
 -}
 +```qml
-+property int gap: Style.gapsOut  // distance between bar edge and panel
++readonly property real barEdgeMargin: shell && shell.bar && shell.bar.barHidden !== undefined
++  && shell.bar.floatGap !== undefined ? Math.max(0, Number(shell.bar.floatGap) || 0) : 0
++readonly property int barClearance: liveBarSize + barEdgeMargin + Style.gapsOut
  ```
  
 -Then create `~/.config/omarchy/bar/modules/gpu.qml`. If you want to store it elsewhere, add a `source` path.
 -
 -Custom QML modules should be an `Item` with `implicitWidth` and `implicitHeight`. They may optionally define these properties, which the bar fills after loading:
-+to
++`shell/Ui/KeyboardPanel.qml`, change
  
  ```qml
 -import QtQuick
@@ -1866,15 +1336,19 @@ index 5741c5f3..5c612d9f 100644
 -    onClicked: if (bar) bar.run("omarchy-launch-or-focus-tui btop")
 -  }
 -}
-+readonly property real barEdgeMargin: bar && bar.floatGap !== undefined
-+  ? Math.max(0, Number(bar.floatGap) || 0) : 0
-+property int gap: Style.gapsOut + barEdgeMargin  // distance between bar edge and panel
++property int gap: Style.gapsOut  // distance between bar edge and panel
  ```
  
 -## Bar properties available to widgets
--
--Widgets receive `bar` (the shell root), `moduleName` (string), and `settings` (object) injected at load time. The bar exposes:
--
++to
+ 
+-Widgets receive `bar` (the shell root), `moduleName` (string), and `settings` (object) injected at load time. A widget that declares `fixedEdge` also gets the edge of it that stays put when it grows: `"start"` (left, or top on a vertical bar), `"end"`, or `"center"` when it grows both ways, following the section it sits in. When the center box holds more than one widget, its first gets `"end"` and its last `"start"`, like `centerBegin`'s and `centerEnd`'s. A widget that grows, like the tray's drawer or the indicator peek, can lay its content out against that edge so it doesn't shift. A widget moved to another section keeps running, and its `fixedEdge` and `settings` change in place, so bind to them rather than reading them once. The bar exposes:
++```qml
++readonly property real barEdgeMargin: bar && bar.floatGap !== undefined
++  ? Math.max(0, Number(bar.floatGap) || 0) : 0
++property int gap: Style.gapsOut + barEdgeMargin  // distance between bar edge and panel
++```
+ 
 -- `bar.foreground`, `bar.background`, `bar.urgent` — theme colors (live-updated)
 -- `bar.fontFamily` — current monospace family
 -- `bar.position` — `"top" | "bottom" | "left" | "right"`
@@ -1883,7 +1357,10 @@ index 5741c5f3..5c612d9f 100644
 -- `bar.run(command)` — fire-and-forget bash exec (quote arguments with `Util.shellQuote` from `qs.Commons`)
 -- `bar.showTooltip(target, text)` / `bar.hideTooltip(target)` — shared tooltip popup
 -- `bar.requestPopout(owner)` / `bar.releasePopout(owner)` — one-popup-at-a-time coordinator
--
++Then `omarchy restart shell`. An Omarchy update to either file will
++silently drop the edit — just reapply it if toasts or panels start
++overlapping the bar again afterward.
+ 
 -First-party bar widgets are manifest-backed just like third-party widgets.
 -Simple widgets carry sibling manifests such as `widgets/Workspaces.manifest.json`;
 -richer popup plugins live in feature directories such as `../panels/audio/`,
@@ -1891,50 +1368,32 @@ index 5741c5f3..5c612d9f 100644
 -`omarchy.menu` and `omarchy.media` declare their bar-widget entry points in their own
 -`manifest.json`. Bar layout ids are namespaced, e.g. `omarchy.audio`,
 -`omarchy.network`, and `omarchy.clock`.
--
--Third-party widgets ship as separate plugins under
--`~/.config/omarchy/plugins/<plugin-id>/` with their own `manifest.json`
--declaring `kinds: ["bar-widget"]` and a `barWidget` entry point. See
--[../../README.md](../../README.md) for the manifest schema. Rescan, enable,
--and place third-party plugins with `omarchy-shell shell rescanPlugins`,
--`omarchy plugin enable`, and `omarchy bar move`.
-+Then `omarchy restart shell`. An Omarchy update to either file will
-+silently drop the edit — just reapply it if toasts or panels start
-+overlapping the bar again afterward.
-+
 +## License
-+
+ 
+-Third-party widgets ship as separate plugins under `~/.config/omarchy/plugins/<plugin-id>/` with their own `manifest.json` declaring `kinds: ["bar-widget"]` and a `barWidget` entry point. See the [shell reference](../../../docs/omarchy-shell.md#plugin-manifest) for the manifest schema. Rescan, enable, and place third-party plugins with `omarchy-shell shell rescanPlugins`, `omarchy plugin enable`, and `omarchy bar move`.
 +MIT — see [LICENSE](LICENSE).
-diff --git a/shell/plugins/bar/UPSTREAM.md b/shell/plugins/bar/UPSTREAM.md
-new file mode 100644
-index 00000000..edf5a446
---- /dev/null
-+++ b/shell/plugins/bar/UPSTREAM.md
-@@ -0,0 +1,19 @@
-+# 这个 bar 是什么
-+
-+`omarchy.bar`（本目录）现在是**浮空圆角 bar**：上游 omarchy 官方 bar 的骨架 +
-+`Charlieras262/omarchy-floating-bar` 的浮空实现 + 本机改动，全部并成一份、放在
-+shell 树里，由 `niri-port/niri.patch` 在每次 `omarchy update` 后重放。
-+
-+- 浮空实现来源：`https://github.com/Charlieras262/omarchy-floating-bar`
-+  本地克隆 commit `5e7dc23`（2026-08-28），版本 1.6.0，MIT（见同目录 `LICENSE`，
-+  版权 Charlieras262）。
-+- 合并基线：本机 shell 树 checkout `basecamp/omarchy` 的 `60663faf`
-+  （2026-09-19）。原版这个目录的内容可用
-+  `git -C ~/.local/share/omarchy show 60663faf:shell/plugins/bar/Bar.qml` 取回。
-+- 合并后 `manifest.json` 用官方的（`id: omarchy.bar`），`shell.json` 的
-+  `bar.id` 因此是 `omarchy.bar`——宿主按“内置 bar”路径加载它（会直接注入
-+  `omarchyPath` / `barWidgetRegistry`，见 `shell.qml` 的 `configureBar()`）。
-+- 上游 omarchy 对 `shell/plugins/bar/` 改动很频繁（100 提交窗口内 86 次），
-+  所以**不再自动跟上游**：需要时手工把这些改动并进来（按需人工合并）。
-+- 浮空会外溢到邻层：`shell/plugins/notifications/Service.qml`、
-+  `shell/Ui/KeyboardPanel.qml` 里的 gap 让步也是这套的一部分，同在本补丁里。
 diff --git a/shell/plugins/bar/widgets/ActiveWindow.qml b/shell/plugins/bar/widgets/ActiveWindow.qml
-index ff7e83d8..20f7c401 100644
+index b803e7f4b..20f7c401a 100644
 --- a/shell/plugins/bar/widgets/ActiveWindow.qml
 +++ b/shell/plugins/bar/widgets/ActiveWindow.qml
-@@ -29,11 +29,17 @@ BarWidget {
+@@ -2,7 +2,6 @@ import QtQuick
+ import Quickshell
+ import Quickshell.Wayland
+ import qs.Commons
+-import qs.Commons as Commons
+ import qs.Ui
+ 
+ BarWidget {
+@@ -19,7 +18,7 @@ BarWidget {
+   implicitHeight: barSize
+ 
+   Behavior on implicitWidth {
+-    NumberAnimation { duration: Style.duration(180); easing.type: Easing.OutCubic }
++    NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+   }
+ 
+   Item {
+@@ -30,12 +29,18 @@ BarWidget {
  
      Text {
        id: labelText
@@ -1943,6 +1402,7 @@ index ff7e83d8..20f7c401 100644
        anchors.left: parent.left
        width: parent.width
        text: root.title
+-      color: root.bar ? root.bar.barForeground : Commons.Color.foreground
 +      // root.title is a Wayland toplevel's title -- set by whatever
 +      // application owns that window, not this shell. QML's default
 +      // Text.AutoText auto-detects and renders rich text, which can embed
@@ -1950,87 +1410,15 @@ index ff7e83d8..20f7c401 100644
 +      // remote resources just from a window's title. Force plain text so
 +      // untrusted window titles are always displayed literally.
 +      textFormat: Text.PlainText
-       color: root.bar ? root.bar.barForeground : Color.foreground
++      color: root.bar ? root.bar.barForeground : Color.foreground
        font.family: root.bar ? root.bar.fontFamily : Style.font.family
        font.pixelSize: Style.font.body
-diff --git a/shell/plugins/bar/widgets/KeyboardLayout.qml b/shell/plugins/bar/widgets/KeyboardLayout.qml
-index 6c3e7206..5457d88e 100644
---- a/shell/plugins/bar/widgets/KeyboardLayout.qml
-+++ b/shell/plugins/bar/widgets/KeyboardLayout.qml
-@@ -27,11 +27,6 @@ BarWidget {
-   // the widget ships on the bar and stays out of the way until there are two.
-   // An older Hyprland that doesn't report the list keeps showing the label.
-   property bool multipleLayouts: true
--  // Where the reading sits in the layout list, how long that list is, and every
--  // keyboard sharing it. A switch moves that set together, so it needs all three.
--  property int layoutIndex: 0
--  property int layoutCount: 0
--  property var syncNames: []
-   // Short language code per layout description ("English (US)": "en"), read from
-   // xkb's own table rather than maintained by hand.
-   property var layoutBriefs: ({})
-@@ -68,31 +63,17 @@ BarWidget {
-   }
- 
-   // switchxkblayout is a hyprctl command rather than a dispatcher, so it has to
--  // be run rather than sent over the dispatch socket.
--  //
--  // Move every keyboard holding the same layout list, rather than the single one
--  // the last reading spoke for. Naming one device puts the whole switch behind
--  // UNTYPED_KEYBOARDS recognising every non-keyboard by name, and that list
--  // cannot keep up with what a seat carries: vendor hotkey blocks
--  // (intel-hid-events, dell-wmi-hotkeys), HID consumer controls, and Bluetooth
--  // AVRCP endpoints from a pair of headphones all arrive holding the seat's
--  // layout list, and they sort ahead of the keyboard being typed on. The click
--  // then advances a device nobody types on; that device is now the furthest
--  // along, so it wins the next reading too, and the label describes it while the
--  // real keyboard never moved.
--  //
--  // An absolute index rather than "next", because "next" advances each device
--  // from wherever it already sits: a seat that has drifted apart stays drifted
--  // and merely inverts. One index converges them in a single click, and a seat
--  // in lockstep is what leaves the reading nothing to disagree about afterwards.
--  //
--  // Keyboards given their own kb_layout hold a different list and are left out:
--  // an index into this list would not mean the same layout to them.
-+  // be run rather than sent over the dispatch socket. It switches the keyboard
-+  // the last reading spoke for, so a click always advances the device the label
-+  // is describing. Switching the seat together would reach the typed keyboard
-+  // without having to name it, but it would also carry the buttons along, and
-+  // the whole read depends on those staying where they started: once a button
-+  // has been advanced too, a toggle that wraps the keyboard back to the first
-+  // layout leaves the button reading as the furthest along, and the label
-+  // follows the button.
-   function cycleLayout() {
--    if (!root.bar || root.layoutCount < 2 || root.syncNames.length === 0) return
--    const next = (root.layoutIndex + 1) % root.layoutCount
--    root.bar.run(root.syncNames.map(name =>
--      "hyprctl switchxkblayout " + Util.shellQuote(name) + " " + next).join("; "))
-+    if (!root.keyboardName || !root.bar) return
-+    root.bar.run("hyprctl switchxkblayout " + Util.shellQuote(root.keyboardName) + " next")
-     refreshTimer.restart()
-   }
- 
-@@ -168,14 +149,6 @@ BarWidget {
-         root.keyboardCount = typed.length
-         root.keyboardName = String(kb.name || "")
-         root.multipleLayouts = kb.layout === undefined || String(kb.layout).indexOf(",") !== -1
--        root.layoutIndex = kb.active_layout_index || 0
--        root.layoutCount = kb.layout === undefined ? 0 : String(kb.layout).split(",").length
--        // Buttons and virtual keyboards are included on purpose: they hold the
--        // same list, and leaving them behind is what lets a reading drift onto
--        // one of them later.
--        root.syncNames = listed.filter(k => String(k.layout) === String(kb.layout))
--                               .map(k => String(k.name || ""))
--                               .filter(name => name !== "")
-         root.layoutFull = kb.active_keymap
-       }
-     }
+       elide: Text.ElideRight
 diff --git a/shell/plugins/bar/widgets/Tray.qml b/shell/plugins/bar/widgets/Tray.qml
-index 650358c1..45ec2ffc 100644
+index cb9115e53..70e59058e 100644
 --- a/shell/plugins/bar/widgets/Tray.qml
 +++ b/shell/plugins/bar/widgets/Tray.qml
-@@ -137,7 +137,26 @@ BarWidget {
+@@ -164,7 +164,26 @@ BarWidget {
      // tray icon outside a standard theme (e.g. Steam's flat public/ dir). Hand
      // it straight to IconImage; guessing a theme sub-directory here only broke
      // apps whose layout didn't match the guess.
@@ -2058,7 +1446,7 @@ index 650358c1..45ec2ffc 100644
    }
  
    // Symbolic icons ship a fixed fill (often near-white) that the host is meant
-@@ -467,13 +486,17 @@ BarWidget {
+@@ -519,13 +538,17 @@ BarWidget {
            }
  
            Text {
@@ -2077,7 +1465,7 @@ index 650358c1..45ec2ffc 100644
              color: root.foreground
              font.family: root.fontFamily
              font.pixelSize: Style.font.bodySmall
-@@ -578,13 +601,15 @@ BarWidget {
+@@ -632,13 +655,15 @@ BarWidget {
            }
  
            Text {
@@ -2094,7 +1482,7 @@ index 650358c1..45ec2ffc 100644
              color: root.foreground
              font.family: root.fontFamily
              font.pixelSize: Style.font.bodySmall
-@@ -683,7 +708,6 @@ BarWidget {
+@@ -737,7 +762,6 @@ BarWidget {
                }
  
                Text {
@@ -2102,7 +1490,7 @@ index 650358c1..45ec2ffc 100644
                  visible: !menuRow.modelData.isSeparator && menuRow.modelData.buttonType !== QsMenuButtonType.None
                  anchors.verticalCenter: parent.verticalCenter
                  anchors.left: parent.left
-@@ -697,7 +721,7 @@ BarWidget {
+@@ -751,7 +775,7 @@ BarWidget {
  
                Image {
                  id: menuIcon
@@ -2111,7 +1499,7 @@ index 650358c1..45ec2ffc 100644
                  anchors.verticalCenter: parent.verticalCenter
                  anchors.left: parent.left
                  anchors.leftMargin: Style.space(24)
-@@ -708,11 +732,10 @@ BarWidget {
+@@ -762,11 +786,10 @@ BarWidget {
                  // which leaves PNG icons upscaled and blurry on HiDPI displays.
                  sourceSize.width: width * Screen.devicePixelRatio
                  sourceSize.height: height * Screen.devicePixelRatio
@@ -2124,7 +1512,7 @@ index 650358c1..45ec2ffc 100644
                  visible: !menuRow.modelData.isSeparator
                  anchors.verticalCenter: parent.verticalCenter
                  anchors.left: parent.left
-@@ -720,6 +743,9 @@ BarWidget {
+@@ -774,6 +797,9 @@ BarWidget {
                  anchors.right: submenuGlyph.left
                  anchors.rightMargin: Style.space(8)
                  text: menuRow.rowText
@@ -2135,18 +1523,11 @@ index 650358c1..45ec2ffc 100644
                  font.family: root.fontFamily
                  font.pixelSize: Style.font.bodySmall
 diff --git a/shell/plugins/bar/widgets/Workspaces.qml b/shell/plugins/bar/widgets/Workspaces.qml
-index ec0482a5..985d1d90 100644
+index d1892541b..cc0126364 100644
 --- a/shell/plugins/bar/widgets/Workspaces.qml
 +++ b/shell/plugins/bar/widgets/Workspaces.qml
-@@ -1,6 +1,5 @@
- import QtQuick
- import QtQuick.Layouts
--import Quickshell.Hyprland
- import qs.Commons
- import qs.Ui
- 
-@@ -9,7 +8,7 @@ BarWidget {
-   moduleName: "omarchy.workspaces"
+@@ -67,7 +67,7 @@ BarWidget {
+   }
  
    function workspaceById(id) {
 -    var values = Hyprland.workspaces.values
@@ -2154,74 +1535,92 @@ index ec0482a5..985d1d90 100644
      for (var i = 0; i < values.length; i++) {
        if (values[i].id === id) return values[i]
      }
-@@ -19,7 +18,7 @@ BarWidget {
- 
+@@ -79,10 +79,12 @@ BarWidget {
+   // them come workspaces that are only visiting: those of a monitor that is
+   // unplugged, which had no room to join this one's.
    function workspaceIds() {
-     var ids = [1, 2, 3, 4, 5]
++    // niri port: keep upstream's per-monitor block layout, but read the
++    // workspace list from the niri backend.
+     var base = root.block * root.slots
+     var ids = [base + 1, base + 2, base + 3, base + 4, base + 5]
+     var guests = []
 -    var values = Hyprland.workspaces.values
 +    var values = Niri.workspaces.values
  
      for (var i = 0; i < values.length; i++) {
        var id = values[i].id
-@@ -56,7 +55,7 @@ BarWidget {
- 
-         readonly property var workspace: root.workspaceById(modelData)
-         readonly property bool occupied: workspace !== null && workspace.toplevels.values.length > 0
--        readonly property bool focused: Hyprland.focusedWorkspace !== null && Hyprland.focusedWorkspace.id === modelData
+@@ -263,6 +265,8 @@ BarWidget {
+         readonly property bool shown: root.monitor !== null && root.monitor.activeWorkspace !== null && root.monitor.activeWorkspace.id === modelData
+         readonly property int slot: root.slotOf(modelData)
+         readonly property bool firstGuest: root.blockOf(modelData) !== root.block && index > 0 && root.blockOf(root.workspaceIds()[index - 1]) === root.block
++        // niri port: the focused pill comes from the niri backend, not Hyprland's.
 +        readonly property bool focused: Niri.focusedWorkspace !== null && Niri.focusedWorkspace.id === modelData
+         required property int index
  
-         bar: root.bar
-         text: focused ? "\uDB85\uDCFB" : (modelData === 10 ? "0" : String(modelData))
-diff --git a/shell/plugins/image-picker/ImagePicker.qml b/shell/plugins/image-picker/ImagePicker.qml
-index 5c002402..5fbeb0c0 100644
---- a/shell/plugins/image-picker/ImagePicker.qml
-+++ b/shell/plugins/image-picker/ImagePicker.qml
-@@ -507,7 +507,11 @@ Item {
-                   // selection moves through the carousel.
-                   source: item.sourceActivated && item.thumbnailPath ? Util.fileUrl(item.thumbnailPath) : ""
-                   fillMode: Image.PreserveAspectCrop
--                  asynchronous: false
-+                  // Niri port: decode off the GUI thread. A synchronous decode
-+                  // of every visible slice (up to 33 at 1536x864) held the
-+                  // picker's first frame back by ~300ms and froze the bar with
-+                  // it; the pool fills the slices within the first frame now.
-+                  asynchronous: true
-                   cache: true
-                   smooth: true
-                 }
+         // A gap sets visiting workspaces apart from the monitor's own.
+diff --git a/shell/plugins/dock/AppGrid.qml b/shell/plugins/dock/AppGrid.qml
+index 53c771dda..9de83e185 100644
+--- a/shell/plugins/dock/AppGrid.qml
++++ b/shell/plugins/dock/AppGrid.qml
+@@ -1,6 +1,7 @@
+ import QtQuick
+ import Quickshell
+ import Quickshell.Wayland
++import Quickshell.Wayland._BackgroundEffect
+ import qs.Commons
+ import qs.Commons as Commons
+ import qs.Ui
+@@ -170,6 +171,16 @@ Item {
+     id: panel
+     shown: root.opened
+     WlrLayershell.namespace: "omarchy-dock-apps"
++
++    // niri port: the surface spans the screen, and effects.kdl has no
++    // `ignore_alpha` equivalent to keep its clear expanse out of the blur. Hand
++    // over the card's own rounded rect so the compositor frosts only behind it;
++    // without this the card is a plain translucent fill and whatever is behind
++    // it reads straight through, unimpeded and unblurred.
++    BackgroundEffect.blurRegion: Region {
++      item: appGridBlurAnchor
++      radius: Math.max(0, Style.cornerRadius - 2)
++    }
+     Rectangle {
+       anchors.fill: parent
+       color: Commons.Color.menu.scrim
+@@ -190,6 +201,17 @@ Item {
+       }
+     }
+ 
++    // A stationary stand-in at the card's resting geometry: niri re-samples
++    // whatever rect it is handed, so this must not ride the card's fade.
++    Item {
++      id: appGridBlurAnchor
++      x: card.x
++      y: card.y
++      width: card.width
++      height: card.height
++      visible: false
++    }
++
+     BorderSurface {
+       id: card
+       width: root.cardWidth
 diff --git a/shell/plugins/menu/Menu.qml b/shell/plugins/menu/Menu.qml
-index aa879c18..53060e8d 100644
+index 7189cce03..3dba92fd4 100644
 --- a/shell/plugins/menu/Menu.qml
 +++ b/shell/plugins/menu/Menu.qml
-@@ -1,7 +1,9 @@
+@@ -1,6 +1,7 @@
  import Quickshell
  import Quickshell.Io
  import Quickshell.Wayland
 +import Quickshell.Wayland._BackgroundEffect
  import QtQuick
-+import QtQuick.Effects
  import qs.Commons
- import qs.Ui
- import "MenuModel.js" as MenuModel
-@@ -251,6 +253,14 @@ Item {
-     root.items = mergedMenu.items
-     root.itemOrder = mergedMenu.itemOrder
-     root.rowsLoaded = true
-+    // niri port: self-heal a bad read of the jsonc sources (see menuSourceRetry).
-+    // Both sources empty just means the FileViews have not loaded yet.
-+    var menuSourcesPending = root.defaultMenuItems.length === 0 && root.userMenuItems.length === 0
-+    if (root.menuHasRootChildren() || menuSourcesPending) root.menuSourceRetries = 0
-+    else if (root.menuSourceRetries < 5) {
-+      root.menuSourceRetries += 1
-+      menuSourceRetry.restart()
-+    }
-     root.evaluateGuards()
-     if (root.opened) {
-       root.rebuildDisplay()
-@@ -981,6 +991,30 @@ Item {
-     onFileChanged: reload()
-   }
- 
+ import qs.Commons as Commons
+@@ -87,6 +88,28 @@ Item {
+   property int dmenuMaxHeight: 0
+   property bool requestActive: false
+   property bool rowsLoaded: false
 +  // niri port: the jsonc sources can be read while an upstream `git pull` is
 +  // rewriting them (or a rename drops the watcher). A bad read parses to zero
 +  // items, and the merged model then keeps only the user overrides -- whose
@@ -2240,127 +1639,210 @@ index aa879c18..53060e8d 100644
 +    id: menuSourceRetry
 +    interval: 1200
 +    onTriggered: {
-+      console.log("omarchy menu: item model looked empty, re-reading the jsonc sources")
 +      defaultMenuFile.reload()
 +      userMenuFile.reload()
 +    }
 +  }
-+
-   // ---------------------------------------------------------------- guards
-   //
-   // `when:` (visibility) and `checked:` (✓ marker) are bash expressions the
-@@ -1072,6 +1106,11 @@ Item {
-     WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
-     exclusionMode: ExclusionMode.Ignore
+   property string activeMenu: "root"
+   property string filterText: ""
+   // Resets of filterText reach the search line; its edits come back through setFilter.
+@@ -305,6 +328,14 @@ Item {
+     root.items = mergedMenu.items
+     root.itemOrder = mergedMenu.itemOrder
+     root.rowsLoaded = true
++    // niri port: self-heal a bad read of the jsonc sources (see menuSourceRetry).
++    // Both sources empty just means the FileViews have not loaded yet.
++    var menuSourcesPending = root.defaultMenuItems.length === 0 && root.userMenuItems.length === 0
++    if (root.menuHasRootChildren() || menuSourcesPending) root.menuSourceRetries = 0
++    else if (root.menuSourceRetries < 5) {
++      root.menuSourceRetries += 1
++      menuSourceRetry.restart()
++    }
+     if (!skipGuards && root.defaultMenuSettled && root.userMenuSettled) root.evaluateGuards()
+     if (root.opened) {
+       root.rebuildDisplay()
+@@ -1275,6 +1306,18 @@ Item {
+     shown: root.opened && root.rowsLoaded
+     WlrLayershell.namespace: "omarchy-menu"
  
-+    // Frost only the menu card, not the full-screen scrim: request a shaped
-+    // ext-background-effect region that tracks the card item. niri blurs just
-+    // behind `card`; the scrim stays a plain dim (no full-screen frost).
-+    BackgroundEffect.blurRegion: Region { item: card; radius: root.cornerRadius }
++    // niri port: the menu surface spans the screen, which Hyprland blurs safely
++    // because `ignore_alpha` keeps its clear expanse out of the effect. niri has
++    // no equivalent, so the card's own rounded rect has to be handed over as the
++    // blur region -- without it the compositor frosts the whole display, and
++    // effects.kdl's `xray false` on this namespace has nothing shaped to draw
++    // behind. Inset by 2px so the compositor's hard-edged mask sits inside the
++    // card's antialiased silhouette instead of outlining it.
++    BackgroundEffect.blurRegion: Region {
++      item: cardBlurAnchor
++      radius: Math.max(0, root.cornerRadius - 2)
++    }
 +
      // The card opens centered exactly as always. The first search keystroke
      // or submenu move freezes the top line where it currently sits — from
      // then on the card grows and shrinks downward instead of re-centering
-@@ -1100,6 +1139,63 @@ Item {
+@@ -1304,6 +1347,24 @@ Item {
        onClicked: root.cancel()
      }
  
-+    // Drop shadow for the card, painted only *outside* it. Three traps here:
-+    //  1. A filled RectangularShadow is a blurred rectangle, so it also paints
-+    //     under the card -- and the card's fill is only ~45% opaque, so the
-+    //     shadow showed through and the card rendered as black glass
-+    //     (measured 2026-10-05: the backdrop under the card dropped 52 -> 22
-+    //     luma over a dark terminal, 185 -> 100 over the wallpaper).
-+    //  2. Straight gradient strips are rectangles: their ends are hard cuts,
-+    //     so over a bright wallpaper a crisp grey block appeared next to the
-+    //     card's corner (measured step 56 luma; the bands below give <5).
-+    //  3. Shifting the whole ring down by `drop` leaves a lit 4px gap between
-+    //     the card and its shadow (alpha 0.01 -> 0.06 -> 0.33 just below the
-+    //     card) which reads as a second edge. The ring has to hug the card;
-+    //     only its *outer* reach gets the offset.
-+    // So: twelve disjoint rounded-rect bands whose alpha follows the bar's own
-+    // measured falloff (niri's ^omarchy-bar$ shadow: peak 0.363 at the surface
-+    // edge, gone by ~48 logical px), blurred by MultiEffect so the band steps
-+    // become one continuous falloff. Nothing is ever painted inside the card's
-+    // rect, so the interior cannot darken.
++    // niri port: the menu surface spans the screen, which Hyprland blurs safely
++    // because `ignore_alpha` keeps its clear expanse out of the effect. niri has
++    // no equivalent, so the card's own rounded rect has to be handed over as the
++    // blur region -- without it the compositor frosts the whole display.
++    //
++    // Bound straight to the card: the card maps at its final size and never
++    // animates, so the region is stationary from the frame it appears. A rect
++    // that *did* move would be re-sampled on every frame and read as a
++    // flickering frost edge, which is why nothing here follows an animation.
 +    Item {
-+      id: cardShadow
-+      readonly property int band: 4                  // band width, logical px
-+      readonly property int drop: 4                  // how far it hangs below
-+      readonly property int pad: 68                  // room for the blur to fade
-+      // Sampled off the bar's profile every `band` logical px; the ~8% is
-+      // compensation for the blur flattening the innermost peak.
-+      readonly property var alphas: [0.40, 0.27, 0.21, 0.18, 0.12, 0.09,
-+                                     0.05, 0.03, 0.02, 0.012, 0.008, 0.005]
-+      x: card.x - pad
-+      y: card.y - pad
-+      width: card.width + pad * 2
-+      height: card.height + pad * 2
-+      opacity: card.opacity
-+      layer.enabled: true
-+      layer.effect: MultiEffect {
-+        blurEnabled: true
-+        blur: 0.22
-+        blurMax: 40
-+      }
-+
-+      Repeater {
-+        model: cardShadow.alphas
-+        Rectangle {
-+          required property int index
-+          required property var modelData
-+          readonly property real e: (index + 1) * cardShadow.band
-+          x: cardShadow.pad - e
-+          y: cardShadow.pad - e + cardShadow.drop
-+          width: card.width + 2 * e
-+          height: card.height + 2 * e - cardShadow.drop
-+          radius: card.radius + e
-+          color: "transparent"
-+          border.width: cardShadow.band
-+          border.color: Qt.rgba(0, 0, 0, modelData)
-+        }
-+      }
++      id: cardBlurAnchor
++      x: card.x
++      y: card.y
++      width: card.width
++      height: card.height
++      visible: false
 +    }
 +
      BorderSurface {
        id: card
        width: root.cardWidth
 diff --git a/shell/plugins/notifications/Service.qml b/shell/plugins/notifications/Service.qml
-index 0122310e..39d5556f 100644
+index fb60ce254..289300663 100644
 --- a/shell/plugins/notifications/Service.qml
 +++ b/shell/plugins/notifications/Service.qml
-@@ -5,6 +5,7 @@ import QtQuick.Layouts
+@@ -8,6 +8,7 @@ import QtQuick
  import Quickshell
  import Quickshell.Io
  import Quickshell.Wayland
 +import Quickshell.Wayland._BackgroundEffect
+ import Quickshell.Hyprland
  import Quickshell.Services.Notifications
  import qs.Commons
+@@ -32,7 +33,7 @@ Item {
+   property string deckDisplayName: ""
+   readonly property var displayNames: Quickshell.screens.map(function(screen) { return screen.name })
+   readonly property string focusedDisplayName: {
+-    var name = Hyprland.focusedMonitor ? Hyprland.focusedMonitor.name : ""
++    var name = Niri.focusedMonitor ? Niri.focusedMonitor.name : ""
+     return displayNames.indexOf(name) >= 0 ? name : (displayNames[0] || "")
+   }
+   readonly property string targetDisplayName: displayNames.indexOf(deckDisplayName) >= 0 ? deckDisplayName : focusedDisplayName
+@@ -102,7 +103,11 @@ Item {
+     var screen = null
+     for (var s = 0; s < Quickshell.screens.length; s++)
+       if (String(Quickshell.screens[s].name) === name) screen = Quickshell.screens[s]
+-    var monitor = screen ? Hyprland.monitorFor(screen) : null
++    // niri port: Hyprland.monitorFor is always null here, which made this return
++    // false for every screen -- so stepAside never held, the notification
++    // surface stayed mapped at its full height, and its blur region painted a
++    // band of frost down the right edge of the display with no toast in it.
++    var monitor = screen ? Niri.monitorFor(screen) : null
+     var workspace = monitor ? monitor.activeWorkspace : null
+     if (!workspace || !workspace.hasFullscreen) return false
+     var windows = workspace.toplevels ? workspace.toplevels.values : []
+@@ -129,7 +134,7 @@ Item {
+   Timer {
+     id: hyprRefresh
+     interval: 100
+-    onTriggered: { Hyprland.refreshToplevels(); hyprSettle.restart() }
++    onTriggered: { Niri.refreshToplevels(); hyprSettle.restart() }
+   }
+   Timer {
+     id: hyprSettle
+@@ -949,7 +954,7 @@ Item {
+   }
  
-@@ -964,6 +965,14 @@ Item {
-       exclusionMode: ExclusionMode.Ignore
+   function openWindows() {
+-    var list = Hyprland.toplevels ? Hyprland.toplevels.values : []
++    var list = Niri.toplevels ? Niri.toplevels.values : []
+     var out = []
+     for (var i = 0; i < list.length; i++) {
+       var ipc = list[i].lastIpcObject
+@@ -1057,7 +1062,7 @@ Item {
+   function focusWindow(win) {
+     if (!win) return
+     if (!/^0x[0-9a-f]+$/i.test(String(win.address || ""))) return
+-    Hyprland.dispatch('hl.dsp.focus({window = hl.get_window("address:' + win.address + '")})')
++    Niri.dispatch('hl.dsp.focus({window = hl.get_window("address:' + win.address + '")})')
+   }
+ 
+   // A click: Omarchy's own --exec command first, then the sender's default
+@@ -1495,11 +1500,26 @@ Item {
+       readonly property var margins: service.marginsFor(String(modelData.name))
+       readonly property bool stepAside: service.fullscreenOn(String(modelData.name))
+       readonly property bool hasSomethingToShow: showingNotifications && toasts.count > 0
+-      visible: !stepAside || hasSomethingToShow
++      // niri port: `stepAside` is the "a fullscreen window owns this screen"
++      // case, and niri's IPC exposes no fullscreen flag, so it is always false
++      // here. Written as upstream has it, that made the condition permanently
++      // true: this surface stayed mapped with no toast in it, and its blur
++      // region drew a band of frost down the right edge of the display.
++      // Mapping only while a toast is actually there is the safe half of the
++      // same intent -- a fullscreen window and an empty deck both end up with no
++      // surface.
++      visible: hasSomethingToShow
        color: "transparent"
  
-+      // This surface is full-screen (see below), so a niri-side `blur true` on
-+      // the notifications namespace would frost the ENTIRE display — that was
-+      // the "a notification blurs the whole screen" bug (2026-09-20). Hand niri
-+      // the toast column as the blur region instead, the way the menu, the
-+      // keyboard panel and the floating bar do. effects.kdl sets only `xray`
-+      // for this namespace, so this region stays the sole blur area.
-+      BackgroundEffect.blurRegion: Region { item: popupColumn; radius: service.cornerRadius }
+       WlrLayershell.namespace: "omarchy-notifications"
+       WlrLayershell.layer: WlrLayer.Overlay
 +
-       readonly property var popupPlacement: NotificationLogic.popupPlacement(
-         service.barPosition, service.barClearance, Style.gapsOut)
- 
++      // niri port: this surface is only as wide as the toast column but spans
++      // the full screen height, so a plain `blur true` frosts a band down the
++      // whole right edge. Hand over the deck's own rect instead; the layer-rule
++      // in effects.kdl sets only `xray`, leaving that region the sole blur area.
++      BackgroundEffect.blurRegion: Region { item: deck; radius: service.cornerRadius }
++
+       readonly property bool takesKeyboard: service.keyboardMode && service.targetDisplayName === String(modelData.name)
+       WlrLayershell.keyboardFocus: takesKeyboard ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+       exclusionMode: ExclusionMode.Ignore
 diff --git a/shell/plugins/osd/Osd.qml b/shell/plugins/osd/Osd.qml
-index 581bfa3c..02288237 100644
+index c80c2e5c4..022882371 100644
 --- a/shell/plugins/osd/Osd.qml
 +++ b/shell/plugins/osd/Osd.qml
-@@ -126,7 +126,18 @@ Item {
-   PanelWindow {
+@@ -3,7 +3,6 @@ import Quickshell
+ import Quickshell.Io
+ import Quickshell.Wayland
+ import qs.Commons
+-import qs.Commons as Commons
+ import qs.Ui
+ import "OsdModel.js" as OsdModel
+ 
+@@ -56,7 +55,7 @@ Item {
+   }
+ 
+   function show(iconName, rawMessage, rawValue, rawMax, rawProgressText, rawDuration) {
+-    var next = OsdModel.stateForShow(iconName, rawMessage, rawValue, rawMax, rawProgressText, rawDuration, Commons.I18n.formatNumber)
++    var next = OsdModel.stateForShow(iconName, rawMessage, rawValue, rawMax, rawProgressText, rawDuration)
+     // Update before opening so a fresh OSD starts at its new value; only
+     // subsequent updates while it remains open animate the progress bar.
+     iconKey = next.iconKey
+@@ -97,7 +96,7 @@ Item {
+   TextMetrics {
+     id: valueMetrics
+     font: messageMetrics.font
+-    text: Commons.I18n.formatNumber(100) + "%"
++    text: "100%"
+   }
+ 
+   TextMetrics {
+@@ -113,7 +112,7 @@ Item {
+     text: OsdModel.widestIcon
+   }
+ 
+-  ShellIpc {
++  IpcHandler {
+     target: "osd"
+     function show(payloadJson: string): string {
+       root.open(payloadJson)
+@@ -124,11 +123,26 @@ Item {
+     function ping(): string { return "ok" }
+   }
+ 
+-  OverlayWindow {
++  PanelWindow {
      id: panel
-     visible: root.opened
--    anchors { top: true; bottom: true; left: true; right: true }
+-    shown: root.opened
+-    shownKeyboardFocus: WlrKeyboardFocus.None
++    visible: root.opened
 +    // Card-sized surface instead of a full-screen transparent layer: a
 +    // full-screen surface would let the compositor-side background blur frost
 +    // the entire display (and Quickshell's blurRegion region tracking is
@@ -2373,26 +1855,72 @@ index 581bfa3c..02288237 100644
 +      bottom: Style.space(67)
 +    }
 +    implicitHeight: card.height
-     color: "transparent"
++    color: "transparent"
      WlrLayershell.namespace: "omarchy-osd"
-     WlrLayershell.layer: WlrLayer.Overlay
-@@ -140,10 +151,7 @@ Item {
++    WlrLayershell.layer: WlrLayer.Overlay
++    WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
++    exclusionMode: ExclusionMode.Ignore
+     // Visual-only surface: keep the layer-shell input region empty so the OSD
+     // never blocks clicks to the desktop below it.
+     mask: Region {}
+@@ -137,11 +151,8 @@ Item {
        id: card
        width: card.borderLeft + root.pad + root.contentWidth + root.pad + card.borderRight
        height: card.borderTop + root.pad + Style.font.displayLarge + root.pad + card.borderBottom
 -      anchors.horizontalCenter: parent.horizontalCenter
 -      anchors.bottom: parent.bottom
 -      anchors.bottomMargin: Style.space(67)
--      color: Util.alpha(Color.background, 0.97)
+-      color: Util.alpha(Commons.Color.background, 0.97)
+-      borderSpec: Border.surfaceSpec("popups", "border", Commons.Color.popups.border, Math.max(1, Style.space(2)))
 +      color: Color.menu.background
-       borderSpec: Border.surfaceSpec("popups", "border", Color.popups.border, Math.max(1, Style.space(2)))
++      borderSpec: Border.surfaceSpec("popups", "border", Color.popups.border, Math.max(1, Style.space(2)))
        radius: Style.cornerRadius
        opacity: root.opened ? 1 : 0
+ 
+@@ -163,7 +174,7 @@ Item {
+             anchors.verticalCenter: parent.verticalCenter
+             text: root.icon
+             font: iconMetrics.font
+-            color: Commons.Color.popups.text
++            color: Color.popups.text
+           }
+         }
+         Rectangle {
+@@ -171,17 +182,15 @@ Item {
+           width: root.barWidth
+           height: Math.max(Style.space(6), Style.spacing.sm)
+           anchors.verticalCenter: parent.verticalCenter
+-          color: Util.alpha(Commons.Color.popups.text, 0.45)
++          color: Util.alpha(Color.popups.text, 0.45)
+           Rectangle {
+-            // Anchored so a right-to-left layout fills from the right.
+-            anchors.left: parent.left
+             height: parent.height
+             width: parent.width * (root.hasProgress ? root.value / root.maxValue : 0)
+-            color: Commons.Color.accent
++            color: Color.accent
+ 
+             Behavior on width {
+               enabled: root.opened
+-              NumberAnimation { duration: Style.duration(140); easing.type: Easing.OutCubic }
++              NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+             }
+           }
+         }
+@@ -195,7 +204,7 @@ Item {
+           anchors.verticalCenter: parent.verticalCenter
+           text: root.message
+           font: messageMetrics.font
+-          color: Commons.Color.popups.text
++          color: Color.popups.text
+           elide: Text.ElideRight
+           maximumLineCount: 1
+         }
 diff --git a/shell/plugins/panels/monitor/Panel.qml b/shell/plugins/panels/monitor/Panel.qml
-index bec38820..98785506 100644
+index a26fbd5b0..f85170f6a 100644
 --- a/shell/plugins/panels/monitor/Panel.qml
 +++ b/shell/plugins/panels/monitor/Panel.qml
-@@ -27,6 +27,24 @@ Panel {
+@@ -28,6 +28,24 @@ Panel {
    property var displays: []
    property int enabledDisplayCount: 0
  
@@ -2417,7 +1945,7 @@ index bec38820..98785506 100644
    // Carry sub-notch touchpad deltas between wheel events.
    property real wheelAccumulator: 0
  
-@@ -37,11 +55,19 @@ Panel {
+@@ -38,11 +56,19 @@ Panel {
    //   "scale"      - 6 Button scale presets; treated as a single
    //                  horizontal row from j/k's perspective. h/l moves
    //                  between presets, identical to bluetooth's header.
@@ -2438,7 +1966,7 @@ index bec38820..98785506 100644
    readonly property var scaleValues: {
      for (var i = 0; i < displays.length; i++) {
        var display = displays[i]
-@@ -76,6 +102,7 @@ Panel {
+@@ -77,6 +103,7 @@ Panel {
      var list = []
      if (brightnessAvailable) list.push("brightness")
      list.push("textsize")
@@ -2446,7 +1974,7 @@ index bec38820..98785506 100644
      list.push("scale")
      if (displays.length > 1) list.push("monitors")
      return list
-@@ -84,18 +111,21 @@ Panel {
+@@ -85,18 +112,21 @@ Panel {
    function sectionCount(section) {
      if (section === "brightness") return 0  // only the slider sentinel at -1
      if (section === "textsize") return 0    // slider sentinel at -1, like brightness
@@ -2471,7 +1999,7 @@ index bec38820..98785506 100644
      return 0
    }
  
-@@ -168,9 +198,12 @@ Panel {
+@@ -169,9 +199,12 @@ Panel {
      }
      var count = sectionCount(focusSection)
      if (sectionIsSingleRow(focusSection)) {
@@ -2487,7 +2015,7 @@ index bec38820..98785506 100644
        return
      }
      if (count === 0) {
-@@ -213,6 +246,9 @@ Panel {
+@@ -215,6 +248,9 @@ Panel {
        brightnessAvailable: root.brightnessAvailable,
        focusedMonitor: root.focusedMonitor,
        scale: root.monitorScale,
@@ -2497,7 +2025,7 @@ index bec38820..98785506 100644
        displays: root.displays
      })
    }
-@@ -222,6 +258,9 @@ Panel {
+@@ -224,6 +260,9 @@ Panel {
  
      function brightness(percent: string): string { return root.brightnessIpc(percent) }
      function state(): string { return root.stateIpc() }
@@ -2507,7 +2035,7 @@ index bec38820..98785506 100644
      function open() { root.open() }
      function close() { root.close() }
      function toggle() { root.toggle() }
-@@ -309,6 +348,91 @@ Panel {
+@@ -319,6 +358,91 @@ Panel {
      if (!actionProc.running) actionProc.running = true
    }
  
@@ -2599,7 +2127,7 @@ index bec38820..98785506 100644
    // ---- Text size (shell base font + GTK text-scaling, via one CLI) ----
    function nearestTextStop(px) {
      var best = 0
-@@ -349,7 +473,10 @@ Panel {
+@@ -359,7 +483,10 @@ Panel {
    implicitWidth: button.implicitWidth
    implicitHeight: button.implicitHeight
  
@@ -2611,7 +2139,7 @@ index bec38820..98785506 100644
  
    // KeyboardPanel primes focus at open-time, so SUPER-bound IPC summons land
    // with j/k ready to navigate. Keep a default landing point, but don't paint
-@@ -357,6 +484,7 @@ Panel {
+@@ -367,6 +494,7 @@ Panel {
    onOpenedChanged: {
      if (opened) {
        refresh()
@@ -2619,7 +2147,7 @@ index bec38820..98785506 100644
        if (brightnessAvailable) {
          focusSection = "brightness"
          selectedIndex = -1
-@@ -369,7 +497,10 @@ Panel {
+@@ -379,7 +507,10 @@ Panel {
    }
  
    onBrightnessAvailableChanged: clampCursor()
@@ -2631,7 +2159,7 @@ index bec38820..98785506 100644
    onScaleValuesChanged: clampCursor()
    onVisibleSectionsChanged: clampCursor()
  
-@@ -435,6 +566,43 @@ Panel {
+@@ -445,6 +576,43 @@ Panel {
      onRunningChanged: if (!running) root.refresh()
    }
  
@@ -2675,7 +2203,7 @@ index bec38820..98785506 100644
    // Applies text size via the CLI, which rewrites the shell override file;
    // Style picks the new base-size up through its own file watch, so there's
    // nothing to refresh here.
-@@ -500,6 +668,7 @@ Panel {
+@@ -512,6 +680,7 @@ Panel {
          else if (dx !== 0) {
            if (root.focusSection === "brightness") root.adjustBrightness(dx * 5)
            else if (root.focusSection === "textsize") root.adjustTextSize(dx)
@@ -2683,7 +2211,7 @@ index bec38820..98785506 100644
            else if (root.focusSection === "scale") root.moveCursorH(dx)
          }
        }
-@@ -725,6 +894,86 @@ Panel {
+@@ -738,6 +907,86 @@ Panel {
              }
            }
  
@@ -2771,10 +2299,10 @@ index bec38820..98785506 100644
            PanelSeparator {
              foreground: root.bar.foreground
 diff --git a/shell/plugins/panels/power/Panel.qml b/shell/plugins/panels/power/Panel.qml
-index b1c34da2..a46be0e8 100644
+index 976bc8ee2..c14d93326 100644
 --- a/shell/plugins/panels/power/Panel.qml
 +++ b/shell/plugins/panels/power/Panel.qml
-@@ -18,6 +18,14 @@ Panel {
+@@ -19,6 +19,14 @@ Panel {
    property var profiles: []
    property string activeProfile: ""
    property int profileIndex: 0
@@ -2789,7 +2317,7 @@ index b1c34da2..a46be0e8 100644
    property bool cursorActive: false
    readonly property bool showPercentage: setting("showPercentage", false) === true
    // With the percentage shown the button paints a text block wider than an
-@@ -47,6 +55,15 @@ Panel {
+@@ -48,6 +56,15 @@ Panel {
      setProfile(profiles[profileIndex])
    }
  
@@ -2805,7 +2333,7 @@ index b1c34da2..a46be0e8 100644
    function batteryIcon() {
      var device = UPower.displayDevice
      return Model.batteryIcon(device, root.discharging, upowerStates())
-@@ -61,6 +78,20 @@ Panel {
+@@ -62,6 +79,20 @@ Panel {
      return Model.profileIcon(name)
    }
  
@@ -2826,7 +2354,7 @@ index b1c34da2..a46be0e8 100644
    readonly property bool fullyCharged: {
      var device = UPower.displayDevice
      return device && device.isPresent && device.state === UPowerDeviceState.FullyCharged && !root.chargeThresholdActive
-@@ -169,6 +200,18 @@ Panel {
+@@ -176,6 +207,18 @@ Panel {
      actionProc.running = true
    }
  
@@ -2845,7 +2373,7 @@ index b1c34da2..a46be0e8 100644
    function togglePercentage() {
      root.settings = Object.assign({}, root.settings, { showPercentage: !root.showPercentage })
      if (root.bar && root.bar.shell) root.bar.shell.updateEntryInline(root.moduleName, root.settings)
-@@ -196,6 +239,10 @@ Panel {
+@@ -206,6 +249,10 @@ Panel {
        var idx = profiles.indexOf(activeProfile)
        profileIndex = idx >= 0 ? idx : 0
        cursorActive = false
@@ -2856,7 +2384,7 @@ index b1c34da2..a46be0e8 100644
      }
    }
  
-@@ -225,7 +272,10 @@ Panel {
+@@ -235,7 +282,10 @@ Panel {
  
    Process {
      id: actionProc
@@ -2868,22 +2396,19 @@ index b1c34da2..a46be0e8 100644
    }
  
    Timer { interval: 5000; running: root.opened; repeat: true; onTriggered: root.refresh() }
-@@ -277,8 +327,10 @@ Panel {
+@@ -287,6 +337,8 @@ Panel {
      id: button
      anchors.fill: parent
      bar: root.bar
-+    // Percentage trails the icon so the digits sit at the far right edge of
-+    // the bar (leftmost widget-relative order read poorly there).
-     text: root.showPercentage && !vertical
--      ? Math.round(root.batteryFraction * 100) + "% " + root.batteryIcon()
-+      ? root.batteryIcon() + " " + Math.round(root.batteryFraction * 100) + "%"
-       : root.batteryIcon()
++    // The percentage rides in labelText so it sits at the far right edge of the
++    // slot instead of trailing the icon inline (2026-09-26, user).
+     text: root.batteryIcon()
+     labelText: root.showPercentage && !vertical ? Commons.I18n.formatNumber(Math.round(root.batteryFraction * 100)) + "%" : ""
      slotSize: Style.bar.iconSlot * (root.showPercentage && !vertical ? 2 : 1)
-     tooltipText: ""
-@@ -302,12 +354,22 @@ Panel {
-     PanelKeyCatcher {
-       id: keyCatcher
+@@ -313,12 +365,22 @@ Panel {
+       property alias heroStatus: heroStatus
        anchors.fill: parent
+       implicitHeight: column.implicitHeight
 +      // Vertical moves hop between the two pickers; horizontal moves walk the
 +      // buttons inside whichever picker currently holds the cursor.
        onMoveRequested: function(dx, dy) {
@@ -2906,7 +2431,7 @@ index b1c34da2..a46be0e8 100644
        onCloseRequested: root.close()
        onTabRequested: function(direction) { root.switchPanel(direction) }
  
-@@ -491,7 +553,7 @@ Panel {
+@@ -503,7 +565,7 @@ Panel {
                  verticalPadding: Style.spacing.controlPaddingY + Style.space(2)
                  bordered: true
                  active: root.activeProfile === modelData
@@ -2915,7 +2440,7 @@ index b1c34da2..a46be0e8 100644
                  onClicked: root.setProfile(modelData)
                  onHovered: function(h) {
                    if (h) {
-@@ -503,6 +565,84 @@ Panel {
+@@ -515,6 +577,85 @@ Panel {
              }
            }
          }
@@ -2948,6 +2473,7 @@ index b1c34da2..a46be0e8 100644
 +            Text {
 +              id: chargeNow
 +              text: "now " + (root.batteryInfo.threshold || "—")
++              textFormat: Text.PlainText
 +              color: chargeHeader.color
 +              font.family: chargeHeader.font.family
 +              font.pixelSize: chargeHeader.font.pixelSize
@@ -3001,10 +2527,10 @@ index b1c34da2..a46be0e8 100644
      }
    }
 diff --git a/shell/services/AppLibrary.qml b/shell/services/AppLibrary.qml
-index 738529de..460565c1 100644
+index 66f399f52..8693980ed 100644
 --- a/shell/services/AppLibrary.qml
 +++ b/shell/services/AppLibrary.qml
-@@ -82,7 +82,10 @@ Item {
+@@ -90,7 +90,10 @@ Item {
      // inherit wayland-wm@.service. Keeping gtk-launch as the desktop-entry
      // resolver supports IDs with spaces and entries that UWSM rejects.
      // Keep the .desktop suffix or ids like org.telegram.desktop won't resolve.
@@ -3015,20 +2541,20 @@ index 738529de..460565c1 100644
 +    Util.execDetached(cmd)
    }
  
-   function remove(desktopId, name) {
+   // The command a terminal entry runs, without the field codes it leaves for a
 diff --git a/shell/shell.qml b/shell/shell.qml
-index 82080624..27d31e4a 100644
+index 4de346dd5..3001cfc5a 100644
 --- a/shell/shell.qml
 +++ b/shell/shell.qml
-@@ -2,6 +2,7 @@ import QtQuick
- import QtQml.Models
+@@ -4,6 +4,7 @@ import QtQml.Models
  import Quickshell
+ import Quickshell.Hyprland
  import Quickshell.Io
 +import Quickshell.Wayland
  
  import qs.Commons
- 
-@@ -224,6 +225,18 @@ ShellRoot {
+ import qs.Commons as Commons
+@@ -237,6 +238,18 @@ ShellRoot {
      if ("pluginRegistry" in target) target.pluginRegistry = shell.pluginRegistryFor(manifest)
      if ("barConfig" in target) target.barConfig = shell.barConfigFor(manifest)
      shell.bar = target
@@ -3047,7 +2573,7 @@ index 82080624..27d31e4a 100644
    }
  
    Component {
-@@ -263,6 +276,48 @@ ShellRoot {
+@@ -276,6 +289,48 @@ ShellRoot {
      }
    }
  
@@ -3096,3 +2622,741 @@ index 82080624..27d31e4a 100644
    // ------------------------------------------------------------- services
    //
    // Generic loader for any enabled plugin that declares kind "service".
+diff --git a/test/shell.d/launch-shell-test.sh b/test/shell.d/launch-shell-test.sh
+index bb2b1c1bf..3a09a9ebb 100755
+--- a/test/shell.d/launch-shell-test.sh
++++ b/test/shell.d/launch-shell-test.sh
+@@ -34,19 +34,46 @@ launch_shell_bin="$test_tmp/omarchy-launch-shell"
+ sed -e 's/^  sleep 1$/  sleep 0.3/' -e 's/sleep 0.5$/sleep 0.05/' \
+   "$ROOT/bin/omarchy-launch-shell" >"$launch_shell_bin"
+ chmod +x "$launch_shell_bin"
++# The niri port additionally captures the crash-handler flag and needs a
++# private XDG_RUNTIME_DIR, so this machine's launcher has both.
++runtime_dir="$test_tmp/run"
++mkdir -p "$runtime_dir"
+ 
+ # Each launch consumes the next status from OMARCHY_TEST_QS_STATUSES; "run"
+-# stands in for a healthy shell that keeps going until stopped.
++# stands in for a healthy shell that keeps going until stopped. The supervisor
++# asks this same binary whether the config's instance slot is taken, so a `list`
++# answers from a count of live instances: each query consumes one, which lets a
++# test keep an instance up for a while and then have it die.
+ cat >"$fake_bin/quickshell" <<'SH'
+ #!/bin/bash
+ 
++if [[ $1 == list ]]; then
++  count=$(cat "${OMARCHY_TEST_SHELL_ALIVE:-/nonexistent}" 2>/dev/null || printf '0')
++
++  if (( ${count:-0} > 0 )); then
++    printf '%s\n' "$(( count - 1 ))" >"$OMARCHY_TEST_SHELL_ALIVE"
++    printf '[\n    {\n        "config_path": "%s/shell/shell.qml",\n        "pid": 1\n    }\n]\n' "$OMARCHY_PATH"
++  else
++    printf 'No running instances for "%s/shell/shell.qml"\n' "$OMARCHY_PATH"
++  fi
++  exit 0
++fi
++
+ printf '%s\n' "$*" >>"$OMARCHY_TEST_QS_LOG"
+-printf 'watcher=%s popup=%s background=%s\n' \
+-  "${QS_DISABLE_FILE_WATCHER:-unset}" "${QS_NO_RELOAD_POPUP:-unset}" "${OMARCHY_STARTUP_BACKGROUND:-unset}" >>"$OMARCHY_TEST_QS_ENV_LOG"
++printf 'watcher=%s popup=%s crashhandler=%s background=%s\n' \
++  "${QS_DISABLE_FILE_WATCHER:-unset}" "${QS_NO_RELOAD_POPUP:-unset}" \
++  "${QS_DISABLE_CRASH_HANDLER:-unset}" "${OMARCHY_STARTUP_BACKGROUND:-unset}" >>"$OMARCHY_TEST_QS_ENV_LOG"
+ 
+ launches=$(wc -l <"$OMARCHY_TEST_QS_LOG")
+ status=$(awk -v n="$launches" 'NR == n { print; found = 1 } END { if (!found) print "0" }' <<<"$OMARCHY_TEST_QS_STATUSES")
+ 
++# A foreign instance answering while nothing holds the slot is the leftover a
++# takeover test needs: it arms one as its own shell exits, so the slot frees
++# from this supervisor's engine while another instance is there to hold it.
++if [[ $status == "0" && -n ${OMARCHY_TEST_QS_ARM:-} ]]; then
++  printf '%s\n' "$OMARCHY_TEST_QS_ARM" >"$OMARCHY_TEST_SHELL_ALIVE"
++fi
++
+ if [[ $status == "run" ]]; then
+   trap 'touch "$OMARCHY_TEST_QS_TERMINATED"; exit 143' TERM
+   while true; do sleep 0.05; done
+@@ -102,8 +129,11 @@ launch_shell() {
+   : >"$qs_env_log"
+   : >"$logger_log"
+ 
++  # A runtime dir of its own: the supervisor lock lives in the real one, and the
++  # session's own supervisor holds it.
+   PATH="$fake_bin:$PATH" \
+   HOME="$launch_home" \
++  XDG_RUNTIME_DIR="$runtime_dir" \
+   OMARCHY_PATH="$shell_root" \
+   OMARCHY_TEST_QS_LOG="$qs_log" \
+   OMARCHY_TEST_QS_ENV_LOG="$qs_env_log" \
+@@ -126,10 +156,12 @@ grep -F -- "-n -p $shell_root/shell" "$qs_log" >/dev/null || fail "the shell lau
+ pass "a shell that exits cleanly is left alone"
+ 
+ # A misspelled variable would leave Quickshell hot-reloading the tree pacman
+-# rewrites underneath it, which is what crashes the restart that follows.
+-[[ $(<"$qs_env_log") == "watcher=1 popup=1 "* ]] ||
++# rewrites underneath it, which is what crashes the restart that follows. Its
++# crash handler gets the same treatment: a relaunch of its own races this
++# supervisor's and leaves two engines fighting over the session lock.
++[[ $(<"$qs_env_log") == "watcher=1 popup=1 crashhandler=1 "* ]] ||
+   fail "the shell launches with Quickshell's own reloading off" "$(<"$qs_env_log")"
+-pass "the shell launches with Quickshell's config watcher and reload popup off"
++pass "the shell launches with Quickshell's config watcher, reload popup and crash handler off"
+ [[ $(<"$qs_env_log") == *"background=$startup_wallpaper" ]] || fail "the shell receives the resolved wallpaper path before startup" "$(<"$qs_env_log")"
+ pass "the selected wallpaper can decode as soon as Quickshell starts"
+ 
+@@ -161,6 +193,7 @@ pass "a compositor too busy to answer is not mistaken for one that is gone"
+ : >"$logger_log"
+ 
+ PATH="$fake_bin:$PATH" \
++XDG_RUNTIME_DIR="$runtime_dir" \
+ OMARCHY_PATH="$shell_root" \
+ OMARCHY_TEST_QS_LOG="$qs_log" \
+ OMARCHY_TEST_QS_ENV_LOG="$qs_env_log" \
+@@ -190,6 +223,7 @@ pass "a signal during backoff stops the supervisor before it relaunches"
+ rm -f "$qs_terminated"
+ 
+ PATH="$fake_bin:$PATH" \
++XDG_RUNTIME_DIR="$runtime_dir" \
+ OMARCHY_PATH="$shell_root" \
+ OMARCHY_TEST_QS_LOG="$qs_log" \
+ OMARCHY_TEST_QS_ENV_LOG="$qs_env_log" \
+@@ -218,3 +252,68 @@ launch_pid=""
+ [[ -f $qs_terminated ]] || fail "the running shell is signalled when the supervisor is"
+ [[ $(launches) == 1 ]] || fail "the signalled shell is not relaunched" "$(<"$qs_log")"
+ pass "stopping the supervisor stops the shell it is watching"
++
++# A shell this supervisor did not start holds the config's instance slot: the
++# leftover of a supervisor that died. Leaving it unsupervised is what stranded
++# the session when it went, and launching into the slot would be the second
++# engine the crash handler used to raise. The arm makes the supervisor's own
++# shell exit cleanly with that instance already listed, so the slot frees while
++# the instance is still there to hold it.
++: >"$qs_log"
++: >"$qs_env_log"
++: >"$logger_log"
++instances="$test_tmp/instances"
++printf '0\n' >"$instances"
++
++PATH="$fake_bin:$PATH" \
++XDG_RUNTIME_DIR="$runtime_dir" \
++OMARCHY_PATH="$shell_root" \
++OMARCHY_TEST_QS_LOG="$qs_log" \
++OMARCHY_TEST_QS_ENV_LOG="$qs_env_log" \
++OMARCHY_TEST_QS_STATUSES=$'0\nrun' \
++OMARCHY_TEST_COMPOSITOR_GONE=0 \
++OMARCHY_TEST_LOGGER_LOG="$logger_log" \
++OMARCHY_TEST_QS_TERMINATED="$qs_terminated" \
++OMARCHY_TEST_SHELL_ALIVE="$instances" \
++OMARCHY_TEST_QS_ARM=8 \
++  "$ROOT/bin/omarchy-launch-shell" &
++launch_pid=$!
++
++for (( waited = 0; waited < 100; waited++ )); do
++  [[ $(launches) == 1 ]] && break
++  sleep 0.05
++done
++[[ $(launches) == 1 ]] || fail "the supervised shell launched before the slot freed" "$(<"$qs_log")"
++
++# Its own shell exited cleanly while that instance kept answering: the session
++# has a shell, so this supervisor must not raise a second one.
++sleep 1
++[[ $(launches) == 1 ]] || fail "a shell in the slot is not duplicated" "$(<"$qs_log")"
++
++for (( waited = 0; waited < 200; waited++ )); do
++  [[ $(launches) == 2 ]] && break
++  sleep 0.1
++done
++[[ $(launches) == 2 ]] || fail "the slot is taken over once the instance in it dies" "$(<"$qs_log")"
++grep -F 'holds the slot' "$logger_log" >/dev/null || fail "the take-over is recorded in the journal"
++pass "an instance this supervisor did not start is waited out, then taken over"
++
++kill -TERM "$launch_pid" 2>/dev/null || true
++wait "$launch_pid" 2>/dev/null || true
++launch_pid=""
++
++# Two supervisors would each raise their own engine, so a launcher that cannot
++# hold the lock leaves the session to the supervisor that can.
++: >"$qs_log"
++: >"$logger_log"
++display=${WAYLAND_DISPLAY:-nosession}
++exec 8>"$runtime_dir/omarchy-shell-supervisor.${display##*/}.lock"
++flock -n 8
++
++launch_shell '0' || fail "a launcher that yields still exits cleanly"
++[[ $(launches) == 0 ]] || fail "a second supervisor does not raise an engine" "$(<"$qs_log")"
++grep -F 'supervisor is running' "$logger_log" >/dev/null || fail "the yield is recorded in the journal"
++pass "a second supervisor yields to the one already running"
++
++flock -u 8
++exec 8>&-
+diff --git a/bin/omarchy-agent-usage-commandcode b/bin/omarchy-agent-usage-commandcode
+new file mode 100755
+index 000000000..ab8924e44
+--- /dev/null
++++ b/bin/omarchy-agent-usage-commandcode
+@@ -0,0 +1,390 @@
++#!/usr/bin/python3
++# omarchy:summary=Print the Command Code usage record as JSON
++# omarchy:args=[--force] [--limits-only]
++# omarchy:hidden=true
++"""Collect Command Code (GOAT) usage into one display-ready JSON record.
++
++Command Code bills one account, and its own `/usage` view is built from two
++endpoints this record reads too, both under the `/alpha` routes its CLI asks
++(they are the CLI's own, not a published contract, so a failure here costs
++the numbers, never the panel):
++
++- `/alpha/billing/credits`: the account's credit ledger. `windowLimits` holds
++  the two rolling allowances the plan meters, `fiveHour` and `weekly`, each
++  with its `used`, `cap` and `resetAt` (epoch milliseconds); `credits` holds
++  what the monthly pool has left (`monthlyCredits`, plus any purchased and
++  free credits).
++- `/alpha/billing/subscriptions`: the plan's `planId`, its status and the
++  billing period's end. The plan names the monthly pool, which Command Code
++  credits per period and measures its own bar against: GOAT 70. The pool is
++  that figure, and what is left of it is the ledger's remainder.
++
++So the record carries the three meters its own `/usage` shows — the 5-hour
++window, the weekly window, and the month's pool — and the balance the pool
++leaves. It carries no token stats: this collector reports the account's
++allowances, and every number it has is the account's rather than this
++machine's (hence `scope: account`), with no prompts or sessions to count
++(`hasPromptStats` false).
++
++Command Code authenticates with an API key (`COMMANDCODE_API_KEY`, the one
++Ante and the CLI sign in with), read from the environment, then from
++`~/.hermes/.env` (where this machine keeps it for the tools that only read
++that file), `~/.ante/auth/api_keys.json` (Ante's own store) and
++`~/.commandcode/.env`. A credential is only ever read, never written: no file
++here is refreshed.
++"""
++
++from __future__ import annotations
++
++import argparse
++import datetime as dt
++import os
++import sys
++import urllib.request
++from concurrent import futures
++from pathlib import Path
++from typing import Any
++
++# The shared collector plumbing ships with the agents panel.
++sys.dont_write_bytecode = True
++sys.path.insert(0, os.path.join(os.environ["OMARCHY_PATH"], "shell", "plugins", "agents"))
++from collectors import (  # noqa: E402
++  HttpError,
++  LimitsCache,
++  base_record as shared_base_record,
++  cache_root,  # noqa: F401 - the tests find the cached answers through it
++  emit,
++  finite,
++  number,
++  open_json,
++  read_json,
++  stamp,
++  trusted_endpoint,
++)
++
++AGENT_ID = "commandcode"
++AGENT_NAME = "Command Code"
++AUTH_HELP = "Set COMMANDCODE_API_KEY to the key your Command Code sign-in uses."
++API_BASE_URL = "https://api.commandcode.ai"
++CREDITS_PATH = "/alpha/billing/credits"
++SUBSCRIPTIONS_PATH = "/alpha/billing/subscriptions"
++
++# Command Code's monthly pool per plan, in credits, as the CLI's own plan
++# table holds it (`getPlanTotalCredits`), and the name each plan shows. A plan
++# this table doesn't know has no pool to measure a bar against, so its month
++# is left out rather than guessed.
++PLAN_CREDITS = {
++  "individual-go": 10,
++  "individual-go-v1": 10,
++  "individual-goat": 70,
++  "individual-pro": 30,
++  "individual-pro-v1": 80,
++  "individual-provider": 15,
++  "individual-max": 150,
++  "individual-ultra": 300,
++  "teams-pro": 40,
++}
++PLAN_LABELS = {
++  "individual-go": "Go",
++  "individual-go-v1": "Go",
++  "individual-goat": "GOAT",
++  "individual-pro": "Pro",
++  "individual-pro-v1": "Pro",
++  "individual-provider": "Provider",
++  "individual-max": "Max",
++  "individual-ultra": "Ultra",
++  "teams-pro": "Teams Pro",
++}
++
++
++def api_base() -> str:
++  """Command Code's API: COMMANDCODE_API_URL when a person points it
++  elsewhere (a proxy), never a URL that would carry the key in the clear."""
++  configured = os.environ.get("COMMANDCODE_API_URL", "").strip()
++  return configured.rstrip("/") if configured and trusted_endpoint(configured) else API_BASE_URL
++
++
++# ---------------------------------------------------------------- credentials
++
++
++def key_from_env_file(path: Path) -> str:
++  """COMMANDCODE_API_KEY as a dotenv file sets it, or "" when it doesn't."""
++  try:
++    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
++  except OSError:
++    return ""
++  for line in lines:
++    text = line.strip()
++    if not text or text.startswith("#"):
++      continue
++    if text.startswith("export "):
++      text = text[len("export "):].strip()
++    name, _, value = text.partition("=")
++    if name.strip() != "COMMANDCODE_API_KEY":
++      continue
++    value = value.strip()
++    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
++      value = value[1:-1]
++    return value.strip()
++  return ""
++
++
++def api_key() -> str:
++  """The key, from the environment first: the panel runs collectors with the
++  shell's environment, which is where Ante and the CLI both read it."""
++  from_env = os.environ.get("COMMANDCODE_API_KEY", "").strip()
++  if from_env:
++    return from_env
++  home = Path.home()
++  for path in (home / ".hermes" / ".env", home / ".commandcode" / ".env"):
++    found = key_from_env_file(path)
++    if found:
++      return found
++  # Ante's own store: the key it signs providers in with, read-only.
++  ante = read_json(home / ".ante" / "auth" / "api_keys.json")
++  return str(ante.get("COMMANDCODE_API_KEY") or "").strip()
++
++
++# ------------------------------------------------------------------- requests
++
++
++def fetch(path: str, key: str, timeout: float = 25) -> Any:
++  # Cloudflare fronts this API and refuses urllib's default User-Agent
++  # outright (error 1010, before the key is even read), so the request says
++  # what it is.
++  request = urllib.request.Request(api_base() + path, headers={
++    "Authorization": "Bearer " + key,
++    "Accept": "application/json",
++    "User-Agent": "omarchy-agent-usage/" + AGENT_ID,
++  })
++  # These answers are slow and occasionally stall past ten seconds on a
++  # proxied path, so the deadline is generous and a transport failure is
++  # retried once: the panel refreshes on a timer, and one lost answer costs a
++  # whole section. A refusal (a status) is an answer and is never repeated.
++  try:
++    return open_json(request, timeout=timeout)
++  except HttpError as error:
++    if not error.transport:
++      raise
++    return open_json(request, timeout=timeout)
++
++
++# --------------------------------------------------------------------- limits
++
++
++def reset_at(value: Any) -> str:
++  """A window's `resetAt`, which is epoch milliseconds, as an ISO instant."""
++  ms = stamp(value)
++  if ms <= 0:
++    return ""
++  try:
++    return dt.datetime.fromtimestamp(ms / 1000, dt.timezone.utc).isoformat()
++  except (OverflowError, OSError, ValueError):
++    return ""
++
++
++def window_limit(window: Any, label: str, title: str) -> dict[str, Any] | None:
++  """One rolling allowance as the panel's window: `used` of `cap` spent."""
++  if not isinstance(window, dict):
++    return None
++  used, cap = finite(window.get("used")), finite(window.get("cap"))
++  # A cap of zero is no allowance to measure: a window that says nothing is
++  # dropped rather than shown as a bar that never moves.
++  if cap <= 0:
++    return None
++  return {
++    "label": label,
++    "title": title,
++    "percent": min(1.0, max(0.0, used / cap)),
++    "resetsAt": reset_at(window.get("resetAt")),
++  }
++
++
++def plan_of(answer: Any) -> tuple[str, str, str]:
++  """The active plan's id, its label, and when the period ends."""
++  data = answer.get("data") if isinstance(answer, dict) else None
++  if isinstance(data, list):
++    data = next((entry for entry in data if isinstance(entry, dict) and entry.get("status") == "active"), None) or (data[0] if data else None)
++  if not isinstance(data, dict):
++    return "", "", ""
++  plan_id = str(data.get("planId") or "")
++  return plan_id, PLAN_LABELS.get(plan_id, plan_id), str(data.get("currentPeriodEnd") or "")
++
++
++def kept_limits(cache: LimitsCache) -> list[dict[str, Any]]:
++  """The windows a cache holds, as they read now.
++
++  A kept window whose reset has passed comes back at zero with no reset time:
++  the allowance it measured is spent and a new one has begun, which only a
++  fresh probe can date. This is applied to the answer rather than to what is
++  kept, so the cache always holds the numbers the service sent and a later
++  read can't mistake a zeroed window for a measured one.
++  """
++  now = dt.datetime.now(dt.timezone.utc)
++  out = []
++  for entry in cache.data.get("limits") if isinstance(cache.data.get("limits"), list) else []:
++    if not isinstance(entry, dict):
++      continue
++    window = dict(entry)
++    reset = str(window.get("resetsAt") or "")
++    if reset:
++      try:
++        if dt.datetime.fromisoformat(reset.replace("Z", "+00:00")) <= now:
++          window["percent"] = 0.0
++          window["resetsAt"] = ""
++      except ValueError:
++        pass
++    out.append(window)
++  return out
++
++
++def collect_limits(key: str, force: bool) -> dict[str, Any]:
++  """The account's ledger and windows, kept per key.
++
++  `live` says the numbers were measured just now (or within the reuse
++  window); a failed check keeps the last good ones and says they're stale.
++  """
++  cache = LimitsCache(AGENT_ID, key)
++  kept = kept_limits(cache)
++  kept_balance = cache.data.get("balance") if isinstance(cache.data.get("balance"), dict) else None
++  kept_plan = str(cache.data.get("tierLabel") or "")
++  result: dict[str, Any] = {
++    "limits": kept,
++    "balance": kept_balance,
++    "tierLabel": kept_plan,
++    "usageStatusText": "",
++    "authHelpText": "",
++    "stale": False,
++    "fetchedAt": cache.fetched_at if kept else 0,
++    "retryAdvised": False,
++  }
++  # A panel opened and shut repeatedly must not become a request per flick.
++  if cache.fresh(force, allow_empty=True):
++    return result
++
++  # Both answers are asked at once: either alone can be slow, and the panel
++  # waits for the record.
++  try:
++    with futures.ThreadPoolExecutor(max_workers=2) as pool:
++      credits_task = pool.submit(fetch, CREDITS_PATH, key)
++      subscriptions_task = pool.submit(fetch, SUBSCRIPTIONS_PATH, key)
++      credits = credits_task.result()
++      subscriptions = subscriptions_task.result()
++  except HttpError as error:
++    if error.status in (401, 403):
++      result["usageStatusText"] = "Sign-in expired"
++      result["authHelpText"] = "Command Code refused the API key. " + AUTH_HELP
++      return result
++    if error.transport:
++      # Nothing answered: no route, no DNS, a reset. The panel should try
++      # again sooner than its regular interval.
++      result["retryAdvised"] = True
++      result["authHelpText"] = "Couldn't reach Command Code. Retrying shortly."
++    elif error.status:
++      result["authHelpText"] = f"Command Code's billing endpoint returned status {error.status}."
++    else:
++      result["authHelpText"] = "Command Code's billing endpoint sent a reply that couldn't be read."
++    if kept or kept_balance:
++      result["stale"] = True
++    else:
++      result["usageStatusText"] = "Command Code limits unavailable"
++    return result
++
++  ledger = credits.get("credits") if isinstance(credits, dict) else None
++  ledger = dict(ledger) if isinstance(ledger, dict) else {}
++  windows = credits.get("windowLimits") if isinstance(credits, dict) else None
++  windows = windows if isinstance(windows, dict) else {}
++  plan_id, plan_label, period_end = plan_of(subscriptions)
++  ledger["planId"] = plan_id
++
++  # The titles are the whole label: the panel shows a window's title as it
++  # reads, and these three name Command Code's own allowances rather than
++  # another service's vocabulary.
++  limits = [
++    window_limit(windows.get("fiveHour"), "5 hours", "5 hours"),
++    window_limit(windows.get("weekly"), "Weekly", "Weekly"),
++  ]
++  limits = [entry for entry in limits if entry]
++
++  pool = PLAN_CREDITS.get(plan_id, 0)
++  balance = None
++  if pool > 0:
++    remaining = max(0.0, finite(ledger.get("monthlyCredits")) + finite(ledger.get("purchasedCredits")) + finite(ledger.get("freeCredits")))
++    spent = max(0.0, pool - remaining)
++    limits.append({
++      "label": "Monthly",
++      "title": "Monthly",
++      "percent": min(1.0, spent / pool),
++      "resetsAt": period_end,
++    })
++    balance = {
++      "remaining": remaining,
++      "funded": float(pool),
++      "spent": spent,
++      "currency": "USD",
++      "estimated": False,
++    }
++
++  result.update(limits=limits, balance=balance, tierLabel=plan_label, authHelpText="")
++  result["fetchedAt"] = cache.save(limits, tierLabel=plan_label, balance=balance)
++  return result
++
++
++# -------------------------------------------------------------------- record
++
++
++def base_record(**overrides: Any) -> dict[str, Any]:
++  return shared_base_record(AGENT_ID, AGENT_NAME, **{
++    # Every number comes from the account's billing ledger, which every
++    # machine on the same account reads identically: aggregating devices must
++    # not sum them.
++    "scope": "account",
++    # The billing ledger counts allowances, never prompts or sessions: the
++    # panel keeps those numbers out of today's line.
++    "hasPromptStats": False,
++    **overrides,
++  })
++
++
++def collect(force: bool = False) -> dict[str, Any]:
++  key = api_key()
++  # Without a key there is nothing to ask: this machine has never signed
++  # Command Code in, so the panel skips it.
++  if not key:
++    return base_record()
++
++  limits = collect_limits(key, force)
++  record = base_record(
++    ready=bool(limits["limits"] or limits["balance"]),
++    tierLabel=limits["tierLabel"],
++    usageStatusText=limits["usageStatusText"],
++    authHelpText=limits["authHelpText"],
++    limits=limits["limits"],
++    limitsStale=bool(limits["stale"]),
++    limitsFetchedAt=limits["fetchedAt"],
++  )
++  if limits["balance"]:
++    record["balance"] = limits["balance"]
++  if limits["retryAdvised"]:
++    record["retryAdvised"] = True
++  return record
++
++
++def main() -> int:
++  parser = argparse.ArgumentParser(description="Print the Command Code usage record as JSON")
++  parser.add_argument("--force", action="store_true", help="re-probe the ledger, ignoring the reuse window")
++  # Command Code has no local scan to reuse, so a near-limit refresh is a
++  # normal run; the flag keeps the invocation every collector takes.
++  parser.add_argument("--limits-only", action="store_true")
++  args = parser.parse_args()
++  try:
++    record = collect(args.force)
++  except Exception as error:
++    record = base_record(usageStatusText="Command Code unavailable", authHelpText="Command Code usage scan failed")
++    print(f"omarchy-agent-usage-commandcode: {type(error).__name__}", file=sys.stderr)
++  emit(record)
++  return 0
++
++
++if __name__ == "__main__":
++  raise SystemExit(main())
+diff --git a/shell/plugins/agents/Panel.qml b/shell/plugins/agents/Panel.qml
+index 33a0627ab..4c56df006 100644
+--- a/shell/plugins/agents/Panel.qml
++++ b/shell/plugins/agents/Panel.qml
+@@ -1490,12 +1490,16 @@ Panel {
+       }
+     }
+ 
+-    // The meter shows what is left, not what is used: a prepaid account
+-    // drains toward empty rather than filling toward a cap.
++    // The meter measures what has been spent, exactly as the window meters
++    // above measure what has been used: one language for every allowance in
++    // the section, and a pool that resets fills toward full as it drains
++    // rather than toward empty. Its column, gutter and type are the window
++    // rows' own, so the four meters read as one block rather than as three
++    // meters and a footnote.
+     Column {
+       visible: !!section.balance
+       width: parent.width
+-      spacing: Style.space(6)
++      spacing: Style.space(12)
+ 
+       Item {
+         width: parent.width
+@@ -1509,36 +1513,51 @@ Panel {
+           text: Commons.I18n.t("agents.balance")
+           color: root.foreground
+           font.family: root.fontFamily
+-          font.pixelSize: Style.font.caption
++          font.pixelSize: Style.font.bodySmall
+         }
+ 
+         Meter {
+           anchors.left: balanceTitle.right
+           anchors.right: balanceValue.left
+-          anchors.rightMargin: Style.spacing.md
++          anchors.rightMargin: Style.space(20)
+           anchors.verticalCenter: parent.verticalCenter
+-          value: section.balance && section.balance.funded > 0 ? section.balance.remaining / section.balance.funded : -1
++          value: section.balance && section.balance.funded > 0 ? section.balance.spent / section.balance.funded : -1
+           alarming: root.balanceAlarming(section.balance)
+         }
+ 
++        // The windows' own time-left column, so both rows end in the same
++        // place; a money string is narrower than "00h 00m" at this size.
++        // The widest value a window row carries, so this row's meter ends
++        // exactly where theirs does.
++        TextMetrics {
++          id: balanceValueMetrics
++          font.family: root.fontFamily
++          font.pixelSize: Style.font.bodySmall
++          text: "100% · 00h 00m"
++        }
++
+         Text {
+           id: balanceValue
+           textFormat: Text.PlainText
+-          width: Style.space(96)
++          width: Math.ceil(balanceValueMetrics.advanceWidth)
+           anchors.right: parent.right
+           anchors.verticalCenter: parent.verticalCenter
+           horizontalAlignment: Text.AlignRight
+           text: section.balance ? root.formatMoney(section.balance.remaining, section.balance.currency) : ""
+           color: root.balanceAlarming(section.balance) ? root.urgent : root.dim
+           font.family: root.fontFamily
+-          font.pixelSize: Style.font.caption
++          font.pixelSize: Style.font.bodySmall
++          elide: Text.ElideLeft
+         }
+       }
+ 
++      // The spent-of-funded line stays the one step down in size, indented
++      // under the meter's own column so it reads as that row's detail.
+       Text {
+         textFormat: Text.PlainText
+         visible: text !== ""
+         width: parent.width
++        leftPadding: parent.width * 0.3
+         text: root.balanceDetailText(section.balance)
+         color: root.dim
+         font.family: root.fontFamily
+@@ -2037,17 +2056,18 @@ Panel {
+       markers: compact.scoped
+     }
+ 
+-    // Sized to the widest time left ("19h 40m"), so every meter ends in the
+-    // same place.
++    // Sized to the widest value the row can carry — a full percentage and the
++    // longest time left ("100% · 19h 40m") — so every meter ends in the same
++    // place whether or not its window has a reset time.
+     TextMetrics {
+       id: compactValueMetrics
+       font.family: root.fontFamily
+       font.pixelSize: Style.font.bodySmall
+-      text: "00h 00m"
++      text: "100% · 00h 00m"
+     }
+ 
+-    // How long until the window resets. The meter says how full it is; the
+-    // exact percentage is in the row's tooltip.
++    // How much of the allowance is used, and when it resets: the meter says
++    // how full it is at a glance, this says by how much and for how long.
+     Text {
+       id: compactValue
+       width: Math.ceil(compactValueMetrics.advanceWidth)
+@@ -2055,8 +2075,12 @@ Panel {
+       anchors.verticalCenter: parent.verticalCenter
+       textFormat: Text.PlainText
+       horizontalAlignment: Text.AlignRight
+-      text: compact.resetMs > 0 ? root.formatDuration(compact.resetMs) : ""
+-      color: root.dim
++      text: {
++        if (!compact.window) return ""
++        var used = Commons.I18n.formatNumber(Math.round(compact.window.percent * 100)) + "%"
++        return compact.resetMs > 0 ? used + " · " + root.formatDuration(compact.resetMs) : used
++      }
++      color: compact.alarming ? root.urgent : root.dim
+       font.family: root.fontFamily
+       font.pixelSize: Style.font.bodySmall
+     }
+diff --git a/shell/plugins/agents/README.md b/shell/plugins/agents/README.md
+index 4794316f7..eb8310943 100644
+--- a/shell/plugins/agents/README.md
++++ b/shell/plugins/agents/README.md
+@@ -94,6 +94,7 @@ Adding an agent needs no QML changes: ship a collector that follows the contract
+ | `fireworks` | Prepaid balance: the live ledger when the key can read it, else configured funding minus rated account costs; kept stale past a failed check | Fireworks billing API, grouped by day and model for the last 30 days, cached per key and account |
+ | `synthetic` | Synthetic's `GET /v2/quotas`: rolling five-hour requests, weekly credits, hourly search, free tool calls | pi/omp sessions and opencode messages on the `synthetic` provider; Claude Code, MiniMax Code and Codex sent to `api.synthetic.new`, and Claude Code replies by `hf:`/`syn:` models with no override |
+ | `local` | None (self-hosted work has no meter) | Codex rollouts, pi/omp sessions and opencode messages on a local runtime, a provider named in `local.json`, or a Codex provider whose `base_url` is on the LAN, never a provider id another collector counts, plus Claude Code turns while `ANTHROPIC_BASE_URL` is self-hosted (not Claude models or cloud-tagged ones), and Kimi Code, Qwen Code, Hermes and Mistral Vibe requests sent to a self-hosted base URL |
++| `commandcode` | Command Code's billing ledger: the 5-hour and weekly rolling windows, and the plan's monthly credit pool as a meter with its balance | none; the billing ledger is the whole account |
+ 
+ Every collector follows the same rules, so the same situation reads the same for every agent: a recent answer is reused for 15 seconds unless refresh is pressed, each credential or account keeps its own last good answer, a failed check keeps it with its age on hover and windows that have since reset back at zero, an endpoint that can't be reached is retried soon, and an agent the machine doesn't use stays out of the panel. Tokens are counted once, under the provider that bills them: pi, omp, and opencode sessions are split by provider into the matching collector. A pi compaction's usage counts, but omp records only the context's size before and after one, not what its summary request used, so omp's compactions are missing from the tokens. pi and omp sessions are read from every profile, and from `PI_CODING_AGENT_DIR`, `PI_CODING_AGENT_SESSION_DIR`, and a `settings.json` `sessionDir` as well as the defaults when set, a forked session's copied messages once; opencode is read from both its `message` and V2 `session_message` stores in the database `OPENCODE_DB` names, a message migrated into both once and a fork's copied history not at all. A machine with none of an agent's home, CLI, or usage prints an empty record the panel skips; one that has them but no sign-in says it is waiting for one. The sections below cover where each agent's sign-in and data come from.
+ 
+@@ -286,6 +287,14 @@ A Codex rollout records its provider's id but not the URL it reached, so the col
+ 
+ It is the exact complement of the provider collectors: a provider id another collector counts is never counted here, whatever `local.json` says (that collector counts it, once), but for a Codex `model_providers` entry, whose `base_url` decides whatever its id, so one under a claimed id on your own hardware (a self-hosted Kimchi gateway's `kimchi codex` setup) counts here; and the Codex collector keeps every rollout on the built-in `openai` provider, but for the models of one that a self-hosted `openai_base_url` served (see [Codex](#codex)). Two providers are claimed only for some models, and only those rows are left out: Ollama's cloud models (a `:cloud` or `-cloud` tag) run on Ollama's servers even through the local daemon, so they count under Ollama Cloud instead, and opencode's Antigravity plugin records a `google` provider with `antigravity-` models, which the Antigravity collector counts. A Codex rollout's prompts are the ones typed, and a subagent's or guardian's thread starts no session, read as the Codex collector reads them. Claude Code counts here while `ANTHROPIC_BASE_URL` is self-hosted (Ollama's `http://localhost:11434`, a LAN box), for every model but a Claude one, which a local gateway forwards on to Anthropic, and a cloud-tagged one, by the [Claude Code](#claude-code) rule; so do MiniMax Code replies on a custom provider whose `baseURL` is self-hosted, and, by the same rule, Kimi Code, Qwen Code, Hermes and Mistral Vibe requests whose recorded base URL is self-hosted, read by each one's own collector. There are no limits or balance.
+ 
++### Command Code
++
++Command Code's section reads the account's billing ledger, the same two answers its own `/usage` view is built from: `/alpha/billing/credits` (what the plan's windows and monthly pool have spent) and `/alpha/billing/subscriptions` (which plan is active, and when its period ends). These are the CLI's own routes rather than a published API, so a change there costs the numbers, not the panel.
++
++The three meters are the allowances that view shows: `5 hours` and `Weekly` are the plan's rolling windows, `used` of `cap` as the service reports them, and `Monthly` is the plan's credit pool (GOAT 70) against what is left of it. The balance under them is that remainder, so the bar and the figure are the same measurement. A window whose reset time has passed reads zero with no reset time until a fresh check dates the next one, and a plan the CLI's own plan table doesn't name gets no monthly meter rather than a guessed one.
++
++The key is `COMMANDCODE_API_KEY`, read from the environment first (where Ante and the CLI both take it), then from `~/.hermes/.env`, `~/.ante/auth/api_keys.json` and `~/.commandcode/.env`. It is only ever read. Every number is the account's, so the record says `scope: account` and carries no prompts or sessions to count.
++
+ ## Interactions
+ 
+ - Bar icon: left = panel, right = launch agent, middle = refresh. It turns
+diff --git a/shell/plugins/agents/assets/commandcode-light.svg b/shell/plugins/agents/assets/commandcode-light.svg
+new file mode 100644
+index 000000000..2bdeb2701
+--- /dev/null
++++ b/shell/plugins/agents/assets/commandcode-light.svg
+@@ -0,0 +1 @@
++<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#111"><title>Command Code</title><path d="M3.6 7.1 8.1 3.6l3.1 3.9a1.1 1.1 0 0 1-.3 1.6l-2 1.2a1.1 1.1 0 0 0-.4 1.5l1.1 1.8a1.1 1.1 0 0 0 1.5.4l2-1.2a1.1 1.1 0 0 1 1.6.4l2.6 4.1-4.5 3.5-1.5-2.4a3 3 0 0 0-4.1-1l-2 1.2-2.5-4.1a3 3 0 0 1 .9-4.1l.1-.1z"/><circle cx="18.1" cy="5.4" r="2.1"/></svg>
+diff --git a/shell/plugins/agents/assets/commandcode.svg b/shell/plugins/agents/assets/commandcode.svg
+new file mode 100644
+index 000000000..ff2c0429f
+--- /dev/null
++++ b/shell/plugins/agents/assets/commandcode.svg
+@@ -0,0 +1 @@
++<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#fff"><title>Command Code</title><path d="M3.6 7.1 8.1 3.6l3.1 3.9a1.1 1.1 0 0 1-.3 1.6l-2 1.2a1.1 1.1 0 0 0-.4 1.5l1.1 1.8a1.1 1.1 0 0 0 1.5.4l2-1.2a1.1 1.1 0 0 1 1.6.4l2.6 4.1-4.5 3.5-1.5-2.4a3 3 0 0 0-4.1-1l-2 1.2-2.5-4.1a3 3 0 0 1 .9-4.1l.1-.1z"/><circle cx="18.1" cy="5.4" r="2.1"/></svg>
+diff --git a/shell/plugins/agents/manifest.json b/shell/plugins/agents/manifest.json
+index 25b11cf54..0b844b7aa 100644
+--- a/shell/plugins/agents/manifest.json
++++ b/shell/plugins/agents/manifest.json
+@@ -41,7 +41,8 @@
+         "deepseek": { "enabled": true },
+         "fireworks": { "enabled": true },
+         "synthetic": { "enabled": true },
+-        "local": { "enabled": true }
++        "local": { "enabled": true },
++        "commandcode": { "enabled": true }
+       },
+       "refreshIntervalSec": 900,
+       "syncMode": "Off",
