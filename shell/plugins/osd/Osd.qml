@@ -112,7 +112,7 @@ Item {
     text: OsdModel.widestIcon
   }
 
-  IpcHandler {
+  ShellIpc {
     target: "osd"
     function show(payloadJson: string): string {
       root.open(payloadJson)
@@ -190,7 +190,7 @@ Item {
 
             Behavior on width {
               enabled: root.opened
-              NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+              NumberAnimation { duration: Style.duration(140); easing.type: Easing.OutCubic }
             }
           }
         }

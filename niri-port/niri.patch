@@ -2010,7 +2010,7 @@ index 939990c79..5c612d9f8 100644
 -Third-party widgets ship as separate plugins under `~/.config/omarchy/plugins/<plugin-id>/` with their own `manifest.json` declaring `kinds: ["bar-widget"]` and a `barWidget` entry point. See the [shell reference](../../../docs/omarchy-shell.md#plugin-manifest) for the manifest schema. Rescan, enable, and place third-party plugins with `omarchy-shell shell rescanPlugins`, `omarchy plugin enable`, and `omarchy bar move`.
 +MIT — see [LICENSE](LICENSE).
 diff --git a/shell/plugins/bar/widgets/ActiveWindow.qml b/shell/plugins/bar/widgets/ActiveWindow.qml
-index b803e7f4b..20f7c401a 100644
+index b803e7f4b..02fc7a4f5 100644
 --- a/shell/plugins/bar/widgets/ActiveWindow.qml
 +++ b/shell/plugins/bar/widgets/ActiveWindow.qml
 @@ -2,7 +2,6 @@ import QtQuick
@@ -2021,15 +2021,6 @@ index b803e7f4b..20f7c401a 100644
  import qs.Ui
  
  BarWidget {
-@@ -19,7 +18,7 @@ BarWidget {
-   implicitHeight: barSize
- 
-   Behavior on implicitWidth {
--    NumberAnimation { duration: Style.duration(180); easing.type: Easing.OutCubic }
-+    NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
-   }
- 
-   Item {
 @@ -30,12 +29,18 @@ BarWidget {
  
      Text {
@@ -2052,7 +2043,7 @@ index b803e7f4b..20f7c401a 100644
        font.pixelSize: Style.font.body
        elide: Text.ElideRight
 diff --git a/shell/plugins/bar/widgets/Tray.qml b/shell/plugins/bar/widgets/Tray.qml
-index cb9115e53..70e59058e 100644
+index cb9115e53..55c337b5a 100644
 --- a/shell/plugins/bar/widgets/Tray.qml
 +++ b/shell/plugins/bar/widgets/Tray.qml
 @@ -164,7 +164,26 @@ BarWidget {
@@ -2119,7 +2110,7 @@ index cb9115e53..70e59058e 100644
              color: root.foreground
              font.family: root.fontFamily
              font.pixelSize: Style.font.bodySmall
-@@ -737,7 +762,6 @@ BarWidget {
+@@ -737,13 +762,13 @@ BarWidget {
                }
  
                Text {
@@ -2127,7 +2118,14 @@ index cb9115e53..70e59058e 100644
                  visible: !menuRow.modelData.isSeparator && menuRow.modelData.buttonType !== QsMenuButtonType.None
                  anchors.verticalCenter: parent.verticalCenter
                  anchors.left: parent.left
-@@ -751,7 +775,7 @@ BarWidget {
+                 width: Style.space(22)
+                 horizontalAlignment: Text.AlignHCenter
+                 text: menuRow.modelData.checkState === Qt.Checked ? "\uf00c" : ""
++                textFormat: Text.PlainText
+                 color: root.foreground
+                 font.family: root.fontFamily
+                 font.pixelSize: Style.font.bodySmall
+@@ -751,7 +776,7 @@ BarWidget {
  
                Image {
                  id: menuIcon
@@ -2136,7 +2134,7 @@ index cb9115e53..70e59058e 100644
                  anchors.verticalCenter: parent.verticalCenter
                  anchors.left: parent.left
                  anchors.leftMargin: Style.space(24)
-@@ -762,11 +786,10 @@ BarWidget {
+@@ -762,11 +787,10 @@ BarWidget {
                  // which leaves PNG icons upscaled and blurry on HiDPI displays.
                  sourceSize.width: width * Screen.devicePixelRatio
                  sourceSize.height: height * Screen.devicePixelRatio
@@ -2149,7 +2147,7 @@ index cb9115e53..70e59058e 100644
                  visible: !menuRow.modelData.isSeparator
                  anchors.verticalCenter: parent.verticalCenter
                  anchors.left: parent.left
-@@ -774,6 +797,9 @@ BarWidget {
+@@ -774,6 +798,9 @@ BarWidget {
                  anchors.right: submenuGlyph.left
                  anchors.rightMargin: Style.space(8)
                  text: menuRow.rowText
@@ -2432,7 +2430,7 @@ index fb60ce254..289300663 100644
        WlrLayershell.keyboardFocus: takesKeyboard ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
        exclusionMode: ExclusionMode.Ignore
 diff --git a/shell/plugins/osd/Osd.qml b/shell/plugins/osd/Osd.qml
-index c80c2e5c4..022882371 100644
+index c80c2e5c4..bab163517 100644
 --- a/shell/plugins/osd/Osd.qml
 +++ b/shell/plugins/osd/Osd.qml
 @@ -3,7 +3,6 @@ import Quickshell
@@ -2461,15 +2459,6 @@ index c80c2e5c4..022882371 100644
    }
  
    TextMetrics {
-@@ -113,7 +112,7 @@ Item {
-     text: OsdModel.widestIcon
-   }
- 
--  ShellIpc {
-+  IpcHandler {
-     target: "osd"
-     function show(payloadJson: string): string {
-       root.open(payloadJson)
 @@ -124,11 +123,26 @@ Item {
      function ping(): string { return "ok" }
    }
@@ -2523,7 +2512,7 @@ index c80c2e5c4..022882371 100644
            }
          }
          Rectangle {
-@@ -171,17 +182,15 @@ Item {
+@@ -171,13 +182,11 @@ Item {
            width: root.barWidth
            height: Math.max(Style.space(6), Style.spacing.sm)
            anchors.verticalCenter: parent.verticalCenter
@@ -2539,11 +2528,6 @@ index c80c2e5c4..022882371 100644
  
              Behavior on width {
                enabled: root.opened
--              NumberAnimation { duration: Style.duration(140); easing.type: Easing.OutCubic }
-+              NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
-             }
-           }
-         }
 @@ -195,7 +204,7 @@ Item {
            anchors.verticalCenter: parent.verticalCenter
            text: root.message
