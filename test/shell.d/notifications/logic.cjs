@@ -320,7 +320,7 @@ function runIn(scope, ...names) {
 }
 
 { // Hostile compositor metadata must not become Lua; only a hex address dispatches.
-  const calls = [], s = runIn({ Hyprland: { dispatch: x => calls.push(x) } }, 'focusWindow')
+  const calls = [], s = runIn({ Niri: { dispatch: x => calls.push(x) } }, 'focusWindow')
   s.focusWindow({ wmClass: 'x\\"}); os.execute("bad") --' })
   s.focusWindow({ address: '0x123);bad()', wmClass: 'x' })
   assert.equal(calls.length, 0)
@@ -355,7 +355,7 @@ function newCapacityScope() {
     deckDisplayName: '',
     hyprRevision: 0,
     displayNames: ['fixture-display'], focusedDisplayName: 'fixture-display',
-    Quickshell: { screens: [] }, Hyprland: { monitorFor: screen => screen.monitor },
+    Quickshell: { screens: [] }, Niri: { monitorFor: screen => screen.monitor },
     lowDuration: 5000, normalDuration: 8000, maxDuration: 30000,
     Security: S, Delivery, Store, Markup: M,
     NotificationUrgency: { Critical: 2, Normal: 1, Low: 0 },
@@ -481,8 +481,8 @@ const summaries = rows => Array.from(rows, row => row.summary)
 
   // A native app with no actions at all still has its own window to go to.
   const focused = []
-  s.Hyprland.toplevels = { values: [{ lastIpcObject: { class: 'signal', pid: 42, address: '0xabc' } }] }
-  s.Hyprland.dispatch = x => focused.push(x)
+  s.Niri.toplevels = { values: [{ lastIpcObject: { class: 'signal', pid: 42, address: '0xabc' } }] }
+  s.Niri.dispatch = x => focused.push(x)
   const native = s.fakeNotification(6)
   native.actions = []
   native.hints = { 'sender-pid': 42 }
