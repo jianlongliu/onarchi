@@ -4,6 +4,10 @@ set -euo pipefail
 
 source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/base-test.sh"
 
+# The port switches background intros off on niri, so an unpinned run on a niri
+# machine would exercise the no-intro path and never reach the assertions below.
+export XDG_CURRENT_DESKTOP=Hyprland
+
 test_tmp=$(mktemp -d)
 trap 'rm -rf "$test_tmp"' EXIT
 home="$test_tmp/home"

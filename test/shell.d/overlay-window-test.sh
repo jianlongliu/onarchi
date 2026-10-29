@@ -53,7 +53,8 @@ reveals.shift()()
 assert(!content.contentRevealed, 'a close or screen loss cancels a pending reveal')
 
 const focusedScreenBody = /function focusedScreen\(\) \{([\s\S]*?)\n  \}/.exec(overlay)[1]
-const focusedScreen = new Function('Hyprland', 'Quickshell', focusedScreenBody)
+// The port reads the focused output from Niri, not Hyprland.
+const focusedScreen = new Function('Niri', 'Quickshell', focusedScreenBody)
 const external = { name: 'DP-1', width: 1920, height: 1080 }
 assertEqual(focusedScreen({ focusedMonitor: { name: 'DP-1' } }, { screens: [screen, external] }), external,
   'overlay selects the focused output')
@@ -64,21 +65,21 @@ assertEqual(focusedScreen({ focusedMonitor: null }, { screens: [] }), null,
 
 const shownHandler = /onShownChanged: \{([\s\S]*?)\n  \}/.exec(overlay)[1]
 let refreshed = 0
-const Hyprland = { refreshMonitors() { refreshed++ } }
-const changeShown = new Function('shown', 'focusedScreen', 'Hyprland', `let targetScreen = null; ${shownHandler}; return targetScreen`)
-assertEqual(changeShown(false, () => external, Hyprland), null, 'closing drops the previous screen reference')
+const Niri = { refreshMonitors() { refreshed++ } }
+const changeShown = new Function('shown', 'focusedScreen', 'Niri', `let targetScreen = null; ${shownHandler}; return targetScreen`)
+assertEqual(changeShown(false, () => external, Niri), null, 'closing drops the previous screen reference')
 assertEqual(refreshed, 0, 'closing does not refresh monitor data')
-assertEqual(changeShown(true, () => screen, Hyprland), screen, 'reopening selects a current screen')
+assertEqual(changeShown(true, () => screen, Niri), screen, 'reopening selects a current screen')
 assertEqual(refreshed, 1, 'opening refreshes monitor scales after a live change while closed')
 const scaleHandler = /onDevicePixelRatioChanged: ([^\n]+)/.exec(overlay)[1]
-const changeScale = new Function('shown', 'Hyprland', scaleHandler)
-changeScale(false, Hyprland)
+const changeScale = new Function('shown', 'Niri', scaleHandler)
+changeScale(false, Niri)
 assertEqual(refreshed, 1, 'scale changes on hidden windows do not refresh monitor data')
 const changedScreen = { name: 'eDP-1', width: 960, height: 600 }
 assert(!ready(true, true, 960, 600, changedScreen, monitor, 2),
   'a stale monitor scale keeps content transparent after a live scale change')
-Hyprland.refreshMonitors = () => { refreshed++; monitor.scale = 2 }
-changeScale(true, Hyprland)
+Niri.refreshMonitors = () => { refreshed++; monitor.scale = 2 }
+changeScale(true, Niri)
 assertEqual(refreshed, 2, 'a showing window refreshes monitor scales when Qt receives a live change')
 assert(ready(true, true, 960, 600, changedScreen, monitor, 2),
   'fresh monitor data lets content reveal at the new scale')

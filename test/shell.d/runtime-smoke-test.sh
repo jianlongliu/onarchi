@@ -632,7 +632,7 @@ pass "bar put leaves a widget already on the bar alone"
 # A hand edit that drops the closing brace puts the shell on the defaults,
 # which have no omarchy.microphone. A bar change then applies for the session
 # only, leaving the file as the user left it until they fix it.
-config="$test_home/.config/omarchy/shell.json"
+config="$SCRATCH_HOME/.config/omarchy/shell.json"
 # Elsewhen saves its first-run cities once its probe returns. Landing between
 # the edit and the shell's reload, that save would write valid JSON back.
 for _ in {1..80}; do

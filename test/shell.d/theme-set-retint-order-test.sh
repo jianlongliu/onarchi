@@ -4,6 +4,10 @@ set -euo pipefail
 
 source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/base-test.sh"
 
+# The port switches background intros off on niri, so an unpinned run on a niri
+# machine would skip the retint ordering this test asserts.
+export XDG_CURRENT_DESKTOP=Hyprland
+
 test_tmp=$(mktemp -d)
 trap 'touch "$test_tmp/release" "$test_tmp/intro-done"; rm -rf "$test_tmp"' EXIT
 home="$test_tmp/home"
