@@ -14,9 +14,7 @@ also load — the shell tests in `test/shell.d/menu-test.sh` and
 
 JSONC here means JSON plus comments and trailing commas, stripped by the
 parser rather than a real JSONC grammar: only whole-line `//` comments are
-removed, so an inline trailing comment breaks the parse. A file that fails to
-parse contributes no entries — a broken user extension silently drops every
-user entry while the shipped menu keeps working.
+removed, so an inline trailing comment breaks the parse. Watched sources retain their previous successfully read rows on a parse failure; at startup those rows are initially empty. An empty user file is accepted as an empty menu, while an empty shipped menu retains its previous rows.
 
 ## Entry schema
 
@@ -105,9 +103,8 @@ can point a submenu at an existing provider but cannot declare a new one:
 
 - `apps` is QML-native: rows come from the shared AppLibrary (desktop
   entries), carrying image icons, launch feedback, and uninstall support like
-  the launcher. App rows are searchable by their desktop Keywords but never
-  routable, so an installed app cannot capture a menu route (htop ships
-  `Keywords=system;...`, and SUPER+ESCAPE must still open the system menu).
+  the launcher. App rows are searchable by their desktop Keywords; their aliases
+  cannot capture routes, although an exact app row id can resolve as a route.
 - `fonts` and `power-profiles` are bash one-liners in the `providers` map in
   `Menu.qml`. The contract is one tab-delimited line per row:
   `label\tvalue\tcurrent`. The row whose value equals `current` gets the ✓

@@ -72,7 +72,7 @@
 | `split-lock/ir-light` | PAM 人脸栈点名的 IR 补光脚本（`pam_exec.so /usr/local/bin/ir-light`）的仓库副本 | `install -m 0755 split-lock/ir-light /usr/local/bin/ir-light`；**硬件专属，见 §5** |
 | `niri-config/local/*.kdl`（7 份） | **本机在用的 niri 配置**（`config` + `input/monitor/layout/window-rules/effects/binds` 的模块化拆分） | 拷到 `~/.config/niri/`、把 `/home/<user>` 换成自己家目录、按自己显示器改 `monitor.kdl`，然后 `niri validate`；说明见 `niri-config/README.md` |
 | `niri-config/omarchy.kdl.template` + `shell.json` 示例 | niri 侧接线 | `install.sh` 会渲染成 `~/.config/niri/omarchy.kdl` 并拷 `shell.json`（**仅当不存在**）；**本机没走这条** —— 用的是模块化拆分，`config.kdl` 直接 include `{input,monitor,layout,window-rules,effects,binds}.kdl`，`omarchy.kdl` 不存在 |
-| `hooks/post-update.d/10-niri-repatch`、`hooks/theme-set.d/{10-niri-border,20-materal}` | 更新后重放覆盖层；换主题写边框渐变 | Omarchy 钩子机制自动调 |
+| `hooks/post-update.d/10-niri-repatch`、`hooks/theme-set.d/{10-niri-border,20-materal}` | 上游真身的 post-update 阶段重放覆盖层；换主题写边框渐变 | 上游钩子机制调用；本机四段更新垫片不触发 post-update |
 | `split-greeter/`、`split-lock/` | 自研登录器与锁屏，各带 `install.sh` + `tests/` | `sudo ./install.sh`（split-greeter 不碰 `config.toml`，最后一步手工） |
 | `battery-care/` | **omarchy-battery-care 的源件**（`omarchy-battery-care` 脚本 + `omarchy-battery-care{,-sleep}.service` + `install.sh` + `README.md` + `tests/`）：把"停在充电阈值之上"的电自动放回 STOP，见 §8 第 47 条 | `pkexec bash ~/Projects/omarchy-on-niri/battery-care/install.sh`（装成 root 属主真副本；`--remove` 卸）；**改仓库后必须重跑 `install.sh`**（`omarchy update` 不刷新它） |
 | `default/omarchy/omarchy-menu.jsonc` | `install.package`/`install.aur`/`remove.package` 的 `xdg-terminal-exec` 回退 | 随仓库/覆盖层 |
@@ -510,10 +510,7 @@ cp /tmp/niri.patch ~/.config/omarchy/niri-port/niri.patch              # 重放�
       `quickshell list -j -p "$OMARCHY_PATH/shell"`，有实例就等它死 —— **不用 IPC ping**，因为
       启动中/卡死的实例也算占用，ping 会把它们当"没有实例"；④ 干净退出后若槽位仍被别的实例占着就
       **继续监督**它，不 `exit 0`（否则留下无人监督的孤儿引擎，它死在锁定态又是同一条红屏）。
-    - **落点**：`~/.local/share/omarchy/bin/omarchy-launch-shell` + 其测试件
-      `test/shell.d/launch-shell-test.sh`（10 例）。**这是上游 checkout，`omarchy update` 会覆盖**；
-      且该文件**不在 `niri-port/niri.patch` 里**（patch 现含 12 个 `bin/` 文件，不含它）⇒ 想跨 update
-      长期保留，得并进 patch。
+    - **落点**：`~/.local/share/omarchy/bin/omarchy-launch-shell` + 其测试件 `test/shell.d/launch-shell-test.sh`（当时 10 例）。2026-09-30 时补丁尚未纳入覆盖层；现仓库 `niri-port/niri.patch` 已包含 `bin/omarchy-launch-shell`，重放可恢复它。
     - 验法：`grep -c QS_DISABLE_CRASH_HANDLER ~/.local/share/omarchy/bin/omarchy-launch-shell` = 1；
       `bash test/shell.d/launch-shell-test.sh` 10 例全绿（`restart-shell-test.sh` 仍 7 例）；
       决定性一条 = `kill -SEGV <engine_pid>` → 只多出**一条**引擎、日志只一行
@@ -572,6 +569,8 @@ cp /tmp/niri.patch ~/.config/omarchy/niri-port/niri.patch              # 重放�
 ---
 
 ## 8.1 Omarchy 官方源已加入（2026-10-28）
+
+> 下文为当日安装与回退记录：四个 Qt 工具已卸，仅留 disktree；结尾旧的“五个包”回退命令不再适用，操作前须核对实际已安装包。
 
 **为什么加**：`omasnap`（截屏）、`monologue`（摄像头录制）、`hype`（Markdown 演示）、`signed`（PDF 签名）、
 `disktree-bin`（磁盘用量）这 5 个工具**只在 Omarchy 自家仓库**，Arch 官方没有。之前一直装不了，就是因为没配源。

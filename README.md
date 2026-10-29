@@ -5,6 +5,8 @@
 Port of [basecamp/omarchy](https://github.com/basecamp/omarchy) (`quattro` / `4.0.0.alpha`) to the
 [niri](https://github.com/YaLTeR/niri) Wayland compositor, instead of Hyprland.
 
+This is an installation reference for people and agents, not a success guarantee. It has not been end-to-end tested on another machine; inspect and adapt each step before running it.
+
 This repo contains the ported Omarchy source plus the glue that makes it run on niri. It is **not a
 standalone installer** — it assumes a working Arch + niri login session and an existing Omarchy install
 (or that you install Omarchy first). What it gives you is:
@@ -26,7 +28,7 @@ standalone installer** — it assumes a working Arch + niri login session and an
 - `hooks/` — Omarchy update/theme hooks that reapply the port.
 - `default/systemd/user/omarchy-picker-warmup.service` — the session-scoped picker warm-up unit
   (`install.sh` installs and enables it; disable with `toggles/picker-warmup-off`).
-- `install.sh` — optional convenience wrapper. **Not the supported path**: the manual steps are in
+- `install.sh` — optional convenience wrapper. The manual steps are in
   `docs/INSTALL.md` and should be followed by hand.
 - `docs/INSTALL.md` — the hand-run install procedure (deps, file placement, config merge, overlay, backlight).
 - `docs/omarchy-on-niri-port.md` — the main volume (current facts: constraints, architecture, file
@@ -142,11 +144,10 @@ Install these on the target Arch machine. Everything below was verified in use o
 ## Install
 
 The manual, hand-run procedure is in **`docs/INSTALL.md`** (deps, `~/bin` glue, config.kdl merge, overlay,
-backlight, per-machine checks). It is the supported path.
+backlight, per-machine checks). It is a manual reference, not a tested installation guarantee.
 
-There is also an optional `install.sh` bootstrap that lays down the same files, but it does **not** rewrite
-an existing `config.kdl` and it will not auto-install packages or fix backlight perms — follow
-`docs/INSTALL.md` to be sure.
+There is also an optional `install.sh` bootstrap, but it does not stage the overlay and plugins, rewrite
+an existing `config.kdl`, install packages or fix backlight permissions. It can overwrite files and warns on repatch failure; consult `docs/INSTALL.md` before running it.
 
 Short version:
 
@@ -157,7 +158,7 @@ cd onarchi
 ./install.sh            # optional; or follow docs/INSTALL.md step by step
 ```
 
-Then log out and back in — `spawn-sh-at-startup` starts the Quickshell shell.
+Then merge the config as described in the guide; the template starts bare Quickshell, whereas the recommended `omarchy-launch-shell` supervises it. Log out and back in after completing the setup.
 
 ## Per-machine adjustments (must check)
 
@@ -176,9 +177,8 @@ The overview backdrop needs no adjustment: niri draws that layer itself, so the 
 ## Upstream sync status
 
 The port currently tracks upstream `quattro` at **`bc220e70`** (2026-10-27), fast-forwarded from
-`60663faf` on 2026-10-28 — 846 commits. The overlay is **33 files / 120 hunks / 2791 lines**,
-md5 `bf04bf1432482a1df2f19d828f99e315`, and applies both ways (`git apply --check` on a pristine
-`HEAD` worktree, `git apply --reverse --check` against this machine's tree).
+`60663faf` on 2026-10-28 — 846 commits. The current `niri.patch` has **39 files / 3385 lines**,
+md5 `63856901c5d4bce08d14f36e5ce4fd24` (untracked overlay files are separate).
 
 Upstream still has **no niri support**: `grep -ri niri shell/ bin/` returns nothing at `bc220e70`,
 while Hyprland coupling grew (19 files / 54 sites → 26 files / 118 sites). Everything below exists
@@ -191,7 +191,7 @@ because of that.
 | Floating bar (float gap, rounded corners, frosted blur) | Grafted onto upstream's new `barStrip`. `exclusiveZone` now includes `floatGap`, so windows no longer sit a band of dead desktop below the strip |
 | Monitor resolution tier slider | Entirely local; upstream has no equivalent. Merged without loss (235 lines) |
 | Battery charge threshold (sysfs-first) | Kept, plus upstream's improvement: it resolves the battery through UPower instead of a `BAT*` glob |
-| `Niri.qml` compositor shim | 186 → 358 lines: `monitors`, `monitorFor`, `toplevels`, `refresh*`, `dispatch` |
+| `Niri.qml` compositor shim | Currently 364 lines: `monitors`, `monitorFor`, `toplevels`, `refresh*`, `dispatch` |
 | `OverlayWindow.qml` | New upstream file, all overlay panels (menu, OSD, clipboard, image picker) go through it. It read `Hyprland.monitors`, which is always empty on niri, so `contentReady` never became true and every panel rendered at opacity 0 — patched to `Niri` |
 | Toast frost | Upstream narrowed the notification surface and dropped the client blur region; the layer rule carried only `xray`, so nothing was frosted. Restored as a client-side `Region` + `blur true` in the rule |
 | Apps grid frost | Upstream's new `omarchy.dock` grid spans the screen and relies on Hyprland's `ignore_alpha`. Given a client region plus an `omarchy-dock-apps` layer rule |
@@ -206,7 +206,7 @@ because of that.
 | Bar decoration beyond frost (shadow, top highlight, forced 12 px radius) | Superseded by upstream's own bar design. Accepted the overwrite |
 | OSD card surface | Upstream moved OSD onto `OverlayWindow`, which requires a full-screen surface; the card-sized variant rendered nothing |
 | Notification blur via `popupColumn` | That element no longer exists upstream; the surface is a narrow strip now |
-| `omarchy-system-{logout,reboot,shutdown}` | Upstream merged them into one `omarchy-system`; the four-line niri guard moved over |
+| `omarchy-system` | Upstream uses a single `omarchy-system` entry; this snapshot's `bin/omarchy-system` does not route to `omarchy-niri-system`. Review the system action wiring before using it on niri |
 | `omasnap`, `monologue`, `hype`, `signed` | All four need **Qt 6.12**; this machine pins Qt 6.11 (see below). `omasnap` additionally hard-depends on `hyprland`. Only `disktree-bin` from that batch runs |
 
 ### Qt stays pinned at 6.11.2

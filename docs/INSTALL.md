@@ -2,8 +2,7 @@
 
 > **简体中文 → [INSTALL.zh.md](INSTALL.zh.md)**
 
-Follow these steps by hand on the target machine. This is the supported path — `install.sh` is just a
-convenience wrapper; everything below is what it actually does, spelled out so you can do it yourself.
+This is a reference for people and agents, not a guarantee: it has not been end-to-end tested on another machine. Review and adapt each step. The optional `install.sh` differs: it does not stage the overlay or plugins, install packages, configure backlight or PAM, or merge the niri config. It installs two user units and warns rather than failing if repatch fails. Both paths can overwrite existing files; back them up first.
 
 Assumptions: you are on **Arch + niri**, logged in as your user, and **Omarchy is already installed** at
 `~/.local/share/omarchy` (it has its own installer). You have this repo cloned somewhere; set `REPO`
@@ -43,7 +42,7 @@ These are PATH-first overrides that translate the Hyprland-coupled pieces to nir
 
 ```sh
 mkdir -p ~/bin
-for f in "$REPO"/port-bin/*; do install -m 0755 "$f" ~/bin/; done
+for f in "$REPO"/port-bin/*; do [[ -f $f ]] || continue; install -m 0755 "$f" ~/bin/; done
 ```
 
 This installs `hyprctl` (the shim — **critical**, ~50 omarchy scripts call it), `omarchy-niri-system`,
@@ -79,17 +78,18 @@ Then edit `~/.config/niri/config.kdl`:
 
    ```kdl
    environment {
+       XDG_CURRENT_DESKTOP "niri"
        OMARCHY_PATH "/home/you/.local/share/omarchy"
        PATH "/home/you/bin:/home/you/.local/share/omarchy/bin:/home/you/.local/bin:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin"
    }
 
-   spawn-sh-at-startup "quickshell -n -p /home/you/.local/share/omarchy/shell"
+   spawn-sh-at-startup "omarchy-launch-shell"
    ```
 
-   (Use your real path, not `/home/you`.)
+   (Use your real path, not `/home/you`. The generated template launches bare `quickshell`; replace that line with the supervised launcher shown here, which logs and restarts the shell after a crash.)
 
 2. **Inside your existing `binds { }` block** — paste the Omarchy bindings. The full list is in
-   `~/config/niri/omarchy.kdl` (generated above); the important ones:
+   `~/.config/niri/omarchy.kdl` (generated above); the important ones:
 
    ```kdl
    Mod+Space         hotkey-overlay-title="Omarchy Menu" { spawn-sh "omarchy-menu toggle"; }
@@ -129,6 +129,7 @@ frosting alphas) is worth copying either way.
 default tree, which upstream does not ship. Skip it and you get window decorations and no frosting:
 
 ```sh
+mkdir -p ~/.config/ghostty
 cp "$REPO/local-config/ghostty/config" ~/.config/ghostty/config      # back up yours first
 mkdir -p ~/.config/systemd/user
 cp "$REPO/local-config/systemd/user/materal-recolor."* ~/.config/systemd/user/
@@ -164,6 +165,19 @@ above (repo copy: `local-config/systemd/user/`).
 
 ---
 
+The manual path also needs the state directory and, if wanted, the two session units installed by `install.sh` (back up existing units and links first):
+
+```sh
+mkdir -p ~/.local/state/omarchy/toggles/hypr ~/.config/systemd/user/graphical-session.target.wants
+for unit in omarchy-picker-warmup.service omarchy-clamshell-watch.service; do
+  install -m 0644 "$REPO/default/systemd/user/$unit" ~/.config/systemd/user/
+  ln -sfn "$HOME/.config/systemd/user/$unit" "$HOME/.config/systemd/user/graphical-session.target.wants/$unit"
+done
+systemctl --user daemon-reload
+```
+
+These links depend on `graphical-session.target` being started by the session; verify that on the target machine.
+
 ## 6. Apply the port overlay to the Omarchy install
 
 Put the overlay where repatch expects it, then apply (idempotent):
@@ -171,17 +185,14 @@ Put the overlay where repatch expects it, then apply (idempotent):
 ```sh
 mkdir -p ~/.config/omarchy/niri-port
 cp "$REPO"/niri-port/niri.patch "$REPO"/niri-port/Niri.qml ~/.config/omarchy/niri-port/
-
-cd ~/.local/share/omarchy
-cp ~/.config/omarchy/niri-port/Niri.qml shell/Commons/Niri.qml
-git apply --reverse --check ~/.config/omarchy/niri-port/niri.patch 2>/dev/null \
-  && echo "overlay already applied" \
-  || git apply ~/.config/omarchy/niri-port/niri.patch
+cp -a "$REPO"/niri-port/plugins ~/.config/omarchy/niri-port/
+~/bin/omarchy-niri-repatch
 ```
 
-**Important:** keep the file changes in `~/.local/share/omarchy` **uncommitted**. The `niri.patch` overlay is
-re-applied after each `omarchy update`; committing inside that repo would break the update's fast-forward.
-Run `~/bin/omarchy-niri-repatch` after any update to restore the port.
+Repatch skips outside `XDG_CURRENT_DESKTOP=niri` or without an Omarchy `.git` directory (both exit 0); inspect its output. Missing overlay exits 1; a patch conflict exits 2. It copies `Niri.qml` and plugins before checking for conflicts, so a conflict can leave those files changed. Back up existing files first. The plugin copy includes `blurwallpaper`; third-party `plugin-patches/` are separate and are not replayed automatically.
+
+**Important:** keep the file changes in `~/.local/share/omarchy` **uncommitted**; committing them can prevent upstream fast-forward updates.
+The upstream post-update hook can reapply `niri.patch`, but the port's `~/bin/omarchy-update` does not run that hook. After an update that changes the Omarchy tree, inspect the result and run `~/bin/omarchy-niri-repatch` manually if needed.
 
 ---
 
@@ -240,11 +251,13 @@ These can't be auto-detected and will differ per box:
 Log out and back in — `spawn-sh-at-startup` starts the Quickshell shell. Then check:
 
 ```sh
-niri msg layers                       # omarchy-background + omarchy-bar present?
-niri msg action spawn -- omarchy-menu toggle   # menu opens?
-~/bin/omarchy-niri-system <arg-bogus> # expect usage + exit 2
-niri msg action spawn -- omarchy-system-logout   # (ends session; only when ready)
+niri msg layers                       # inspect Omarchy layers
+omarchy-shell shell ping              # shell IPC responds?
+omarchy-menu toggle                  # menu opens?
+~/bin/omarchy-niri-system bogus      # usage, exit 2
 ```
+
+System action wiring needs separate review: this snapshot's `bin/omarchy-system` does not call `omarchy-niri-system`. Do not test logout, reboot or shutdown until you have verified the installed entry point and are ready for the action.
 
 Bar should render workspaces/clock/keyboard layout; `Mod+Space` opens the menu; media keys show an OSD;
 the Power menu shows log out / reboot / shutdown.

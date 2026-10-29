@@ -110,7 +110,7 @@ split-lock/install.sh                                            # split-lock �
 | `omarchy plugin add <git-url> [--enable] [--yes]` | 从 git 装第三方插件 | 交互式问确认；`--enable` 会顺带问放哪个 section |
 | `omarchy plugin clone <source-id> [--edit]` | 把第一方插件复制成用户插件（写 `clonedFrom`） | 自研三件就是这么来的 |
 | `omarchy plugin enable <id> [placement]` / `disable <id>` | 开关 | 实走 `omarchy-shell shell setPluginEnabled`，改 shell.json |
-| `omarchy plugin update [id] [--yes]` | `git fetch` → `merge --ff-only` → `validate` | **工作树脏就拒绝**，见 §6 |
+| `omarchy plugin update [id] [--yes]` | `git fetch` → `merge --ff-only` → `validate` | 不保证拒绝脏工作树；验证失败会硬重置，见 §6 |
 | `omarchy plugin remove [id] [--yes]` | 卸载 | |
 | `omarchy plugin validate <dir>` | 校验 manifest / 入口文件 | 更新后也会自动跑 |
 
@@ -341,25 +341,14 @@ journalctl -t omarchy-shell --since "-10min" | tail -50
 
 `omarchy plugin update [id] [--yes]` 干这三件事：
 
-1. `git fetch origin HEAD`；
-2. **`git merge --ff-only FETCH_HEAD`** —— 工作树有本地改动（我们的 patch）时**直接失败**并打印
-   `cannot fast-forward '<id>'; you have local changes in <dir>`；
-3. `omarchy-plugin-validate` 不过则 `git reset --hard ORIG_HEAD` 回滚。
+1. `git fetch origin HEAD`；若 HEAD 已等于 FETCH_HEAD，直接报告已是最新，**不检查工作树或验证**。
+2. 否则可预览 diff 并确认，然后尝试 `git merge --ff-only FETCH_HEAD`。没有预先拒绝脏工作树：不冲突的本地改动可能保留并让合并成功；失败消息提到本地改动，但非快进等其他原因也可能导致失败。
+3. 合并后运行 `omarchy-plugin-validate`；失败时执行 `git reset --hard ORIG_HEAD`。这会丢弃跟踪文件的本地修改（包括合并前保留的修改），还可能覆盖阻碍重置的未跟踪文件；不能当作安全回滚。
 
-本机有本地 patch 的两个插件：`meviusisback.ai-subs`、`ronald.input-sources`
-（bar 本体 2026-10-04 起不是插件了，它的改动在 `niri.patch` 里，见 §5.4）。**更新配方**：
-
-```sh
-cd ~/.config/omarchy/plugins/<id>
-git checkout -- .                                   # 丢掉本地魔改（patch 已存档，不用担心）
-omarchy plugin update <id> --yes                    # 或交互式跑，看清 diff 再确认
-git apply ~/.config/omarchy/niri-port/plugin-patches/<id>.patch   # 冲突时用 -3 或手改
-omarchy-restart-shell                               # QML 不热更，必须重启壳层
-```
+本机有本地 patch 的两个插件：`meviusisback.ai-subs`、`ronald.input-sources`（bar 本体见 §5.4）。**更新前先检查并备份完整插件目录**，包括暂存、未暂存和未跟踪文件及其 Git 状态；确认备份可恢复后，再决定如何在隔离副本中更新和验证。已有 patch 不一定包含全部本地变更，不要依赖它作为唯一备份。检查可从 `git -C ~/.config/omarchy/plugins/插件ID status --short` 和 `git -C ~/.config/omarchy/plugins/插件ID diff HEAD` 开始；二者不能替代备份未跟踪文件。验证失败时先保全现场和备份，再人工处理，不要盲目重试或清理工作树。
 
 ⚠ **这些 patch 没有自动重放器**：`~/bin/omarchy-niri-repatch` 只管 omarchy overlay
-（`$OVL/niri.patch` + `$OVL/Niri.qml` + `$OVL/plugins/*` 整插件拷贝）。store 装来的插件被更新覆盖后，
-要照上面手工 `git apply`。
+（`$OVL/niri.patch` + `$OVL/Niri.qml` + `$OVL/plugins/*` 整插件拷贝）。备份并在隔离副本验证后，store 装来的插件如需更新，须人工处理本地变更与 patch 重放。
 
 ## 7. 坑清单
 
@@ -372,7 +361,7 @@ omarchy-restart-shell                               # QML 不热更，必须重�
   `debugBarGeometry` 的宽度纹丝不动）。**唯一可靠方式：`omarchy-restart-shell`**。
 - **锁屏时不要重启壳层**：`omarchy-restart-shell` 自己会先问锁服务（`lock status` 报 secure/requested
   就 `exit 1`），别绕过它——杀掉锁客户端会把人挡在桌面外。
-- **`plugin update` 失败 ≠ 坏了**：带 patch 的插件必然 ff 失败，先按 §6 清理。
+- **`plugin update` 失败 ≠ 必然是本地 patch 冲突**：先按 §6 检查并备份，勿直接清理；验证失败时硬重置可能已丢失本地修改。
 - **bar layout 里别重复写同一个 id**；`omarchy.tray` 即使当前没内容也别删（托盘项以后会再长出来）。
 - 排查 bar 渲染前先 `niri msg layers` 确认存在 namespace `omarchy-bar`（niri 的 blur 规则按它匹配）；
   聚焦环只在有焦点时绘制，锁屏后的截图里没有环是正常的。

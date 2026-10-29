@@ -117,7 +117,7 @@ hyprctl 调用面有界、可直接映射。
 | `~/bin/omarchy-picker-warmup` (+x) + `~/.config/systemd/user/omarchy-picker-warmup.service` | 登录后 45s 延迟预热主题/背景选择器（读缩略图进页缓存；`Nice=19`/IO idle；`toggles/picker-warmup-off` 即关，§8 第 25 条）。仓库 `port-bin/omarchy-picker-warmup` + `default/systemd/user/omarchy-picker-warmup.service`（`%h` 模板） |
 | `~/bin/omarchy-display-text-size` (+x) | bar 的 Display 面板 TEXT SIZE 滑块垫片：官方脚本只管 shell `[font]`/GTK factor/终端 pt，这个补 GTK dconf+settings.ini、Qt(qt6ct)、fcitx5、XSETTINGS 各层（§8.19）。仓库 `port-bin/omarchy-display-text-size` |
 | `~/.config/omarchy/hooks/theme-set.d/10-niri-border` | 换 style 时自动 `omarchy-niri-apply-theme`（只写不重载，保护 SCALE）|
-| `~/.config/omarchy/hooks/post-update.d/10-niri-repatch` | `omarchy update` 后自动重放覆盖层 |
+| `~/.config/omarchy/hooks/post-update.d/10-niri-repatch` | 上游真身的 post-update 阶段重放覆盖层；本机四段垫片不调用该钩子 |
 | `~/.config/omarchy/niri-port/`（`niri.patch` + `Niri.qml` + `plugins/` + `plugin-patches/`）| 移植覆盖层产物（仓库外，重放用）。**当前：`niri.patch` 33 文件 / 106 hunk / 3098 行**，`--reverse --check` 通过、repatch 幂等，md5 `f6ef5a467795e2bd6f1ccf14161b185e`（2026-10-05 三轮后核 —— menu 那轮 2956→3022 行、弹层那轮 3022→3088 行、bar 顶边高光那轮 3088→3098 行，hunk 数始终 106，见 `docs/visual.md` §8 第 43 条、§8 第 45 条、§8 第 46 条；3088 行 / md5 `423813f5…`、3022 行 / md5 `bcb5aca3…` 为其间的中间版本；再往前 2026-10-04 **合并浮空 bar** 后核，与仓库 `niri-port/niri.patch` 逐字节一致：`shell/plugins/bar/` 进 6 个路径 + 新文件 `LICENSE`/`UPSTREAM.md`，82→105 hunk，见 `docs/plugins.md` §5.4；上一版 27 文件 / 82 hunk、md5 `cdc361f9…` = 同日加 `shell/Ui/KeyboardPanel.qml` 的卡片投影，1 hunk / 18 行，见 `docs/visual.md` §8 第 43 条。上一版 27 文件 / 81 hunk、md5 `3c672ab5…` = 2026-09-30 加 `bin/omarchy-update`（把 CLI `omarchy update` 委派给 `~/bin` 垫片，4 hunk），见 `docs/upstream.md` §8.7；上一版 26 文件 / 77 hunk、md5 `22dd2334…` = 2026-09-27 加 `bin/omarchy-default-agent`、`bin/omarchy-agent` 两条 ante 分支（5 hunk），见 `docs/behavior.md` §8 第 40 条 —— 同轮还新增了两个**仓库外**的 root 动作（paru 开关的 `/usr/bin` 副本 + polkit 规则，见 §5），它们不进补丁；再上一版 24 文件 / 72 hunk、md5 `e6868080…` = 2026-09-26 加 `shell/plugins/panels/power/Panel.qml` 的 **CHARGE LIMIT 档位切换**共 8 个 hunk，同时把 `bin/omarchy-battery-status` 改成 **sysfs 优先**（阈值读数陈旧的真根因）；再上一版 `4ec279cf…` = 2026-09-26 加 `shell/plugins/panels/monitor/Panel.qml` 的**分辨率滑块**；上一版 `ef920a66…` = 2026-09-23 加菜单 `style.avatar.*` 三行，见 `docs/lock.md` §11.29）；上一版重导出是把活体先改、补丁没跟上的两处（`Background.qml` 的 `paintedOnce`、`shell.qml` 的 `pushBootReveal()` 增补）补进补丁 —— 补上之前 repatch 判 exit 2。**`backups/` 已不在这里**（2026-09-21 全部备份搬进 `~/.local/state/backups/`，见 `local-overrides.md` §0.1），安全网是断的。**2026-10-04 起 bar 的改动不再走插件补丁**：浮空 bar 已并进这份 `niri.patch`（`shell/plugins/bar/` 那 6 个文件（4 个改动 + 2 个新文件），33 文件 / 106 hunk / 3022 行、md5 `bcb5aca36ace33d829c6773da7026801`，见 `docs/plugins.md` §5.4）—— bar 不再依赖那个没有自动重放器的插件补丁 |
 | `~/bin/omarchy-sleep-lock-start` (+x) | **合盖/挂起锁屏的启动包装器**（上游 `omarchy-sleep-lock.service` 在本机两条 `ConditionEnvironment=` 都过不去，改由它拉起）：有界等（30s 封顶）会话把环境发布进用户管理器 → 采纳 `WAYLAND_DISPLAY`/`XDG_RUNTIME_DIR`/`XDG_SESSION_TYPE`/`NIRI_SOCKET`/`XDG_CURRENT_DESKTOP`/`DBUS_SESSION_BUS_ADDRESS` → `exec` 上游 `omarchy-system-sleep-monitor`；单元见 `local-config/systemd/user/omarchy-sleep-lock.service`，全过程见 `lock.md` §11.28 |
 | `~/bin/omarchy-hyprland-window-gaps-toggle` (+x) | **窗口缝隙开关垫片**（2026-09-24）：上游靠 `default/hypr/toggles/window-no-gaps.lua` 把 gaps/border/rounding 归零；niri 侧改成写/删 `~/.config/niri/layout-no-gaps.kdl`（`layout.kdl` 尾部 `include optional=true` 读它，include 是位置性的 ⇒ 只覆盖它点名的属性），并按上游语义写同一个 flag 文件；`~/bin/hyprctl` 的 `getoption` 在 flag 在时对 `general:gaps_out`/`decoration:rounding` 返回 0 ⇒ **壳层跟着塌**（`Style.gapsOut`/`cornerRadius`）。规格、坑与实测见 `docs/shims.md` §4；仓库副本 `port-bin/omarchy-hyprland-window-gaps-toggle` |
@@ -216,8 +216,10 @@ niri 语法要点：**不能写 `=`，不能写 `$PATH`**（不会展开），�
 
 ### 5.2 启动 QuickShell（替换 niri 自带的 waybar）
 
+仓库 `niri-config/local/config.kdl` 使用监督进程，别裸启动 quickshell：
+
 ```kdl
-spawn-sh-at-startup "quickshell -n -p /home/<dev-user>/.local/share/omarchy/shell"
+spawn-sh-at-startup "omarchy-launch-shell"
 ```
 
 ### 5.3 Omarchy 绑定（不冲突子集）
@@ -266,7 +268,7 @@ ODS 已确认在 niri 渲染（`omarchy-osd -i volume-high -p 40` + grim 截图�
 
 ### 5.4 niri 平铺/焦点/工作区键位（用户自定义方向键方案）
 
-已移除 niri vim 键（`Mod+H/J/K/L`），改用方向键；`Mod+K`/`Mod+Ctrl+L` 让给 Omarchy：
+已移除 niri vim 键（`Mod+H/J/K/L`），改用方向键；现行锁屏为 `Mod+L`，`Mod+K` 是 Omarchy 键位菜单：
 
 ```kdl
 Mod+Left   { focus-column-left; }            // 向左移动
@@ -547,10 +549,7 @@ false` 让 niri 把焦点环画在窗口**周围**而非背后，问题解决（
    niri validate
    niri msg action reload-config
    ```
-7. 启动 QuickShell（如需手动，设置 `HYPRLAND_INSTANCE_SIGNATURE=1` 以消除只读警告）：
-   ```sh
-   HYPRLAND_INSTANCE_SIGNATURE=1 quickshell -n -p ~/.local/share/omarchy/shell
-   ```
+7. 如需手动启动，使用 `omarchy-launch-shell` 监督；先确认没有现存实例，不要裸启动第二个 quickshell。
 8. A 层（菜单指向 niri 真配置 + Hyprland 层降级）：
    - patch `default/omarchy/omarchy-menu.jsonc`（§8.6）。
    - patch `bin/omarchy-refresh-hyprland` 加 niri no-op 守卫（§8.6）。
@@ -563,7 +562,7 @@ false` 让 niri 把焦点环画在窗口**周围**而非背后，问题解决（
       > ~/.config/omarchy/niri-port/niri.patch`；另 `cp shell/Commons/Niri.qml ~/.config/omarchy/niri-port/`。
     - 写 `~/bin/omarchy-niri-repatch`，建
       `~/.config/omarchy/hooks/post-update.d/10-niri-repatch`。
-    - 每次 `omarchy update` 之后钩子自动重放；若冲突（上游改了同一函数）则手动合并（找 Ante）。
+    - 上游真身执行到 post-update 阶段才会调用钩子；本机四段垫片不调用它，也不更新 checkout。手动跟进上游后须另行重放覆盖层并重启 shell；冲突时手动合并。
 11. bar 部件与主题取色（**用户级，抗更新**）：
     - 拷 `~/.config/omarchy/plugins/{jianlongliu.arch-logo,jianlongliu.workspaces}/`。
       **浮空 bar 不用另装**：它已经在 `$OMARCHY_PATH/shell/plugins/bar/` 里，随 `niri.patch`（第 10 步）重放，
@@ -769,8 +768,7 @@ false` 让 niri 把焦点环画在窗口**周围**而非背后，问题解决（
 - 显示管理器：greetd / dms-greeter（DMS 自家 greeter，`/etc/greetd/config.toml` / `niri/dms.kdl` 归主账户所有）。包管理器 paru。
 - 电源后端：**TLP**（`tlp` + `tlp-pd` 1.10.2，D-Bus `net.hadess.PowerProfiles`），**无** power-profiles-daemon（`powerprofilesctl` 缺失）。
 - 引导：**systemd-boot + Secure Boot，无 Limine**；内核是 stock `linux`（不是上游推的 `linux-omarchy`）。
-- 仓库：`core` / `extra` / `multilib` / `archlinuxcn`——**未配置 Omarchy 自家仓库**（所以 `mise-bin`、
-  签名强制等迁移在此不适用）。
+- 仓库源（本机 `pacman-conf --repo-list` 核对）：`omarchy` / `core` / `extra` / `multilib` / `archlinuxcn` / `tui-tools`；此前未配置 Omarchy 源的结论是历史记录。
 - 快照：**snapper** 已启用（`root` / `home` / `data` / `opencode` 四个配置，`root` 的 `SUBVOLUME="/"`），pacman 事务前后自动打快照（钩子 `05-snap-pac-pre` / `zz-snap-pac-post`）。
 - **特权通道**：`pkexec` 免密可用；`sudo -n` 失败（要密码），`omarchy-pkg-add` 因此非交互不可用。
 - `mise` 来自 Arch `extra`（2026-09-09 装），上游用的是自家仓库的 `mise-bin`。

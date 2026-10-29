@@ -79,15 +79,18 @@ flags map onto that call:
 | `-u` / `--urgency` | hint `urgency` (byte) | `low`/`normal`/`critical`; defaults to `low` |
 | `-t` / `--expire-time` | `expire_timeout` | milliseconds on screen; server default otherwise |
 
-Unknown flags are a hard error, not a silent pass-through: `--exec` is the only
-door to a click command, and there is no generic option pass-through to smuggle
-one through.
+| `-r` / `--replace-id` | `replaces_id` | Numeric notification id to update |
+| `-p` / `--print-id` | return value | Print the returned id |
+| `--action <label> <program> [words…]` | hint `omarchy-actions` | Up to three buttons; card click runs the first action; cannot combine with `--exec` |
+| `--with <args…>` | appended action argv | Consumes the rest of the line and appends these arguments to every action |
+
+After the headline, an unrecognized token in the description position is treated as body text, even if it starts with a dash. Recognized flags in that position are parsed as options instead; unknown tokens in the subsequent option position are errors. Leading recognized options are also parsed before the headline, so a headline matching one of them is not reliably treated as text. Likewise a body matching a recognized flag cannot safely be passed as an ordinary description. `--exec` and `--with` consume all remaining arguments.
 
 The defaults are the point: an unadorned `omarchy-notification-send "Done"`
 is a low-urgency user-action toast that pops through DND and is treated as
 ephemeral noise when silenced.
 
-The click command is deliberately not a libnotify action. An action keeps the
+The click command and buttons are deliberately not libnotify actions. An action keeps the
 sender blocked waiting for `ActionInvoked`, and dies unanswered whenever the
 shell restarts underneath it — the installer toasts restart the shell as their
 first act. Carrying the command as a hint means the shell executes the click
@@ -112,10 +115,7 @@ quoted argument (`"$file"`) stays one argument even with spaces. On the shell
 side they are run through `Util.execArgv`, which invokes `bash -lc 'exec "$@"'`
 with the arguments as **positional parameters** — never interpolated into the
 script text. bash expands `"$@"` without re-tokenizing or re-evaluating it, so a
-value carrying data an attacker controls — a downloaded video's title, a
-received filename, a crashed process's name — is only ever a single argument and
-can never be reparsed as a command. The login shell keeps the PATH and session
-environment that GUI click targets (the screenshot editor, mpv, xdg-open) expect.
+value carrying data an attacker controls remains one argument and is not re-parsed as shell syntax. This does not prevent the target program from interpreting that argument as an option or otherwise acting on its contents: use an option terminator such as `--` where supported, validate data, and avoid passing untrusted data as the executable. The login shell keeps the PATH and session environment that GUI click targets expect.
 
 The critical rule: **the splitting must happen at the call site, not inside the
 tool.** Passing a single quoted string (`--exec "mpv $title"`) and letting the
@@ -132,18 +132,9 @@ as the program (`--exec sh -c …`), but that runs code because the *developer*
 wrote it, not because attacker data became a command — a reviewable red flag
 (greppable as `--exec sh`/`--exec bash`), not an injection. Insulating against a
 native same-user process is out of scope: it already runs with your privileges
-and needs no notification to execute code. What is fully closed is untrusted
-*content* — web notifications can't set the exec hint at all, and any relayed
-title/filename is confined to inert argument data.
+and needs no notification to execute code. Argument boundaries prevent shell re-parsing, not option injection or unsafe behavior in the target program; callers must also handle the sender's recognized-option ambiguity described above.
 
-The sender keeps that last part true structurally rather than leaving it to each
-caller. Because it calls `Notify` directly, the headline and description are
-typed string parameters — a relayed value like `--hint=…` or `-rf` is the
-summary or body, never an option or a hint, and there is no argv/option layer
-(no `notify-send`) left to reinterpret it. `--exec` is the only thing that can
-build the `omarchy-exec-argv` hint. (The leading `--` on the `busctl` call is a
-belt for `busctl`'s own getopt, which would otherwise read a dash-leading value
-as a `busctl` option; the summary/body themselves are never parsed as options.)
+The sender uses typed D-Bus arguments after its own option parsing. That boundary does not eliminate ambiguity at the sender's CLI: `--exec` and `--action` can both build `omarchy-exec-argv`; the latter also builds `omarchy-actions`. The leading `--` protects busctl's own option parsing, not the sender's argument parsing.
 
 ## Helper commands
 

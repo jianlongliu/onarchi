@@ -2,7 +2,7 @@
 
 > **English → [INSTALL.md](INSTALL.md)**
 
-在目标机器上逐条手动执行。这是受支持的路径——`install.sh` 只是便捷包装；下面就是它实际做的事，展开让你能自己做。
+这是供人和 agent 参考的步骤，不保证成功：尚未在其他机器上端到端验证。执行前逐条审阅并按机器调整。可选的 `install.sh` 行为不同：它不放置覆盖层和插件、不安装包、不配置背光或 PAM，也不合并 niri 配置；它安装两个用户单元，repatch 失败只警告。两条路径都可能覆盖已有文件，先备份。
 
 假设：你在 **Arch + niri** 上、以你的用户登录，并且 **Omarchy 已经装在** `~/.local/share/omarchy`（它有自己的安装器）。
 你已经克隆了本仓库到某处；把下面的 `REPO` 设为该路径。
@@ -37,7 +37,7 @@ sudo pacman -S --needed \
 
 ```sh
 mkdir -p ~/bin
-for f in "$REPO"/port-bin/*; do install -m 0755 "$f" ~/bin/; done
+for f in "$REPO"/port-bin/*; do [[ -f $f ]] || continue; install -m 0755 "$f" ~/bin/; done
 ```
 
 这会装上：`hyprctl`（垫片——**关键**，约 50 个 omarchy 脚本会调它）、`omarchy-niri-system`、
@@ -71,16 +71,17 @@ cp ~/.config/niri/config.kdl ~/.local/state/backups/.config/niri/config.kdl.bak 
 
    ```kdl
    environment {
+       XDG_CURRENT_DESKTOP "niri"
        OMARCHY_PATH "/home/you/.local/share/omarchy"
        PATH "/home/you/bin:/home/you/.local/share/omarchy/bin:/home/you/.local/bin:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin"
    }
 
-   spawn-sh-at-startup "quickshell -n -p /home/you/.local/share/omarchy/shell"
+   spawn-sh-at-startup "omarchy-launch-shell"
    ```
 
-   （用你自己的真实路径，别用 `/home/you`。）
+   （用你自己的真实路径，别用 `/home/you`。生成的模板直接启动 `quickshell`；请换成这里的监督启动器，它记录日志并在外壳崩溃后重启。）
 
-2. **在你现有的 `binds { }` 块里** — 粘入 Omarchy 绑定。完整列表在 `~/config/niri/omarchy.kdl`（上面生成的）；重点是这些：
+2. **在你现有的 `binds { }` 块里** — 粘入 Omarchy 绑定。完整列表在 `~/.config/niri/omarchy.kdl`（上面生成的）；重点是这些：
 
    ```kdl
    Mod+Space         hotkey-overlay-title="Omarchy Menu" { spawn-sh "omarchy-menu toggle"; }
@@ -113,6 +114,7 @@ cp "$REPO/niri-config/shell.json" ~/.config/omarchy/shell.json
 "有窗口装饰、无磨砂"：
 
 ```sh
+mkdir -p ~/.config/ghostty
 cp "$REPO/local-config/ghostty/config" ~/.config/ghostty/config      # 先备份你自己的
 mkdir -p ~/.config/systemd/user
 cp "$REPO/local-config/systemd/user/materal-recolor."* ~/.config/systemd/user/
@@ -144,6 +146,19 @@ install -m 0755 "$REPO"/hooks/theme-set.d/*    ~/.config/omarchy/hooks/theme-set
 
 ---
 
+手动路径还需要状态目录；如需 `install.sh` 安装的两个会话单元，可执行以下命令（先备份已有单元和链接）：
+
+```sh
+mkdir -p ~/.local/state/omarchy/toggles/hypr ~/.config/systemd/user/graphical-session.target.wants
+for unit in omarchy-picker-warmup.service omarchy-clamshell-watch.service; do
+  install -m 0644 "$REPO/default/systemd/user/$unit" ~/.config/systemd/user/
+  ln -sfn "$HOME/.config/systemd/user/$unit" "$HOME/.config/systemd/user/graphical-session.target.wants/$unit"
+done
+systemctl --user daemon-reload
+```
+
+链接依赖会话启动 `graphical-session.target`，请在目标机器核实。
+
 ## 6. 把移植覆盖层应用到 Omarchy 安装
 
 把覆盖层放到 repatch 期望的位置，然后应用（幂等）：
@@ -151,16 +166,14 @@ install -m 0755 "$REPO"/hooks/theme-set.d/*    ~/.config/omarchy/hooks/theme-set
 ```sh
 mkdir -p ~/.config/omarchy/niri-port
 cp "$REPO"/niri-port/niri.patch "$REPO"/niri-port/Niri.qml ~/.config/omarchy/niri-port/
-
-cd ~/.local/share/omarchy
-cp ~/.config/omarchy/niri-port/Niri.qml shell/Commons/Niri.qml
-git apply --reverse --check ~/.config/omarchy/niri-port/niri.patch 2>/dev/null \
-  && echo "overlay already applied" \
-  || git apply ~/.config/omarchy/niri-port/niri.patch
+cp -a "$REPO"/niri-port/plugins ~/.config/omarchy/niri-port/
+~/bin/omarchy-niri-repatch
 ```
 
-**重要：** 保持 `~/.local/share/omarchy` 里的文件改动**未提交**。`niri.patch` 覆盖层会在每次 `omarchy update` 后
-重新应用；在那个仓库里提交会弄断更新的快进。任何更新后跑 `~/bin/omarchy-niri-repatch` 来恢复移植。
+repatch 在 `XDG_CURRENT_DESKTOP` 不是 `niri` 或 Omarchy 没有 `.git` 目录时跳过（均返回 0），要检查输出；覆盖层缺失返回 1，补丁冲突返回 2。冲突检查前它已复制 `Niri.qml` 和插件，因此冲突时这些文件也可能已改变，先备份。插件副本包含 `blurwallpaper`；第三方 `plugin-patches/` 独立存放，不自动重放。
+
+**重要：** 保持 `~/.local/share/omarchy` 里的文件改动**未提交**；提交它们可能阻碍上游快进更新。
+上游 post-update 钩子可以重放 `niri.patch`，但移植的 `~/bin/omarchy-update` 不会触发该钩子。更新改变 Omarchy 源码树后应检查结果，必要时手动运行 `~/bin/omarchy-niri-repatch`。
 
 ---
 
@@ -216,11 +229,13 @@ omarchy-shell lock status | grep passwordPam             # 期望 "passwordPam":
 注销再登录——`spawn-sh-at-startup` 会拉起 QuickShell 外壳。然后检查：
 
 ```sh
-niri msg layers                       # 有没有 omarchy-background + omarchy-bar ？
-niri msg action spawn -- omarchy-menu toggle   # 菜单能开吗？
-~/bin/omarchy-niri-system <arg-bogus> # 应输出用法并返回 exit 2
-niri msg action spawn -- omarchy-system-logout   # （结束会话；确认就绪后再做）
+niri msg layers                       # 检查 Omarchy 图层
+omarchy-shell shell ping              # 外壳 IPC 有响应吗？
+omarchy-menu toggle                   # 菜单能开吗？
+~/bin/omarchy-niri-system bogus       # 输出用法并返回 2
 ```
+
+系统动作接线需要另行检查：当前 `bin/omarchy-system` 没有调用 `omarchy-niri-system`。核实已安装的入口并做好准备前，不要测试注销、重启或关机。
 
 bar 应渲染出工作区/时钟/键盘布局；`Mod+Space` 打开菜单；媒体键显示 OSD；Power 菜单显示 注销 / 重启 / 关机。
 

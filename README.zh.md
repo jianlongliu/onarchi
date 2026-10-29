@@ -5,6 +5,8 @@
 把 [basecamp/omarchy](https://github.com/basecamp/omarchy)（`quattro` / `4.0.0.alpha`）从 Hyprland 移植到
 [niri](https://github.com/YaLTeR/niri) Wayland 合成器上。
 
+这是供人和 agent 参考的安装资料，不保证安装成功；尚未在其他机器上端到端验证，执行前请逐步审阅并按机器调整。
+
 本仓库包含移植后的 Omarchy 源码，以及让它能在 niri 上跑起来的"胶水"。它**不是独立的安装器**——假设你已经有一个
 Arch + niri 登录会话、并且**已经装好 Omarchy**（或者你会先装 Omarchy）。它给你的是：
 
@@ -133,10 +135,9 @@ onarchi/
 ## 安装
 
 手动、逐条执行的步骤在 **`docs/INSTALL.zh.md`**（依赖、`~/bin` 胶水、config.kdl 合并、覆盖层、背光、每机检查）。
-这是受支持的路径。
+这是手动参考路径，尚未在其他机器上端到端验证。
 
-另外有个可选的 `install.sh` 引导脚本，会放下同样的文件，但它**不会**改写已存在的 `config.kdl`，也不会自动装包或
-修背光权限——要稳妥请按 `docs/INSTALL.zh.md` 走。
+可选的 `install.sh` 不会放置覆盖层和插件、改写已有 `config.kdl`、装包或修背光权限。它可能覆盖已有文件，repatch 失败也只警告；运行前请读 `docs/INSTALL.zh.md`。
 
 简版：
 
@@ -147,7 +148,7 @@ cd onarchi
 ./install.sh            # 可选；或按 docs/INSTALL.zh.md 逐步来
 ```
 
-然后注销再登录——`spawn-sh-at-startup` 会拉起 QuickShell 外壳。
+然后按指南合并配置：模板直接启动 Quickshell，推荐改用有监督的 `omarchy-launch-shell`。完成配置后注销再登录。
 
 ## 每机调整（必须检查）
 
@@ -166,8 +167,7 @@ cd onarchi
 ## 上游同步状态
 
 本移植当前跟到上游 `quattro` 的 **`bc220e70`**（2026-10-27）—— 2026-10-28 从 `60663faf` 快进，
-共 846 个提交。覆盖层 **33 文件 / 120 hunk / 2791 行**，md5 `bf04bf1432482a1df2f19d828f99e315`，
-双向可验（纯净 `HEAD` 上 `git apply --check`、本机树上 `git apply --reverse --check`）。
+共 846 个提交。当前 `niri.patch` 为 **39 文件 / 3385 行**，md5 `63856901c5d4bce08d14f36e5ce4fd24`（未跟踪的覆盖层文件另计）。
 
 上游**仍然没有 niri 支持**：`bc220e70` 上 `grep -ri niri shell/ bin/` 零命中，而 Hyprland 耦合反而
 加重（19 文件 54 处 → 26 文件 118 处）。下面每一条都是这个前提的产物。
@@ -179,7 +179,7 @@ cd onarchi
 | 浮动 bar（间隙、圆角、霜化） | 接进上游新的 `barStrip`；`exclusiveZone` 现在算上 `floatGap`，窗口与条带之间不再多出一圈死桌面 |
 | 显示器分辨率档位滑块 | 完全本地，上游没有对应物；合并零丢失（235 行） |
 | 电池充电阈值（sysfs 优先） | 保留，并吸收上游改进：电池路径由 UPower 解析，不再用 `BAT*` 通配 |
-| `Niri.qml` 合成器垫片 | 186 → 358 行：`monitors`、`monitorFor`、`toplevels`、`refresh*`、`dispatch` |
+| `Niri.qml` 合成器垫片 | 当前 364 行：`monitors`、`monitorFor`、`toplevels`、`refresh*`、`dispatch` |
 | `OverlayWindow.qml` | 上游新增文件，所有 overlay 面板（菜单、OSD、剪贴板、图片选择器）都经过它。它读 `Hyprland.monitors`，在 niri 上恒为空 ⇒ `contentReady` 永远为假 ⇒ **每个面板都以 opacity 0 渲染**。已改指 `Niri` |
 | 通知霜化 | 上游把通知表面改窄并丢了客户端区域，layer 规则只剩 `xray` ⇒ 完全无霜化。恢复为客户端 `Region` + 规则里 `blur true` |
 | Apps 网格霜化 | 上游新增的 `omarchy.dock` 网格铺满屏幕、在 Hyprland 上靠 `ignore_alpha`。补了客户端区域 + `omarchy-dock-apps` 的 layer 规则 |
@@ -194,7 +194,7 @@ cd onarchi
 | 霜化之外的 bar 装饰（投影、顶边高光、强制 12px 圆角） | 被上游自己的 bar 设计取代。接受覆盖 |
 | OSD 的卡片化表面 | 上游把 OSD 迁到 `OverlayWindow`，而后者要求全屏表面；卡片化版本渲染出来是空白 |
 | 经 `popupColumn` 的通知霜化 | 该元素上游已不存在，表面现在是窄条带 |
-| `omarchy-system-{logout,reboot,shutdown}` | 上游合并成一个 `omarchy-system`；四行 niri 守卫已移过去 |
+| `omarchy-system` | 上游使用统一入口；当前 `bin/omarchy-system` 未转发到 `omarchy-niri-system`，在 niri 使用系统动作前须检查接线 |
 | `omasnap`、`monologue`、`hype`、`signed` | 四个都要 **Qt 6.12**，本机钉在 6.11（见下）。`omasnap` 还硬依赖 `hyprland`。同批只有 `disktree-bin` 能跑 |
 
 ### Qt 钉在 6.11.2

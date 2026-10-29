@@ -28,7 +28,7 @@
 | 6 | **浮动工具窗底色提亮**（`Ctrl+Shift+Esc` / `Mod+Y` / `Mod+E` 太黑） | 三选一：① 全局 —— `~/.config/ghostty/config` 在 include 之后写一行 `background`（取主题亮档 `#282a2f`，**连 Mod+Return 一起变亮**）+ nautilus 跟主题的 `~/.config/gtk-4.0/gtk.css`；② 只这两个键 —— 加 `XDG_CONFIG_HOME` 垫片指到另一份 ghostty 配置（btop 子进程会继承该变量）；③ 不动 | 漏项已补：三键 + nautilus 都补了 `opacity`（2026-09-25）。**alpha 实测对浮动窗只有 2–3/255 的效果**，主因是底色；机制与全套实测数据见 `docs/visual.md` §8.8 第 37 条（用户 2026-09-25「晚上看看文档」） |
 
 | 7 | **把三条自定义时序塞进注入 EDID**（让它们成为内核原生模式，少依赖自定义 modeline） | 改 `/usr/lib/firmware/edid/CSO1411.bin`（先备份）→ `pkexec mkinitcpio -P` → 重启；试件已备好（`~/.local/state/omarchy/edid-trial/trial-2.bin` = 合法重排 + 三条 CTA DTD，本地校验通过） | 起因：用户以为"四档分辨率就在注入件里"，2026-09-26 复核**不成立**（件里只有 DTD1 4K + 一条被内核丢弃的 DTD2）。**收益有限** —— 档位靠 modeline 注入已经能上屏；且 EDID 是承重墙、验证必须走重启。`debugfs edid_override` 热验**不通**（eDP 不重探测，试完）。见 `local-overrides.md` §5 第 16 条 |
-| 8 | **跟进 Omasnap 截图**（上游已用它取代 satty + tensaku：`omarchy-capture-screenshot` 重写成它的壳，参数从 `smart\|region\|windows\|fullscreen [slurp\|copy\|save] [--editor=]` 变成 `… \|scroll [copy\|save]`，`--editor=` 取消） | 上游这份来自 `omarchy-pkgs` 的 `omasnap` 包（本机没配那个仓库）；AUR 有 `omasnap-bin 1.21.0`，但**硬依赖 `hyprland`** 与 `layer-shell-qt`（本机两个都没装） | 2026-09-27 拍板**暂不跟进**（依赖太重、且"for Omarchy and Hyprland"在 niri 上未验证）。真跟进时要动：`bin/omarchy-capture-screenshot`、`config/imv/config`、`install/omarchy-base.packages`、`migrations/1788129995.sh`、`manual/12-screenshots-recording.md`；同批上游也改了 `default/hypr/apps/screenshot-selection.lua`（Hyprland 专有，本机不用） |
+| 8 | **跟进 Omasnap 截图**（上游已用它取代 satty + tensaku） | 官方 Omarchy 源已配置；此前实测的 `omasnap` 依赖 `hyprland`，且受 Qt 6.12 符号限制 | 2026-09-27 拍板暂不跟进；2026-10-28 的依赖与安装结果见 `local-overrides.md` §8.1。niri 上仍需端到端验证。 |
 | 9 | **要不要真启用上游的"临时免密 sudo"**（`omarchy-sudo-passwordless [MINUTES]`，默认 15、上限 1440：往 `/etc/sudoers.d/99-omarchy-nopasswd-<uid>` 发布一条带 `NOTAFTER` 截止的规则，配 `systemd-run` 日历定时器到期自撤） | 启用需三样 **root 拥有、路径链不可被普通用户写** 的东西：`/etc/tmpfiles.d/omarchy-nopasswd-sudo.conf`（开机清残留授权）、`/usr/share/libalpm/hooks/05-omarchy-passwordless-revoke.hook`（内容要逐字节等于模板）、**真实文件**（非符号链接）`/usr/bin/omarchy-sudo-passwordless` | 代码 2026-09-27 已随上游合入工作树（见 `docs/upstream.md` §8.20），**机制未启用**。dev-link 形态与上游三条前提正面冲突（`omarchy_security_require_source_root` 只认 `$OMARCHY_PATH/bin/<cmd>` 或 `/usr/share/omarchy` + `/usr/bin/<cmd>`；`verify_root_path` 拒绝符号链接、逐级查 root 属主）。**别为了绕过而在用户可写路径放入口再配 pkexec 免密**：那等于把"无密码 root"送给任何能写该目录的进程 |
 
 ## 低优先垫片
@@ -45,7 +45,7 @@
 |---|---|---|---|
 | 10 | **验证 `GDK_SCALE` 是否修好 GTK 应用的 DPI** | 已写入 `~/.config/niri/config.kdl` 的 `environment {}`：`GDK_SCALE "2"`。**必须重启会话**（reload 不生效） | 判据：nautilus 的字体与控件尺寸应与 bar 的 `base-size 14` 视觉一致。**不要加 `GDK_DPI_SCALE`**，会二次放大。若无效，下一步查 GTK4 是否走 `gdctl`/portal 而非环境变量 |
 | 11 | **WPS 的剪贴板与 DPI** | 待定：给 WPS 强制 `QT_QPA_PLATFORM=wayland`，或维持 XWayland 另找缩放办法 | 现状：`app_id: wpsoffice`（XWayland），未设 `QT_QPA_PLATFORM`，`Xft.dpi` 是 192 与输出 2.0 一致，但 WPS 是否认它未测。剪贴板问题大概率出在 XWayland 中转 |
-| 12 | **91 条迁移的分类处置** | 见 `docs/upstream.md` §8.23 的账 | 33 条要 root 且机型专属（N1x / ASUS / aarch64 / Limine）——本机 x86 用不上，建议整批标已跑；42 条动 Hyprland 或 uwsm，同理。已跑 6 条面向用户的 |
+| 12 | **迁移逐条分类处置** | 见 `docs/port-merge-status.md` 的迁移对账 | 不按 root、机型或 Hyprland/uwsm 分类整批标记：类别有交叉，每条须核对脚本及本机状态，记录执行、跳过或待决的理由；旧记录的六条执行证据与标记也须对账。 |
 | 13 | **`omarchy-nvim` / `omarchy-power-profiles-daemon` 的替换风险** | 加 `[omarchy]` 源后，这两个会覆盖 Arch 同名包 | 目前两个都没装 ⇒ 无影响。将来若装 `neovim` 要留意会被换成 omarchy 构建 |
 | 14 | **等 Qt 6.12 修好再回头拿那四个工具** | `omasnap` / `monologue` / `hype` / `signed` | 全部硬依赖 Qt 6.12；`omasnap` 还要 `hyprland`。上游 `b83d3df08` 只修了 palette 语法，没有 `MultiEffect` 修复 ⇒ 解钉前先实测 6.12 的模糊是否仍失效 |
 

@@ -272,14 +272,13 @@
       ⇒ **造出来的启动器点了没反应**。⚠ 同一根因还挂着 **Learn 里 5 条**（`learn.omarchy/hyprland/arch/neovim/bash` 全是
       `omarchy-launch-webapp`）。唯一修法：把默认浏览器设成 `google-chrome.desktop`（Chrome 已装）⇒ 一处修活 6+ 条。
       本轮按用户决定**只记档：不动浏览器默认值，也不屏蔽 Learn**。
-    - `install.preinstalls`：本机没装 omarchy 包、没配 Omarchy 仓库（`/etc/pacman.conf` 只有 core/extra/multilib/archlinuxcn）
+    - `install.preinstalls`（2026-09-22 当时）：本机没装 omarchy 包、没配 Omarchy 仓库（该源后来已加入，见 `local-overrides.md` §8.1）
       ⇒ 包表里的 `aether`/`cliamp`/`omacut`/`omacalc`/`omawrite` **任何仓库都查不到** ⇒ `omarchy-pkg-add` 整笔事务失败、
       脚本 exit 1（"Preinstalls are still marked as removed"）。另注：它本来也**显示成置灰 ✓（像已装）**——`disabled`
       守卫是 `[[ ! -f ~/.local/state/omarchy/preinstalls-removed ]]`，本机没这个 marker ⇒ 守卫成立。
     - `update.channel`：**最危险的一条**。`stable|rc|edge` 走 `omarchy-refresh-pacman <channel>` + `omarchy-update-pacman -S … omarchy{,-settings}`
       ⇒ **把 Omarchy 自家仓库写进 pacman 配置**；`dev` 更狠 —— `git clone github.com/omacom/omarchy ~/omarchy` + `omarchy-dev-link`
-      （写 `/etc/omarchy.conf`、**改 `OMARCHY_PATH`**）+ 标 reboot-required。本机 `~/bin/omarchy-update` 垫片的注释早写明
-      "本机没装 omarchy 包、没配 Omarchy 自家仓库，上游流程会卡在 omarchy-update-keyring"。另注 `omarchy-channel-current`
+      （写 `/etc/omarchy.conf`、**改 `OMARCHY_PATH`**）+ 标 reboot-required。本机垫片的旧注释称未配 Omarchy 源；该源后来已加入，见 `local-overrides.md` §8.1。另注 `omarchy-channel-current`
       在本机报 `dev` ⇒ Dev 那行一直挂着个毫无意义的 ✓。
     - `update.config.plymouth`：`omarchy-refresh-plymouth` → `omarchy-plymouth-set --refresh-default`，同 `style.unlock` 那套
       root 事务（且 `/usr/share/plymouth/themes/omarchy` 根本不存在）⇒ 必拒。
@@ -329,9 +328,7 @@
       **`iconFont` 显式清空**。清它是有原因的：`mergeMenuSources` 是**逐字段覆盖**，不清就继续拿默认项的
       `iconFont:"omarchy"` 去渲染这枚普通 Nerd Font 字形；置空后 `Menu.qml` 的
       `font.family: row.iconFont.length > 0 ? row.iconFont : root.fontFamily` 回落到菜单字体。
-      **动作保持原样**（`omarchy-launch-floating-terminal-with-presentation omarchy-update`）⇒ 裸调 `omarchy-update`
-      落到 `~/bin/omarchy-update` 垫片 = 裸 `sudo pacman -Syu`（**2026-09-27 起脚本自己不打任何字**：原先那行绿色中文横幅与末尾那行黄色 AUR 提醒都已删，用户要求更新终端保持干净；AUR 更新走菜单里独立的 AUR Packages 入口），与 bar 的 `system-update` 部件同一条路。
-      想更直白就是把 action 换成 `'sudo pacman -Syu'`。
+      **动作保持原样**（`omarchy-launch-floating-terminal-with-presentation omarchy-update`）。2026-09-27 时垫片仅运行 `sudo pacman -Syu`；现行仓库 `port-bin/omarchy-update` 已改为四段：系统包、AUR、插件、mise，详见 `local-overrides.md` §8 第 19 项。
     - `update.aur`：`omarchy-launch-floating-terminal-with-presentation 'paru -Sua'`（本机 paru v2.1.0 在位；
       AUR 另有 `~/bin/yay` 垫片，此处按用户要求用 paru）。
     - `update.plugins`：`omarchy-launch-floating-terminal-with-presentation 'omarchy plugin update'`（= `bin/omarchy-plugin-update`）。
@@ -994,7 +991,7 @@ Omarchy 有两层配置，只有层1在 niri 上真正生效：
 ### C. 环境不成立（用户明确**不算**移植缺口）
 
 `style.unlock`（本机无 LUKS）、`install.webapp` / `install.preinstalls`（没装 chromium）、
-`update.channel`（没配 Omarchy 仓库）、`update.password.drive`（无 LUKS 加密盘）。
+`update.channel`（当时没配 Omarchy 仓库，现已加入；仍须评估切换风险）、`update.password.drive`（无 LUKS 加密盘）。
 这 5 条都在用户 override 里 `when:"false"` 隐藏，属"机器没有这个能力"，不是移植欠账。
 
 ### D. 本轮关掉的项（2026-09-24）

@@ -43,7 +43,7 @@
 
 ### 8.18 锁屏"不能锁"：PAM 门禁（手工部署漏了安装器步骤）（2026-09-19）
 
-**症状**：`Mod+Ctrl+L`（以及菜单里的锁屏）毫无反应——不黑屏、不出锁屏界面、没有报错弹窗。
+**症状（当时键位；现行仓库绑定是 `Mod+L`）**：`Mod+Ctrl+L`（以及菜单里的锁屏）毫无反应——不黑屏、不出锁屏界面、没有报错弹窗。
 
 **依赖链（实测）**：锁屏要能工作，系统里必须存在 **`/etc/pam.d/omarchy-lock-password`**。
 stock 的 `shell/plugins/lock/Service.qml` 用 `FileView { path: "/etc/pam.d/omarchy-lock-password";
@@ -642,7 +642,7 @@ Omarchy 的锁层从 `hyprctl -j monitors` 读两个字段，shim 之前都在�
 - 线上标志：`tr '\0' '\n' < /proc/<engine_pid>/environ | grep '^QS_'` 三个都 `=1`；`ls -l /proc/<supervisor_pid>/fd/9` 指向锁文件（引擎不继承它）。
 - 让线上生效（不重启整机）：`niri msg action spawn-sh -- omarchy-launch-shell` 后再 `kill -TERM <旧 supervisor pid>`（新 supervisor 会拿锁、等旧引擎死、接管）。
 
-**回退**：备份 `~/.local/state/backups/.local/share/omarchy/bin/omarchy-launch-shell.bak-20260930`（测试件同理 `…/test/shell.d/launch-shell-test.sh.bak-20260930`）。**注意**：`~/.local/share/omarchy` 是上游 checkout，`omarchy update` 会覆盖这个文件 ⇒ 要长期保留得并进 `niri-port/niri.patch`（该 patch 现已含 12 个 `bin/` 文件，此文件**不在其中**）。
+**回退**：备份 `~/.local/state/backups/.local/share/omarchy/bin/omarchy-launch-shell.bak-20260930`（测试件同理 `…/test/shell.d/launch-shell-test.sh.bak-20260930`）。当时补丁尚未入覆盖层；现仓库 `niri-port/niri.patch` 已包含 `bin/omarchy-launch-shell`，后续重放会恢复补丁。
 
 **未做（留给上游/待发话）**：给 stranded-lock 恢复加"这个 output 是否已有 lock surface"的防重守卫（本机 fork `~/.config/omarchy/plugins/jianlongliu.split-lock/Service.qml`，上游 `shell/plugins/lock/Service.qml`）—— 本轮从源头消掉了"两条引擎"，故只作为纵深防御记在此处。
 
