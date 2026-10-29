@@ -11,6 +11,11 @@ mkdir -p "$mock_bin"
 export PATH="$mock_bin:$PATH" CALL_LOG="$call_log" OMARCHY_PATH="$ROOT"
 export HYPRLAND_INSTANCE_SIGNATURE="test-session"
 export EXPECTED_PATH="$PATH" EXPECTED_OMARCHY_PATH="$OMARCHY_PATH"
+# Pin the desktop instead of inheriting it. On a niri machine the logout
+# branch asks the compositor to quit, so an unpinned run would end the very
+# session running the suite. `niri` is mocked for the same reason: the mock
+# has to shadow the real binary on PATH, never the other way round.
+export XDG_CURRENT_DESKTOP=Hyprland
 
 cat >"$mock_bin/systemd-run" <<'SH'
 #!/bin/bash
@@ -40,7 +45,7 @@ trap 'rm -f "$CALL_LOG.inhibited"' EXIT
 "$@"
 SH
 
-for command in uwsm omarchy-state omarchy-hyprland-window-close-all omarchy-osd omarchy-notification-send sleep timeout systemctl; do
+for command in uwsm niri omarchy-state omarchy-hyprland-window-close-all omarchy-osd omarchy-notification-send sleep timeout systemctl; do
   cat >"$mock_bin/$command" <<'SH'
 #!/bin/bash
 
@@ -75,6 +80,15 @@ case $command in
     touch "$CALL_LOG.poweroff"
     [[ ${FAIL_POWEROFF:-false} != "true" && ${FAIL_EXIT:-false} != "true" ]]
     ;;
+  niri)
+    # Asking the compositor to quit is what actually ends a niri session, so the
+    # arguments are the contract: a bare `quit` stops at niri's own
+    # "Press Enter to confirm" prompt, which a menu logout cannot answer.
+    [[ -f $CALL_LOG.grace ]] || exit 2
+    [[ $* == "msg action quit --skip-confirmation" ]] || exit 3
+    touch "$CALL_LOG.poweroff"
+    [[ ${FAIL_EXIT:-false} != "true" ]]
+    ;;
 esac
 SH
 done
@@ -97,6 +111,7 @@ for action in reboot logout; do
   [[ -f $CALL_LOG.environment ]] || fail "$action forwards the caller environment over stale manager values"
   grep -q '^timeout 2s omarchy-hyprland-window-close-all --wait$' "$CALL_LOG" || fail "$action waits for application exit with a deadline"
   ! grep -q '^sleep ' "$CALL_LOG" || fail "$action has no fixed sleep"
+  ! grep -q '^niri ' "$CALL_LOG" || fail "$action keeps uwsm on a Hyprland desktop"
   rm -f "$CALL_LOG.grace"
   BLOCK_WINDOW_CLOSE=true bash "$CALL_LOG.worker" || fail "$action proceeds after the close deadline"
   ! grep -q '^omarchy-notification-send ' "$CALL_LOG" || fail "$action does not report a close timeout as failure"
@@ -107,6 +122,26 @@ for action in reboot logout; do
   grep -q "^omarchy-notification-send -u critical ${action^} failed " "$CALL_LOG" || fail "$action reports a rejected exit request"
   pass "$action waits outside the launching terminal without a fixed delay"
 done
+
+# niri has no uwsm, so the logout branch asks the compositor to quit instead.
+# The desktop is switched for the whole call, preparation and worker alike:
+# the branch is chosen where the action is parsed, not where it is executed.
+export XDG_CURRENT_DESKTOP=niri
+run_power_command logout || fail "niri logout service is scheduled"
+grep -q -- '--setenv=NIRI_SOCKET' "$CALL_LOG" || fail "niri logout forwards the compositor socket"
+grep -q -- '--setenv=XDG_CURRENT_DESKTOP' "$CALL_LOG" || fail "niri logout forwards the desktop name to the worker"
+bash "$CALL_LOG.worker" || fail "niri logout worker succeeds"
+grep -q '^niri msg action quit --skip-confirmation$' "$CALL_LOG" || fail "niri logout asks the compositor to quit without its confirmation prompt"
+! grep -q '^uwsm ' "$CALL_LOG" || fail "niri logout never falls back to uwsm"
+grep -q '^timeout 2s omarchy-hyprland-window-close-all --wait$' "$CALL_LOG" || fail "niri logout still closes applications first"
+! grep -q '^omarchy-notification-send ' "$CALL_LOG" || fail "successful niri logout sends no failure notification"
+rm -f "$CALL_LOG.grace"
+if FAIL_EXIT=true bash "$CALL_LOG.worker"; then
+  fail "niri logout propagates a refused quit"
+fi
+grep -q '^omarchy-notification-send -u critical Logout failed ' "$CALL_LOG" || fail "niri logout reports a refused quit"
+pass "niri logout quits the compositor without the confirmation prompt"
+export XDG_CURRENT_DESKTOP=Hyprland
 
 run_power_command shutdown || fail "shutdown service is scheduled"
 grep -q '^systemd-run --user --collect --quiet --property=Type=exec --property=RuntimeMaxSec=30s .* shutdown --execute$' "$CALL_LOG" || fail "shutdown uses a bounded service outside the launching terminal"
