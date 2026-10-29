@@ -929,7 +929,7 @@ Panel {
 
               PanelSectionHeader {
                 id: resolutionHeader
-                text: "RESOLUTION"
+                text: Commons.I18n.t("monitor.resolution")
                 foreground: root.bar.foreground
                 fontFamily: root.bar.fontFamily
                 anchors.left: parent.left

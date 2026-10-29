@@ -13,12 +13,12 @@ presentation_script="omarchy-show-logo; $cmd; code=\$?; if (( code != 130 )); th
 
 # Hyprland/uwsm session: uwsm-app + xdg-terminal-exec. niri has neither, so
 # fall back to a Wayland terminal (ghostty, matching niri's Mod+Return bind).
-if command -v uwsm-app >/dev/null 2>&1 && command -v xdg-terminal-exec >/dev/null 2>&1; then
+if omarchy-cmd-present uwsm-app xdg-terminal-exec; then
   exec setsid uwsm-app -- xdg-terminal-exec --app-id=org.omarchy.terminal --title=Omarchy -e bash -c "$presentation_script"
 fi
 
 for term in ghostty kitty alacritty foot; do
-  if command -v "$term" >/dev/null 2>&1; then
+  if omarchy-cmd-present "$term"; then
     exec setsid "$term" -e bash -c "$presentation_script"
   fi
 done

@@ -447,6 +447,15 @@
   "trigger.tests.disk-speedtest": {
     "label": "Disk Speed Test"
   },
+  "style.avatar": {
+    "label": "Avatar"
+  },
+  "style.avatar.image": {
+    "label": "Set From Image"
+  },
+  "style.avatar.default": {
+    "label": "Restore Default"
+  },
   "setup.monitors": {
     "label": "Monitors"
   },
@@ -510,6 +519,12 @@
   },
   "setup.default.agent.commandcode": {
     "label": "Command Code"
+  },
+  "setup.default.agent.ante": {
+    "label": "Ante"
+  },
+  "setup.default.agent.antex": {
+    "label": "Antex"
   },
   "setup.default.agent.copilot": {
     "label": "Copilot"
@@ -693,7 +708,7 @@
     "label": "Git"
   },
   "setup.config.hyprland": {
-    "label": "Hyprland"
+    "label": "Niri"
   },
   "setup.config.hyprsunset": {
     "label": "Hyprsunset"
@@ -1254,7 +1269,7 @@
     "label": "Shell"
   },
   "update.config.hyprland": {
-    "label": "Hyprland"
+    "label": "Niri Theme"
   },
   "update.config.hyprsunset": {
     "label": "Hyprsunset"

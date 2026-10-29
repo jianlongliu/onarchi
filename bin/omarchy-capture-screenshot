@@ -68,9 +68,14 @@ case "$PROCESSING" in
 
     # Best-effort: the screenshot is already saved and on the clipboard, so a
     # notification outage must not report the capture itself as failed.
-    omarchy-notification-send "Screenshot saved to clipboard and file" "Edit with Super + Alt + , (or click this)" \
+    #
+    # Omasnap is not used on niri, so the buttons are plain: Edit launches the
+    # editor, Open hands the file to the desktop's default handler.
+    omarchy-notification-send "$(omarchy-i18n capture.screenshotSavedCopied)" \
       --image "$FILEPATH" \
-      --exec "$SCREENSHOT_EDITOR" --filename "$FILEPATH" || true
+      --action "$(omarchy-i18n capture.screenshotEdit)" "$SCREENSHOT_EDITOR" \
+      --action "$(omarchy-i18n capture.screenshotOpen)" xdg-open \
+      --with "$FILEPATH" || true
     ;;
   copy)
     grim -g "$SELECTION" - | wl-copy --type image/png
@@ -78,5 +83,10 @@ case "$PROCESSING" in
   save)
     grim -g "$SELECTION" "$FILEPATH" || exit 1
     echo "$FILEPATH"
+    omarchy-notification-send "$(omarchy-i18n capture.screenshotSaved)" \
+      --image "$FILEPATH" \
+      --action "$(omarchy-i18n capture.screenshotEdit)" "$SCREENSHOT_EDITOR" \
+      --action "$(omarchy-i18n capture.screenshotOpen)" xdg-open \
+      --with "$FILEPATH" || true
     ;;
 esac

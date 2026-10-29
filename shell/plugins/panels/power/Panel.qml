@@ -596,7 +596,7 @@ Panel {
 
             PanelSectionHeader {
               id: chargeHeader
-              text: "CHARGE LIMIT"
+              text: Commons.I18n.t("power.chargeLimitHeader")
               foreground: root.bar.foreground
               fontFamily: root.bar.fontFamily
               anchors.left: parent.left
