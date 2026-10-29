@@ -421,310 +421,6 @@ index 000000000..a0fe51853
 +
 +if __name__ == "__main__":
 +  raise SystemExit(main())
-diff --git a/bin/omarchy-default-agent b/bin/omarchy-default-agent
-index 69d4c2291..95123785c 100755
---- a/bin/omarchy-default-agent
-+++ b/bin/omarchy-default-agent
-@@ -1,7 +1,7 @@
- #!/bin/bash
- 
- # omarchy:summary=Set and launch the default coding agent
--# omarchy:args=[pi|omp|opencode|ori|claude|codex|grok|openclaw|agy|hermes|copilot|crush|cursor-agent|muse|kimi|qwen|dsh|mcode|kiro-cli|freebuff|kilo|devin|amp|commandcode]
-+# omarchy:args=[pi|omp|opencode|ori|claude|codex|grok|openclaw|agy|hermes|copilot|crush|cursor-agent|muse|kimi|qwen|dsh|mcode|kiro-cli|freebuff|kilo|devin|amp|commandcode|ante|antex]
- # omarchy:examples=omarchy default agent | omarchy default agent codex | omarchy default agent claude
- 
- installing=false
-@@ -25,6 +25,8 @@ fi
- 
- case "$1" in
- pi) agent="pi"; name="Pi" ;;
-+ante) agent="ante"; name="Ante"; agent_self_managed=true ;;
-+antex) agent="antex"; name="Antex"; agent_self_managed=true ;;
- omp | oh-my-pi) agent="omp"; name="Oh My Pi"; agent_package="oh-my-pi" ;;
- opencode | open-code) agent="opencode"; name="OpenCode" ;;
- ori | openrouter) agent="ori"; name="Ori"; agent_package="ori" ;;
-@@ -65,7 +67,7 @@ devin | devin-cli)
- amp | ampcode) agent="amp"; name="Amp" ;;
- commandcode | command-code | cmdc) agent="commandcode"; name="Command Code"; agent_package="npm:command-code" ;;
- *)
--  echo "Usage: omarchy-default-agent <pi|omp|opencode|ori|claude|codex|grok|openclaw|agy|hermes|copilot|crush|cursor-agent|muse|kimi|qwen|dsh|mcode|kiro-cli|freebuff|kilo|devin|amp|commandcode>"
-+  echo "Usage: omarchy-default-agent <pi|omp|opencode|ori|claude|codex|grok|openclaw|agy|hermes|copilot|crush|cursor-agent|muse|kimi|qwen|dsh|mcode|kiro-cli|freebuff|kilo|devin|amp|commandcode|ante>"
-   exit 1
-   ;;
- esac
-@@ -88,6 +90,12 @@ if [[ -n ${agent_installer:-} ]]; then
-   # minutes-long install inside the menu action instead.
-   agent_present() { "$agent_installer" --check; }
-   agent_install() { "$agent_installer" --now; }
-+elif [[ -n ${agent_self_managed:-} ]]; then
-+  # Ante ships its own launcher (nothing mise-shaped to point at) and updates
-+  # itself with `ante update`, so presence is just the command being on PATH
-+  # and there is nothing to install. See behavior.md §8 第 40 条.
-+  agent_present() { omarchy-cmd-present "$agent"; }
-+  agent_install() { agent_present; }
- else
-   # omarchy-mise-install's wrappers run `mise use` and `mise x`, current ones on
-   # lines of their own and older ones after an inline variable; either way
-diff --git a/default/omarchy/omarchy-menu.jsonc b/default/omarchy/omarchy-menu.jsonc
-index da07a04..8f762b8 100644
---- a/default/omarchy/omarchy-menu.jsonc
-+++ b/default/omarchy/omarchy-menu.jsonc
-@@ -178,10 +178,14 @@
-   "trigger.tests.network-speedtest": {"icon":"󰓅","label":"Network Speed Test","action":"omarchy-shell shell summon omarchy.speedtest"},
-   "trigger.tests.disk-speedtest": {"icon":"󰋊","label":"Disk Speed Test","action":"omarchy-shell shell summon omarchy.disk-speedtest"},
- 
-+  "style.avatar": {"icon":"󰀉","label":"Avatar"},
-+  "style.avatar.image": {"icon":"","label":"Set From Image","action":"omarchy-avatar pick"},
-+  "style.avatar.default": {"icon":"","label":"Restore Default","action":"omarchy-avatar default"},
-+
-   // Setup
--  "setup.monitors": {"icon":"󰍹","label":"Monitors","action":"omarchy-launch-config-editor \"$HOME/.config/hypr/monitors.lua\""},
--  "setup.keybindings": {"icon":"","label":"Keybindings","when":"[[ -f ~/.config/hypr/bindings.lua ]]","action":"omarchy-launch-config-editor \"$HOME/.config/hypr/bindings.lua\""},
--  "setup.input": {"icon":"","label":"Input","when":"[[ -f ~/.config/hypr/input.lua ]]","action":"omarchy-launch-config-editor \"$HOME/.config/hypr/input.lua\""},
-+  "setup.monitors": {"icon":"󰍹","label":"Monitors","action":"omarchy-launch-config-editor \"$HOME/.config/niri/monitor.kdl\""},
-+  "setup.keybindings": {"icon":"","label":"Keybindings","action":"omarchy-launch-config-editor \"$HOME/.config/niri/binds.kdl\""},
-+  "setup.input": {"icon":"","label":"Input","action":"omarchy-launch-config-editor \"$HOME/.config/niri/input.kdl\""},
-   "setup.typing": {"icon":"","label":"Typing"},
-   "setup.typing.keyboard": {"icon":"","label":"Keyboard Layouts","action":"omarchy-setup-keyboard"},
-   "setup.typing.input": {"icon":"","label":"Input Methods","action":"omarchy-setup-input"},
-@@ -197,6 +201,8 @@
-   "setup.default.agent": {"icon":"󰚩","label":"Agent","title":"Default Agent"},
-   "setup.default.agent.amp": {"icon":"","iconFont":"omarchy","label":"Amp","checked":"[[ \"$(omarchy-default-agent)\" == \"amp\" ]]","action":"omarchy-default-agent amp"},
-   "setup.default.agent.agy": {"icon":"","iconFont":"omarchy","label":"Antigravity","checked":"[[ \"$(omarchy-default-agent)\" == \"agy\" ]]","action":"omarchy-default-agent agy"},
-+  "setup.default.agent.ante": {"icon":"󱚤","label":"Ante","checked":"[[ \"$(omarchy-default-agent)\" == \"ante\" ]]","action":"omarchy-default-agent ante"},
-+  "setup.default.agent.antex": {"icon":"󱚤","label":"Antex","checked":"[[ \"$(omarchy-default-agent)\" == \"antex\" ]]","action":"omarchy-default-agent antex"},
-   "setup.default.agent.claude": {"icon":"","iconFont":"omarchy","label":"Claude","checked":"[[ \"$(omarchy-default-agent)\" == \"claude\" ]]","action":"omarchy-default-agent claude"},
-   "setup.default.agent.codex": {"icon":"","iconFont":"omarchy","label":"Codex","checked":"[[ \"$(omarchy-default-agent)\" == \"codex\" ]]","action":"omarchy-default-agent codex"},
-   "setup.default.agent.commandcode": {"icon":"","iconFont":"omarchy","label":"Command Code","checked":"[[ \"$(omarchy-default-agent)\" == \"commandcode\" ]]","action":"omarchy-default-agent commandcode"},
-@@ -259,14 +265,17 @@
-   "setup.security.sudoless-docker": {"icon":"󰡨","label":"Sudoless Docker","when":"omarchy-sudo-docker --configured","action":"omarchy-launch-floating-terminal-with-presentation omarchy-setup-security-sudoless-docker"},
-   "setup.security.passwordless-sudo": {"icon":"󰟵","label":"Passwordless Sudo","action":"omarchy-launch-floating-terminal-with-presentation omarchy-sudo-passwordless"},
-   "setup.config.git": {"icon":"","label":"Git","action":"omarchy-launch-floating-terminal-with-presentation omarchy-setup-git"},
--  "setup.config.hyprland": {"icon":"","label":"Hyprland","action":"omarchy-launch-config-editor \"$HOME/.config/hypr/hyprland.lua\""},
--  "setup.config.hyprsunset": {"icon":"","label":"Hyprsunset","action":"omarchy-launch-config-editor ~/.config/hypr/hyprsunset.conf && omarchy-restart-hyprsunset"},
-+  "setup.config.hyprland": {"icon":"","label":"Niri","action":"omarchy-launch-config-editor \"$HOME/.config/niri/config.kdl\""},
-+  "setup.config.hyprsunset": {"icon":"","label":"Hyprsunset","when":"false","action":"omarchy-launch-config-editor ~/.config/hypr/hyprsunset.conf && omarchy-restart-hyprsunset"},
-   "setup.config.xcompose": {"icon":"󰞅","label":"XCompose","action":"omarchy-launch-config-editor ~/.XCompose && omarchy-restart-xcompose"},
-   "setup.direct-boot": {"icon":"","label":"Direct Boot","when":"! omarchy-hw-aarch64-apple && [[ ! -f /etc/limine-entry-tool.d/zz-omarchy-dgx-spark.conf ]]","action":"omarchy-launch-floating-terminal-with-presentation omarchy-setup-direct-boot"},
-   "setup.reset": {"icon":"󰑓","label":"Reset Computer","when":"[[ $(findmnt -no FSTYPE /) == btrfs ]]","action":"omarchy-launch-floating-terminal-with-presentation omarchy-system-factory-reset"},
- 
-   // Install
--  "install.package": {"icon":"󰣇","label":"Package","action":"xdg-terminal-exec --app-id=org.omarchy.terminal omarchy-pkg-install"},
-+  // niri port: these skip the presentation wrapper and call xdg-terminal-exec directly, which a
-+  // machine without that package answers with silence. Keep them on it when it is there, and fall
-+  // back to the port's ghostty shim inside omarchy-launch-floating-terminal-with-presentation when it is not.
-+  "install.package": {"icon":"󰣇","label":"Package","action":"if command -v xdg-terminal-exec >/dev/null 2>&1; then xdg-terminal-exec --app-id=org.omarchy.terminal omarchy-pkg-install; else omarchy-launch-floating-terminal-with-presentation omarchy-pkg-install; fi"},
-   "install.ai": {"icon":"󱚤","label":"AI"},
-   "install.service": {"icon":"","label":"Service"},
-   "install.development": {"icon":"󰵮","label":"Development"},
-@@ -287,7 +296,7 @@
-   "install.terminal": {"icon":"","label":"Terminal"},
-   "install.tui": {"icon":"","label":"TUI","action":"omarchy-launch-floating-terminal-with-presentation omarchy-tui-install"},
-   "install.windows": {"icon":"󰍲","label":"Windows","when":"omarchy-hw-x86","disabled":"[[ -f $HOME/.local/share/applications/windows-vm.desktop ]]","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy-windows-vm install'"},
--  "install.aur": {"icon":"󰣇","label":"AUR","action":"xdg-terminal-exec --app-id=org.omarchy.terminal omarchy-pkg-aur-install"},
-+  "install.aur": {"icon":"󰣇","label":"AUR","action":"if command -v xdg-terminal-exec >/dev/null 2>&1; then xdg-terminal-exec --app-id=org.omarchy.terminal omarchy-pkg-aur-install; else omarchy-launch-floating-terminal-with-presentation omarchy-pkg-aur-install; fi"},
-   "install.preinstalls": {"icon":"󰏓","label":"Preinstalls","disabled":"[[ ! -f $HOME/.local/state/omarchy/preinstalls-removed ]]","action":"omarchy-launch-floating-terminal-with-presentation omarchy-install-preinstalls"},
-   "install.browser.chrome": {"icon":"","label":"Chrome","disabled":"omarchy-pkg-present google-chrome","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy-install-browser chrome'"},
-   "install.browser.edge": {"icon":"󰇩","label":"Edge","when":"omarchy-hw-x86","disabled":"omarchy-pkg-present microsoft-edge-stable-bin","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy-install-browser edge'"},
-@@ -360,7 +369,8 @@
-   "install.development.elixir.phoenix": {"icon":"","label":"Phoenix","disabled":"compgen -G \"$HOME/.mix/archives/phx_new*\"","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy-install-dev-env phoenix'"},
- 
-   // Remove
--  "remove.package": {"icon":"󰣇","label":"Package","action":"xdg-terminal-exec --app-id=org.omarchy.terminal omarchy-pkg-remove"},
-+  // Same xdg-terminal-exec fallback as install.package above.
-+  "remove.package": {"icon":"󰣇","label":"Package","action":"if command -v xdg-terminal-exec >/dev/null 2>&1; then xdg-terminal-exec --app-id=org.omarchy.terminal omarchy-pkg-remove; else omarchy-launch-floating-terminal-with-presentation omarchy-pkg-remove; fi"},
-   "remove.ai": {"icon":"󱚤","label":"AI","title":"Remove"},
-   "remove.dictation": {"icon":"","label":"Dictation","when":"omarchy-pkg-present voxtype-bin || omarchy-pkg-present superwhisper-bin"},
-   "remove.service": {"icon":"","label":"Services","title":"Remove"},
-@@ -446,10 +456,10 @@
-   "update.channel.rc": {"icon":"🟡","label":"RC","checked":"[[ \"$(omarchy-channel-current)\" == \"rc\" ]]","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy-channel-set rc'"},
-   "update.channel.edge": {"icon":"🟠","label":"Edge","checked":"[[ \"$(omarchy-channel-current)\" == \"edge\" ]]","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy-channel-set edge'"},
-   "update.channel.dev": {"icon":"🔴","label":"Dev","checked":"[[ \"$(omarchy-channel-current)\" == \"dev\" ]]","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy-channel-set dev'"},
--  "update.process.hyprsunset": {"icon":"","label":"Hyprsunset","action":"omarchy-restart-hyprsunset"},
-+  "update.process.hyprsunset": {"icon":"","label":"Hyprsunset","when":"false","action":"omarchy-restart-hyprsunset"},
-   "update.process.shell": {"icon":"󰍜","label":"Shell","action":"omarchy-restart-shell"},
--  "update.config.hyprland": {"icon":"","label":"Hyprland","action":"omarchy-launch-floating-terminal-with-presentation omarchy-refresh-hyprland"},
--  "update.config.hyprsunset": {"icon":"","label":"Hyprsunset","action":"omarchy-launch-floating-terminal-with-presentation omarchy-refresh-hyprsunset"},
-+  "update.config.hyprland": {"icon":"","label":"Niri Theme","action":"omarchy-niri-apply-theme"},
-+  "update.config.hyprsunset": {"icon":"","label":"Hyprsunset","when":"false","action":"omarchy-launch-floating-terminal-with-presentation omarchy-refresh-hyprsunset"},
-   "update.config.plymouth": {"icon":"󱣴","label":"Plymouth","action":"omarchy-launch-floating-terminal-with-presentation omarchy-refresh-plymouth"},
-   "update.config.tmux": {"icon":"","label":"Tmux","action":"omarchy-launch-floating-terminal-with-presentation omarchy-refresh-tmux"},
-   "update.config.shell": {"icon":"󰍜","label":"Shell","action":"omarchy-launch-floating-terminal-with-presentation omarchy-refresh-shell"},
-diff --git a/shell/plugins/agents/Panel.qml b/shell/plugins/agents/Panel.qml
-index 33a0627ab..4c56df006 100644
---- a/shell/plugins/agents/Panel.qml
-+++ b/shell/plugins/agents/Panel.qml
-@@ -1490,12 +1490,16 @@ Panel {
-       }
-     }
- 
--    // The meter shows what is left, not what is used: a prepaid account
--    // drains toward empty rather than filling toward a cap.
-+    // The meter measures what has been spent, exactly as the window meters
-+    // above measure what has been used: one language for every allowance in
-+    // the section, and a pool that resets fills toward full as it drains
-+    // rather than toward empty. Its column, gutter and type are the window
-+    // rows' own, so the four meters read as one block rather than as three
-+    // meters and a footnote.
-     Column {
-       visible: !!section.balance
-       width: parent.width
--      spacing: Style.space(6)
-+      spacing: Style.space(12)
- 
-       Item {
-         width: parent.width
-@@ -1509,36 +1513,51 @@ Panel {
-           text: Commons.I18n.t("agents.balance")
-           color: root.foreground
-           font.family: root.fontFamily
--          font.pixelSize: Style.font.caption
-+          font.pixelSize: Style.font.bodySmall
-         }
- 
-         Meter {
-           anchors.left: balanceTitle.right
-           anchors.right: balanceValue.left
--          anchors.rightMargin: Style.spacing.md
-+          anchors.rightMargin: Style.space(20)
-           anchors.verticalCenter: parent.verticalCenter
--          value: section.balance && section.balance.funded > 0 ? section.balance.remaining / section.balance.funded : -1
-+          value: section.balance && section.balance.funded > 0 ? section.balance.spent / section.balance.funded : -1
-           alarming: root.balanceAlarming(section.balance)
-         }
- 
-+        // The windows' own time-left column, so both rows end in the same
-+        // place; a money string is narrower than "00h 00m" at this size.
-+        // The widest value a window row carries, so this row's meter ends
-+        // exactly where theirs does.
-+        TextMetrics {
-+          id: balanceValueMetrics
-+          font.family: root.fontFamily
-+          font.pixelSize: Style.font.bodySmall
-+          text: "100% · 00h 00m"
-+        }
-+
-         Text {
-           id: balanceValue
-           textFormat: Text.PlainText
--          width: Style.space(96)
-+          width: Math.ceil(balanceValueMetrics.advanceWidth)
-           anchors.right: parent.right
-           anchors.verticalCenter: parent.verticalCenter
-           horizontalAlignment: Text.AlignRight
-           text: section.balance ? root.formatMoney(section.balance.remaining, section.balance.currency) : ""
-           color: root.balanceAlarming(section.balance) ? root.urgent : root.dim
-           font.family: root.fontFamily
--          font.pixelSize: Style.font.caption
-+          font.pixelSize: Style.font.bodySmall
-+          elide: Text.ElideLeft
-         }
-       }
- 
-+      // The spent-of-funded line stays the one step down in size, indented
-+      // under the meter's own column so it reads as that row's detail.
-       Text {
-         textFormat: Text.PlainText
-         visible: text !== ""
-         width: parent.width
-+        leftPadding: parent.width * 0.3
-         text: root.balanceDetailText(section.balance)
-         color: root.dim
-         font.family: root.fontFamily
-@@ -2037,17 +2056,18 @@ Panel {
-       markers: compact.scoped
-     }
- 
--    // Sized to the widest time left ("19h 40m"), so every meter ends in the
--    // same place.
-+    // Sized to the widest value the row can carry — a full percentage and the
-+    // longest time left ("100% · 19h 40m") — so every meter ends in the same
-+    // place whether or not its window has a reset time.
-     TextMetrics {
-       id: compactValueMetrics
-       font.family: root.fontFamily
-       font.pixelSize: Style.font.bodySmall
--      text: "00h 00m"
-+      text: "100% · 00h 00m"
-     }
- 
--    // How long until the window resets. The meter says how full it is; the
--    // exact percentage is in the row's tooltip.
-+    // How much of the allowance is used, and when it resets: the meter says
-+    // how full it is at a glance, this says by how much and for how long.
-     Text {
-       id: compactValue
-       width: Math.ceil(compactValueMetrics.advanceWidth)
-@@ -2055,8 +2075,12 @@ Panel {
-       anchors.verticalCenter: parent.verticalCenter
-       textFormat: Text.PlainText
-       horizontalAlignment: Text.AlignRight
--      text: compact.resetMs > 0 ? root.formatDuration(compact.resetMs) : ""
--      color: root.dim
-+      text: {
-+        if (!compact.window) return ""
-+        var used = Commons.I18n.formatNumber(Math.round(compact.window.percent * 100)) + "%"
-+        return compact.resetMs > 0 ? used + " · " + root.formatDuration(compact.resetMs) : used
-+      }
-+      color: compact.alarming ? root.urgent : root.dim
-       font.family: root.fontFamily
-       font.pixelSize: Style.font.bodySmall
-     }
-diff --git a/shell/plugins/agents/README.md b/shell/plugins/agents/README.md
-index 4794316f7..eb8310943 100644
---- a/shell/plugins/agents/README.md
-+++ b/shell/plugins/agents/README.md
-@@ -94,6 +94,7 @@ Adding an agent needs no QML changes: ship a collector that follows the contract
- | `fireworks` | Prepaid balance: the live ledger when the key can read it, else configured funding minus rated account costs; kept stale past a failed check | Fireworks billing API, grouped by day and model for the last 30 days, cached per key and account |
- | `synthetic` | Synthetic's `GET /v2/quotas`: rolling five-hour requests, weekly credits, hourly search, free tool calls | pi/omp sessions and opencode messages on the `synthetic` provider; Claude Code, MiniMax Code and Codex sent to `api.synthetic.new`, and Claude Code replies by `hf:`/`syn:` models with no override |
- | `local` | None (self-hosted work has no meter) | Codex rollouts, pi/omp sessions and opencode messages on a local runtime, a provider named in `local.json`, or a Codex provider whose `base_url` is on the LAN, never a provider id another collector counts, plus Claude Code turns while `ANTHROPIC_BASE_URL` is self-hosted (not Claude models or cloud-tagged ones), and Kimi Code, Qwen Code, Hermes and Mistral Vibe requests sent to a self-hosted base URL |
-+| `commandcode` | Command Code's billing ledger: the 5-hour and weekly rolling windows, and the plan's monthly credit pool as a meter with its balance | none; the billing ledger is the whole account |
- 
- Every collector follows the same rules, so the same situation reads the same for every agent: a recent answer is reused for 15 seconds unless refresh is pressed, each credential or account keeps its own last good answer, a failed check keeps it with its age on hover and windows that have since reset back at zero, an endpoint that can't be reached is retried soon, and an agent the machine doesn't use stays out of the panel. Tokens are counted once, under the provider that bills them: pi, omp, and opencode sessions are split by provider into the matching collector. A pi compaction's usage counts, but omp records only the context's size before and after one, not what its summary request used, so omp's compactions are missing from the tokens. pi and omp sessions are read from every profile, and from `PI_CODING_AGENT_DIR`, `PI_CODING_AGENT_SESSION_DIR`, and a `settings.json` `sessionDir` as well as the defaults when set, a forked session's copied messages once; opencode is read from both its `message` and V2 `session_message` stores in the database `OPENCODE_DB` names, a message migrated into both once and a fork's copied history not at all. A machine with none of an agent's home, CLI, or usage prints an empty record the panel skips; one that has them but no sign-in says it is waiting for one. The sections below cover where each agent's sign-in and data come from.
- 
-@@ -286,6 +287,14 @@ A Codex rollout records its provider's id but not the URL it reached, so the col
- 
- It is the exact complement of the provider collectors: a provider id another collector counts is never counted here, whatever `local.json` says (that collector counts it, once), but for a Codex `model_providers` entry, whose `base_url` decides whatever its id, so one under a claimed id on your own hardware (a self-hosted Kimchi gateway's `kimchi codex` setup) counts here; and the Codex collector keeps every rollout on the built-in `openai` provider, but for the models of one that a self-hosted `openai_base_url` served (see [Codex](#codex)). Two providers are claimed only for some models, and only those rows are left out: Ollama's cloud models (a `:cloud` or `-cloud` tag) run on Ollama's servers even through the local daemon, so they count under Ollama Cloud instead, and opencode's Antigravity plugin records a `google` provider with `antigravity-` models, which the Antigravity collector counts. A Codex rollout's prompts are the ones typed, and a subagent's or guardian's thread starts no session, read as the Codex collector reads them. Claude Code counts here while `ANTHROPIC_BASE_URL` is self-hosted (Ollama's `http://localhost:11434`, a LAN box), for every model but a Claude one, which a local gateway forwards on to Anthropic, and a cloud-tagged one, by the [Claude Code](#claude-code) rule; so do MiniMax Code replies on a custom provider whose `baseURL` is self-hosted, and, by the same rule, Kimi Code, Qwen Code, Hermes and Mistral Vibe requests whose recorded base URL is self-hosted, read by each one's own collector. There are no limits or balance.
- 
-+### Command Code
-+
-+Command Code's section reads the account's billing ledger, the same two answers its own `/usage` view is built from: `/alpha/billing/credits` (what the plan's windows and monthly pool have spent) and `/alpha/billing/subscriptions` (which plan is active, and when its period ends). These are the CLI's own routes rather than a published API, so a change there costs the numbers, not the panel.
-+
-+The three meters are the allowances that view shows: `5 hours` and `Weekly` are the plan's rolling windows, `used` of `cap` as the service reports them, and `Monthly` is the plan's credit pool (GOAT 70) against what is left of it. The balance under them is that remainder, so the bar and the figure are the same measurement. A window whose reset time has passed reads zero with no reset time until a fresh check dates the next one, and a plan the CLI's own plan table doesn't name gets no monthly meter rather than a guessed one.
-+
-+The key is `COMMANDCODE_API_KEY`, read from the environment first (where Ante and the CLI both take it), then from `~/.hermes/.env`, `~/.ante/auth/api_keys.json` and `~/.commandcode/.env`. It is only ever read. Every number is the account's, so the record says `scope: account` and carries no prompts or sessions to count.
-+
- ## Interactions
- 
- - Bar icon: left = panel, right = launch agent, middle = refresh. It turns
-diff --git a/shell/plugins/agents/assets/commandcode-light.svg b/shell/plugins/agents/assets/commandcode-light.svg
-new file mode 100644
-index 000000000..2bdeb2701
---- /dev/null
-+++ b/shell/plugins/agents/assets/commandcode-light.svg
-@@ -0,0 +1 @@
-+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#111"><title>Command Code</title><path d="M3.6 7.1 8.1 3.6l3.1 3.9a1.1 1.1 0 0 1-.3 1.6l-2 1.2a1.1 1.1 0 0 0-.4 1.5l1.1 1.8a1.1 1.1 0 0 0 1.5.4l2-1.2a1.1 1.1 0 0 1 1.6.4l2.6 4.1-4.5 3.5-1.5-2.4a3 3 0 0 0-4.1-1l-2 1.2-2.5-4.1a3 3 0 0 1 .9-4.1l.1-.1z"/><circle cx="18.1" cy="5.4" r="2.1"/></svg>
-diff --git a/shell/plugins/agents/assets/commandcode.svg b/shell/plugins/agents/assets/commandcode.svg
-new file mode 100644
-index 000000000..ff2c0429f
---- /dev/null
-+++ b/shell/plugins/agents/assets/commandcode.svg
-@@ -0,0 +1 @@
-+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#fff"><title>Command Code</title><path d="M3.6 7.1 8.1 3.6l3.1 3.9a1.1 1.1 0 0 1-.3 1.6l-2 1.2a1.1 1.1 0 0 0-.4 1.5l1.1 1.8a1.1 1.1 0 0 0 1.5.4l2-1.2a1.1 1.1 0 0 1 1.6.4l2.6 4.1-4.5 3.5-1.5-2.4a3 3 0 0 0-4.1-1l-2 1.2-2.5-4.1a3 3 0 0 1 .9-4.1l.1-.1z"/><circle cx="18.1" cy="5.4" r="2.1"/></svg>
-diff --git a/shell/plugins/agents/manifest.json b/shell/plugins/agents/manifest.json
-index 25b11cf54..0b844b7aa 100644
---- a/shell/plugins/agents/manifest.json
-+++ b/shell/plugins/agents/manifest.json
-@@ -41,7 +41,8 @@
-         "deepseek": { "enabled": true },
-         "fireworks": { "enabled": true },
-         "synthetic": { "enabled": true },
--        "local": { "enabled": true }
-+        "local": { "enabled": true },
-+        "commandcode": { "enabled": true }
-       },
-       "refreshIntervalSec": 900,
-       "syncMode": "Off",
 diff --git a/bin/omarchy-battery-status b/bin/omarchy-battery-status
 index 7f642e620..9776dec36 100755
 --- a/bin/omarchy-battery-status
@@ -757,10 +453,10 @@ index 7f642e620..9776dec36 100755
  # Time left is the energy left over the draw shown beside it, so the two always
  # agree; charging counts up to the charge limit. UPower's own estimate averages
 diff --git a/bin/omarchy-capture-screenshot b/bin/omarchy-capture-screenshot
-index 745bee2d4..ec5d3e60b 100755
+index 745bee2d4..15e696852 100755
 --- a/bin/omarchy-capture-screenshot
 +++ b/bin/omarchy-capture-screenshot
-@@ -2,26 +2,81 @@
+@@ -2,26 +2,91 @@
  
  # omarchy:summary=Take a screenshot
  # omarchy:group=capture
@@ -845,9 +541,14 @@ index 745bee2d4..ec5d3e60b 100755
 -exec omasnap "${omasnap_args[@]}"
 +    # Best-effort: the screenshot is already saved and on the clipboard, so a
 +    # notification outage must not report the capture itself as failed.
-+    omarchy-notification-send "Screenshot saved to clipboard and file" "Edit with Super + Alt + , (or click this)" \
++    #
++    # Omasnap is not used on niri, so the buttons are plain: Edit launches the
++    # editor, Open hands the file to the desktop's default handler.
++    omarchy-notification-send "$(omarchy-i18n capture.screenshotSavedCopied)" \
 +      --image "$FILEPATH" \
-+      --exec "$SCREENSHOT_EDITOR" --filename "$FILEPATH" || true
++      --action "$(omarchy-i18n capture.screenshotEdit)" "$SCREENSHOT_EDITOR" \
++      --action "$(omarchy-i18n capture.screenshotOpen)" xdg-open \
++      --with "$FILEPATH" || true
 +    ;;
 +  copy)
 +    grim -g "$SELECTION" - | wl-copy --type image/png
@@ -855,8 +556,57 @@ index 745bee2d4..ec5d3e60b 100755
 +  save)
 +    grim -g "$SELECTION" "$FILEPATH" || exit 1
 +    echo "$FILEPATH"
++    omarchy-notification-send "$(omarchy-i18n capture.screenshotSaved)" \
++      --image "$FILEPATH" \
++      --action "$(omarchy-i18n capture.screenshotEdit)" "$SCREENSHOT_EDITOR" \
++      --action "$(omarchy-i18n capture.screenshotOpen)" xdg-open \
++      --with "$FILEPATH" || true
 +    ;;
 +esac
+diff --git a/bin/omarchy-default-agent b/bin/omarchy-default-agent
+index 69d4c2291..95123785c 100755
+--- a/bin/omarchy-default-agent
++++ b/bin/omarchy-default-agent
+@@ -1,7 +1,7 @@
+ #!/bin/bash
+ 
+ # omarchy:summary=Set and launch the default coding agent
+-# omarchy:args=[pi|omp|opencode|ori|claude|codex|grok|openclaw|agy|hermes|copilot|crush|cursor-agent|muse|kimi|qwen|dsh|mcode|kiro-cli|freebuff|kilo|devin|amp|commandcode]
++# omarchy:args=[pi|omp|opencode|ori|claude|codex|grok|openclaw|agy|hermes|copilot|crush|cursor-agent|muse|kimi|qwen|dsh|mcode|kiro-cli|freebuff|kilo|devin|amp|commandcode|ante|antex]
+ # omarchy:examples=omarchy default agent | omarchy default agent codex | omarchy default agent claude
+ 
+ installing=false
+@@ -25,6 +25,8 @@ fi
+ 
+ case "$1" in
+ pi) agent="pi"; name="Pi" ;;
++ante) agent="ante"; name="Ante"; agent_self_managed=true ;;
++antex) agent="antex"; name="Antex"; agent_self_managed=true ;;
+ omp | oh-my-pi) agent="omp"; name="Oh My Pi"; agent_package="oh-my-pi" ;;
+ opencode | open-code) agent="opencode"; name="OpenCode" ;;
+ ori | openrouter) agent="ori"; name="Ori"; agent_package="ori" ;;
+@@ -65,7 +67,7 @@ devin | devin-cli)
+ amp | ampcode) agent="amp"; name="Amp" ;;
+ commandcode | command-code | cmdc) agent="commandcode"; name="Command Code"; agent_package="npm:command-code" ;;
+ *)
+-  echo "Usage: omarchy-default-agent <pi|omp|opencode|ori|claude|codex|grok|openclaw|agy|hermes|copilot|crush|cursor-agent|muse|kimi|qwen|dsh|mcode|kiro-cli|freebuff|kilo|devin|amp|commandcode>"
++  echo "Usage: omarchy-default-agent <pi|omp|opencode|ori|claude|codex|grok|openclaw|agy|hermes|copilot|crush|cursor-agent|muse|kimi|qwen|dsh|mcode|kiro-cli|freebuff|kilo|devin|amp|commandcode|ante>"
+   exit 1
+   ;;
+ esac
+@@ -88,6 +90,12 @@ if [[ -n ${agent_installer:-} ]]; then
+   # minutes-long install inside the menu action instead.
+   agent_present() { "$agent_installer" --check; }
+   agent_install() { "$agent_installer" --now; }
++elif [[ -n ${agent_self_managed:-} ]]; then
++  # Ante ships its own launcher (nothing mise-shaped to point at) and updates
++  # itself with `ante update`, so presence is just the command being on PATH
++  # and there is nothing to install. See behavior.md §8 第 40 条.
++  agent_present() { omarchy-cmd-present "$agent"; }
++  agent_install() { agent_present; }
+ else
+   # omarchy-mise-install's wrappers run `mise use` and `mise x`, current ones on
+   # lines of their own and older ones after an inline variable; either way
 diff --git a/bin/omarchy-launch-editor b/bin/omarchy-launch-editor
 index cbf12c787..a4497a748 100755
 --- a/bin/omarchy-launch-editor
@@ -875,7 +625,7 @@ index cbf12c787..a4497a748 100755
    ;;
  esac
 diff --git a/bin/omarchy-launch-floating-terminal-with-presentation b/bin/omarchy-launch-floating-terminal-with-presentation
-index 4497ff0dd..c4670d5dd 100755
+index 4497ff0dd..dd5988d49 100755
 --- a/bin/omarchy-launch-floating-terminal-with-presentation
 +++ b/bin/omarchy-launch-floating-terminal-with-presentation
 @@ -11,4 +11,16 @@ cmd="$*"
@@ -885,12 +635,12 @@ index 4497ff0dd..c4670d5dd 100755
 -exec setsid uwsm-app -- xdg-terminal-exec --app-id=org.omarchy.terminal --title=Omarchy -e bash -c "$presentation_script"
 +# Hyprland/uwsm session: uwsm-app + xdg-terminal-exec. niri has neither, so
 +# fall back to a Wayland terminal (ghostty, matching niri's Mod+Return bind).
-+if command -v uwsm-app >/dev/null 2>&1 && command -v xdg-terminal-exec >/dev/null 2>&1; then
++if omarchy-cmd-present uwsm-app xdg-terminal-exec; then
 +  exec setsid uwsm-app -- xdg-terminal-exec --app-id=org.omarchy.terminal --title=Omarchy -e bash -c "$presentation_script"
 +fi
 +
 +for term in ghostty kitty alacritty foot; do
-+  if command -v "$term" >/dev/null 2>&1; then
++  if omarchy-cmd-present "$term"; then
 +    exec setsid "$term" -e bash -c "$presentation_script"
 +  fi
 +done
@@ -1030,7 +780,7 @@ index 6bc7c8911..03d2e25fc 100755
    # Relaunching into a session already tearing down burns the attempt budget.
    compositor_alive || exit 0
 diff --git a/bin/omarchy-launch-tui b/bin/omarchy-launch-tui
-index bd67c64ca..57f761020 100755
+index bd67c64ca..238d798cd 100755
 --- a/bin/omarchy-launch-tui
 +++ b/bin/omarchy-launch-tui
 @@ -10,4 +10,16 @@ else
@@ -1040,12 +790,12 @@ index bd67c64ca..57f761020 100755
 -exec setsid uwsm-app -- xdg-terminal-exec --app-id=$APP_ID -e "$1" "${@:2}"
 +# Hyprland/uwsm session: uwsm-app + xdg-terminal-exec. niri has neither, so
 +# fall back to a Wayland terminal (ghostty, matching niri's Mod+Return bind).
-+if command -v uwsm-app >/dev/null 2>&1 && command -v xdg-terminal-exec >/dev/null 2>&1; then
++if omarchy-cmd-present uwsm-app xdg-terminal-exec; then
 +  exec setsid uwsm-app -- xdg-terminal-exec --app-id=$APP_ID -e "$1" "${@:2}"
 +fi
 +
 +for term in ghostty kitty alacritty foot; do
-+  if command -v "$term" >/dev/null 2>&1; then
++  if omarchy-cmd-present "$term"; then
 +    exec setsid "$term" -e "$1" "${@:2}"
 +  fi
 +done
@@ -1070,6 +820,39 @@ index 6549c6935..730288404 100755
  omarchy-refresh-config hypr/.luarc.json
  omarchy-refresh-config hypr/autostart.lua
  omarchy-refresh-config hypr/bindings.lua
+diff --git a/bin/omarchy-system b/bin/omarchy-system
+index 02ab05c30..670bd0ada 100755
+--- a/bin/omarchy-system
++++ b/bin/omarchy-system
+@@ -18,7 +18,17 @@ fi
+ 
+ action=${1:-}
+ case $action in
+-  logout) command=(uwsm stop) ;;
++  logout)
++    # niri has no uwsm, so `uwsm stop` would fail after every window was already
++    # gone. Ask the compositor to quit instead, the way a niri session logs out;
++    # --skip-confirmation skips niri's own "Press Enter to confirm" prompt, which
++    # a menu logout must not require.
++    if [[ ${XDG_CURRENT_DESKTOP:-} == niri ]]; then
++      command=(niri msg action quit --skip-confirmation)
++    else
++      command=(uwsm stop)
++    fi
++    ;;
+   reboot) command=(systemctl reboot --no-wall) ;;
+   shutdown) command=(systemctl poweroff --no-wall) ;;
+   *) echo "$usage" >&2; exit 2 ;;
+@@ -73,7 +83,8 @@ elif [[ ${2:-} == "--execute" ]]; then
+ elif [[ -z ${2:-} ]]; then
+   # Survive closing the terminal that requested the session exit.
+   systemd-run --user --collect --quiet --property=Type=exec --property=RuntimeMaxSec=30s \
+-    --setenv=PATH --setenv=HYPRLAND_INSTANCE_SIGNATURE --setenv=OMARCHY_PATH \
++    --setenv=PATH --setenv=HYPRLAND_INSTANCE_SIGNATURE --setenv=NIRI_SOCKET \
++    --setenv=XDG_CURRENT_DESKTOP --setenv=OMARCHY_PATH \
+     "$0" "$action" --execute
+ else
+   echo "$usage" >&2
 diff --git a/bin/omarchy-theme-set b/bin/omarchy-theme-set
 index 6fc1d9443..11c8f4396 100755
 --- a/bin/omarchy-theme-set
@@ -1141,6 +924,91 @@ index 0a871493a..45261e141 100755
  PATH="$OMARCHY_PATH/bin:/usr/bin:/usr/sbin:/bin:/sbin"
  unset OMARCHY_SUDO_NO_UPDATE
  # Helpers that manage their own sudo boundary leave this authorization to us.
+diff --git a/default/omarchy/omarchy-menu.jsonc b/default/omarchy/omarchy-menu.jsonc
+index da07a04ff..8f762b856 100644
+--- a/default/omarchy/omarchy-menu.jsonc
++++ b/default/omarchy/omarchy-menu.jsonc
+@@ -178,10 +178,14 @@
+   "trigger.tests.network-speedtest": {"icon":"󰓅","label":"Network Speed Test","action":"omarchy-shell shell summon omarchy.speedtest"},
+   "trigger.tests.disk-speedtest": {"icon":"󰋊","label":"Disk Speed Test","action":"omarchy-shell shell summon omarchy.disk-speedtest"},
+ 
++  "style.avatar": {"icon":"󰀉","label":"Avatar"},
++  "style.avatar.image": {"icon":"","label":"Set From Image","action":"omarchy-avatar pick"},
++  "style.avatar.default": {"icon":"","label":"Restore Default","action":"omarchy-avatar default"},
++
+   // Setup
+-  "setup.monitors": {"icon":"󰍹","label":"Monitors","action":"omarchy-launch-config-editor \"$HOME/.config/hypr/monitors.lua\""},
+-  "setup.keybindings": {"icon":"","label":"Keybindings","when":"[[ -f ~/.config/hypr/bindings.lua ]]","action":"omarchy-launch-config-editor \"$HOME/.config/hypr/bindings.lua\""},
+-  "setup.input": {"icon":"","label":"Input","when":"[[ -f ~/.config/hypr/input.lua ]]","action":"omarchy-launch-config-editor \"$HOME/.config/hypr/input.lua\""},
++  "setup.monitors": {"icon":"󰍹","label":"Monitors","action":"omarchy-launch-config-editor \"$HOME/.config/niri/monitor.kdl\""},
++  "setup.keybindings": {"icon":"","label":"Keybindings","action":"omarchy-launch-config-editor \"$HOME/.config/niri/binds.kdl\""},
++  "setup.input": {"icon":"","label":"Input","action":"omarchy-launch-config-editor \"$HOME/.config/niri/input.kdl\""},
+   "setup.typing": {"icon":"","label":"Typing"},
+   "setup.typing.keyboard": {"icon":"","label":"Keyboard Layouts","action":"omarchy-setup-keyboard"},
+   "setup.typing.input": {"icon":"","label":"Input Methods","action":"omarchy-setup-input"},
+@@ -197,6 +201,8 @@
+   "setup.default.agent": {"icon":"󰚩","label":"Agent","title":"Default Agent"},
+   "setup.default.agent.amp": {"icon":"","iconFont":"omarchy","label":"Amp","checked":"[[ \"$(omarchy-default-agent)\" == \"amp\" ]]","action":"omarchy-default-agent amp"},
+   "setup.default.agent.agy": {"icon":"","iconFont":"omarchy","label":"Antigravity","checked":"[[ \"$(omarchy-default-agent)\" == \"agy\" ]]","action":"omarchy-default-agent agy"},
++  "setup.default.agent.ante": {"icon":"󱚤","label":"Ante","checked":"[[ \"$(omarchy-default-agent)\" == \"ante\" ]]","action":"omarchy-default-agent ante"},
++  "setup.default.agent.antex": {"icon":"󱚤","label":"Antex","checked":"[[ \"$(omarchy-default-agent)\" == \"antex\" ]]","action":"omarchy-default-agent antex"},
+   "setup.default.agent.claude": {"icon":"","iconFont":"omarchy","label":"Claude","checked":"[[ \"$(omarchy-default-agent)\" == \"claude\" ]]","action":"omarchy-default-agent claude"},
+   "setup.default.agent.codex": {"icon":"","iconFont":"omarchy","label":"Codex","checked":"[[ \"$(omarchy-default-agent)\" == \"codex\" ]]","action":"omarchy-default-agent codex"},
+   "setup.default.agent.commandcode": {"icon":"","iconFont":"omarchy","label":"Command Code","checked":"[[ \"$(omarchy-default-agent)\" == \"commandcode\" ]]","action":"omarchy-default-agent commandcode"},
+@@ -259,14 +265,17 @@
+   "setup.security.sudoless-docker": {"icon":"󰡨","label":"Sudoless Docker","when":"omarchy-sudo-docker --configured","action":"omarchy-launch-floating-terminal-with-presentation omarchy-setup-security-sudoless-docker"},
+   "setup.security.passwordless-sudo": {"icon":"󰟵","label":"Passwordless Sudo","action":"omarchy-launch-floating-terminal-with-presentation omarchy-sudo-passwordless"},
+   "setup.config.git": {"icon":"","label":"Git","action":"omarchy-launch-floating-terminal-with-presentation omarchy-setup-git"},
+-  "setup.config.hyprland": {"icon":"","label":"Hyprland","action":"omarchy-launch-config-editor \"$HOME/.config/hypr/hyprland.lua\""},
+-  "setup.config.hyprsunset": {"icon":"","label":"Hyprsunset","action":"omarchy-launch-config-editor ~/.config/hypr/hyprsunset.conf && omarchy-restart-hyprsunset"},
++  "setup.config.hyprland": {"icon":"","label":"Niri","action":"omarchy-launch-config-editor \"$HOME/.config/niri/config.kdl\""},
++  "setup.config.hyprsunset": {"icon":"","label":"Hyprsunset","when":"false","action":"omarchy-launch-config-editor ~/.config/hypr/hyprsunset.conf && omarchy-restart-hyprsunset"},
+   "setup.config.xcompose": {"icon":"󰞅","label":"XCompose","action":"omarchy-launch-config-editor ~/.XCompose && omarchy-restart-xcompose"},
+   "setup.direct-boot": {"icon":"","label":"Direct Boot","when":"! omarchy-hw-aarch64-apple && [[ ! -f /etc/limine-entry-tool.d/zz-omarchy-dgx-spark.conf ]]","action":"omarchy-launch-floating-terminal-with-presentation omarchy-setup-direct-boot"},
+   "setup.reset": {"icon":"󰑓","label":"Reset Computer","when":"[[ $(findmnt -no FSTYPE /) == btrfs ]]","action":"omarchy-launch-floating-terminal-with-presentation omarchy-system-factory-reset"},
+ 
+   // Install
+-  "install.package": {"icon":"󰣇","label":"Package","action":"xdg-terminal-exec --app-id=org.omarchy.terminal omarchy-pkg-install"},
++  // niri port: these skip the presentation wrapper and call xdg-terminal-exec directly, which a
++  // machine without that package answers with silence. Keep them on it when it is there, and fall
++  // back to the port's ghostty shim inside omarchy-launch-floating-terminal-with-presentation when it is not.
++  "install.package": {"icon":"󰣇","label":"Package","action":"if command -v xdg-terminal-exec >/dev/null 2>&1; then xdg-terminal-exec --app-id=org.omarchy.terminal omarchy-pkg-install; else omarchy-launch-floating-terminal-with-presentation omarchy-pkg-install; fi"},
+   "install.ai": {"icon":"󱚤","label":"AI"},
+   "install.service": {"icon":"","label":"Service"},
+   "install.development": {"icon":"󰵮","label":"Development"},
+@@ -287,7 +296,7 @@
+   "install.terminal": {"icon":"","label":"Terminal"},
+   "install.tui": {"icon":"","label":"TUI","action":"omarchy-launch-floating-terminal-with-presentation omarchy-tui-install"},
+   "install.windows": {"icon":"󰍲","label":"Windows","when":"omarchy-hw-x86","disabled":"[[ -f $HOME/.local/share/applications/windows-vm.desktop ]]","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy-windows-vm install'"},
+-  "install.aur": {"icon":"󰣇","label":"AUR","action":"xdg-terminal-exec --app-id=org.omarchy.terminal omarchy-pkg-aur-install"},
++  "install.aur": {"icon":"󰣇","label":"AUR","action":"if command -v xdg-terminal-exec >/dev/null 2>&1; then xdg-terminal-exec --app-id=org.omarchy.terminal omarchy-pkg-aur-install; else omarchy-launch-floating-terminal-with-presentation omarchy-pkg-aur-install; fi"},
+   "install.preinstalls": {"icon":"󰏓","label":"Preinstalls","disabled":"[[ ! -f $HOME/.local/state/omarchy/preinstalls-removed ]]","action":"omarchy-launch-floating-terminal-with-presentation omarchy-install-preinstalls"},
+   "install.browser.chrome": {"icon":"","label":"Chrome","disabled":"omarchy-pkg-present google-chrome","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy-install-browser chrome'"},
+   "install.browser.edge": {"icon":"󰇩","label":"Edge","when":"omarchy-hw-x86","disabled":"omarchy-pkg-present microsoft-edge-stable-bin","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy-install-browser edge'"},
+@@ -360,7 +369,8 @@
+   "install.development.elixir.phoenix": {"icon":"","label":"Phoenix","disabled":"compgen -G \"$HOME/.mix/archives/phx_new*\"","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy-install-dev-env phoenix'"},
+ 
+   // Remove
+-  "remove.package": {"icon":"󰣇","label":"Package","action":"xdg-terminal-exec --app-id=org.omarchy.terminal omarchy-pkg-remove"},
++  // Same xdg-terminal-exec fallback as install.package above.
++  "remove.package": {"icon":"󰣇","label":"Package","action":"if command -v xdg-terminal-exec >/dev/null 2>&1; then xdg-terminal-exec --app-id=org.omarchy.terminal omarchy-pkg-remove; else omarchy-launch-floating-terminal-with-presentation omarchy-pkg-remove; fi"},
+   "remove.ai": {"icon":"󱚤","label":"AI","title":"Remove"},
+   "remove.dictation": {"icon":"","label":"Dictation","when":"omarchy-pkg-present voxtype-bin || omarchy-pkg-present superwhisper-bin"},
+   "remove.service": {"icon":"","label":"Services","title":"Remove"},
+@@ -446,10 +456,10 @@
+   "update.channel.rc": {"icon":"🟡","label":"RC","checked":"[[ \"$(omarchy-channel-current)\" == \"rc\" ]]","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy-channel-set rc'"},
+   "update.channel.edge": {"icon":"🟠","label":"Edge","checked":"[[ \"$(omarchy-channel-current)\" == \"edge\" ]]","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy-channel-set edge'"},
+   "update.channel.dev": {"icon":"🔴","label":"Dev","checked":"[[ \"$(omarchy-channel-current)\" == \"dev\" ]]","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy-channel-set dev'"},
+-  "update.process.hyprsunset": {"icon":"","label":"Hyprsunset","action":"omarchy-restart-hyprsunset"},
++  "update.process.hyprsunset": {"icon":"","label":"Hyprsunset","when":"false","action":"omarchy-restart-hyprsunset"},
+   "update.process.shell": {"icon":"󰍜","label":"Shell","action":"omarchy-restart-shell"},
+-  "update.config.hyprland": {"icon":"","label":"Hyprland","action":"omarchy-launch-floating-terminal-with-presentation omarchy-refresh-hyprland"},
+-  "update.config.hyprsunset": {"icon":"","label":"Hyprsunset","action":"omarchy-launch-floating-terminal-with-presentation omarchy-refresh-hyprsunset"},
++  "update.config.hyprland": {"icon":"","label":"Niri Theme","action":"omarchy-niri-apply-theme"},
++  "update.config.hyprsunset": {"icon":"","label":"Hyprsunset","when":"false","action":"omarchy-launch-floating-terminal-with-presentation omarchy-refresh-hyprsunset"},
+   "update.config.plymouth": {"icon":"󱣴","label":"Plymouth","action":"omarchy-launch-floating-terminal-with-presentation omarchy-refresh-plymouth"},
+   "update.config.tmux": {"icon":"","label":"Tmux","action":"omarchy-launch-floating-terminal-with-presentation omarchy-refresh-tmux"},
+   "update.config.shell": {"icon":"󰍜","label":"Shell","action":"omarchy-launch-floating-terminal-with-presentation omarchy-refresh-shell"},
 diff --git a/shell/Commons/Style.qml b/shell/Commons/Style.qml
 index 6016cce4a..0447e970e 100644
 --- a/shell/Commons/Style.qml
@@ -1391,6 +1259,181 @@ index e0b3c322b..ded86cfa3 100644
  
    Connections {
      target: Quickshell
+diff --git a/shell/plugins/agents/Panel.qml b/shell/plugins/agents/Panel.qml
+index 33a0627ab..4c56df006 100644
+--- a/shell/plugins/agents/Panel.qml
++++ b/shell/plugins/agents/Panel.qml
+@@ -1490,12 +1490,16 @@ Panel {
+       }
+     }
+ 
+-    // The meter shows what is left, not what is used: a prepaid account
+-    // drains toward empty rather than filling toward a cap.
++    // The meter measures what has been spent, exactly as the window meters
++    // above measure what has been used: one language for every allowance in
++    // the section, and a pool that resets fills toward full as it drains
++    // rather than toward empty. Its column, gutter and type are the window
++    // rows' own, so the four meters read as one block rather than as three
++    // meters and a footnote.
+     Column {
+       visible: !!section.balance
+       width: parent.width
+-      spacing: Style.space(6)
++      spacing: Style.space(12)
+ 
+       Item {
+         width: parent.width
+@@ -1509,36 +1513,51 @@ Panel {
+           text: Commons.I18n.t("agents.balance")
+           color: root.foreground
+           font.family: root.fontFamily
+-          font.pixelSize: Style.font.caption
++          font.pixelSize: Style.font.bodySmall
+         }
+ 
+         Meter {
+           anchors.left: balanceTitle.right
+           anchors.right: balanceValue.left
+-          anchors.rightMargin: Style.spacing.md
++          anchors.rightMargin: Style.space(20)
+           anchors.verticalCenter: parent.verticalCenter
+-          value: section.balance && section.balance.funded > 0 ? section.balance.remaining / section.balance.funded : -1
++          value: section.balance && section.balance.funded > 0 ? section.balance.spent / section.balance.funded : -1
+           alarming: root.balanceAlarming(section.balance)
+         }
+ 
++        // The windows' own time-left column, so both rows end in the same
++        // place; a money string is narrower than "00h 00m" at this size.
++        // The widest value a window row carries, so this row's meter ends
++        // exactly where theirs does.
++        TextMetrics {
++          id: balanceValueMetrics
++          font.family: root.fontFamily
++          font.pixelSize: Style.font.bodySmall
++          text: "100% · 00h 00m"
++        }
++
+         Text {
+           id: balanceValue
+           textFormat: Text.PlainText
+-          width: Style.space(96)
++          width: Math.ceil(balanceValueMetrics.advanceWidth)
+           anchors.right: parent.right
+           anchors.verticalCenter: parent.verticalCenter
+           horizontalAlignment: Text.AlignRight
+           text: section.balance ? root.formatMoney(section.balance.remaining, section.balance.currency) : ""
+           color: root.balanceAlarming(section.balance) ? root.urgent : root.dim
+           font.family: root.fontFamily
+-          font.pixelSize: Style.font.caption
++          font.pixelSize: Style.font.bodySmall
++          elide: Text.ElideLeft
+         }
+       }
+ 
++      // The spent-of-funded line stays the one step down in size, indented
++      // under the meter's own column so it reads as that row's detail.
+       Text {
+         textFormat: Text.PlainText
+         visible: text !== ""
+         width: parent.width
++        leftPadding: parent.width * 0.3
+         text: root.balanceDetailText(section.balance)
+         color: root.dim
+         font.family: root.fontFamily
+@@ -2037,17 +2056,18 @@ Panel {
+       markers: compact.scoped
+     }
+ 
+-    // Sized to the widest time left ("19h 40m"), so every meter ends in the
+-    // same place.
++    // Sized to the widest value the row can carry — a full percentage and the
++    // longest time left ("100% · 19h 40m") — so every meter ends in the same
++    // place whether or not its window has a reset time.
+     TextMetrics {
+       id: compactValueMetrics
+       font.family: root.fontFamily
+       font.pixelSize: Style.font.bodySmall
+-      text: "00h 00m"
++      text: "100% · 00h 00m"
+     }
+ 
+-    // How long until the window resets. The meter says how full it is; the
+-    // exact percentage is in the row's tooltip.
++    // How much of the allowance is used, and when it resets: the meter says
++    // how full it is at a glance, this says by how much and for how long.
+     Text {
+       id: compactValue
+       width: Math.ceil(compactValueMetrics.advanceWidth)
+@@ -2055,8 +2075,12 @@ Panel {
+       anchors.verticalCenter: parent.verticalCenter
+       textFormat: Text.PlainText
+       horizontalAlignment: Text.AlignRight
+-      text: compact.resetMs > 0 ? root.formatDuration(compact.resetMs) : ""
+-      color: root.dim
++      text: {
++        if (!compact.window) return ""
++        var used = Commons.I18n.formatNumber(Math.round(compact.window.percent * 100)) + "%"
++        return compact.resetMs > 0 ? used + " · " + root.formatDuration(compact.resetMs) : used
++      }
++      color: compact.alarming ? root.urgent : root.dim
+       font.family: root.fontFamily
+       font.pixelSize: Style.font.bodySmall
+     }
+diff --git a/shell/plugins/agents/README.md b/shell/plugins/agents/README.md
+index 4794316f7..eb8310943 100644
+--- a/shell/plugins/agents/README.md
++++ b/shell/plugins/agents/README.md
+@@ -94,6 +94,7 @@ Adding an agent needs no QML changes: ship a collector that follows the contract
+ | `fireworks` | Prepaid balance: the live ledger when the key can read it, else configured funding minus rated account costs; kept stale past a failed check | Fireworks billing API, grouped by day and model for the last 30 days, cached per key and account |
+ | `synthetic` | Synthetic's `GET /v2/quotas`: rolling five-hour requests, weekly credits, hourly search, free tool calls | pi/omp sessions and opencode messages on the `synthetic` provider; Claude Code, MiniMax Code and Codex sent to `api.synthetic.new`, and Claude Code replies by `hf:`/`syn:` models with no override |
+ | `local` | None (self-hosted work has no meter) | Codex rollouts, pi/omp sessions and opencode messages on a local runtime, a provider named in `local.json`, or a Codex provider whose `base_url` is on the LAN, never a provider id another collector counts, plus Claude Code turns while `ANTHROPIC_BASE_URL` is self-hosted (not Claude models or cloud-tagged ones), and Kimi Code, Qwen Code, Hermes and Mistral Vibe requests sent to a self-hosted base URL |
++| `commandcode` | Command Code's billing ledger: the 5-hour and weekly rolling windows, and the plan's monthly credit pool as a meter with its balance | none; the billing ledger is the whole account |
+ 
+ Every collector follows the same rules, so the same situation reads the same for every agent: a recent answer is reused for 15 seconds unless refresh is pressed, each credential or account keeps its own last good answer, a failed check keeps it with its age on hover and windows that have since reset back at zero, an endpoint that can't be reached is retried soon, and an agent the machine doesn't use stays out of the panel. Tokens are counted once, under the provider that bills them: pi, omp, and opencode sessions are split by provider into the matching collector. A pi compaction's usage counts, but omp records only the context's size before and after one, not what its summary request used, so omp's compactions are missing from the tokens. pi and omp sessions are read from every profile, and from `PI_CODING_AGENT_DIR`, `PI_CODING_AGENT_SESSION_DIR`, and a `settings.json` `sessionDir` as well as the defaults when set, a forked session's copied messages once; opencode is read from both its `message` and V2 `session_message` stores in the database `OPENCODE_DB` names, a message migrated into both once and a fork's copied history not at all. A machine with none of an agent's home, CLI, or usage prints an empty record the panel skips; one that has them but no sign-in says it is waiting for one. The sections below cover where each agent's sign-in and data come from.
+ 
+@@ -286,6 +287,14 @@ A Codex rollout records its provider's id but not the URL it reached, so the col
+ 
+ It is the exact complement of the provider collectors: a provider id another collector counts is never counted here, whatever `local.json` says (that collector counts it, once), but for a Codex `model_providers` entry, whose `base_url` decides whatever its id, so one under a claimed id on your own hardware (a self-hosted Kimchi gateway's `kimchi codex` setup) counts here; and the Codex collector keeps every rollout on the built-in `openai` provider, but for the models of one that a self-hosted `openai_base_url` served (see [Codex](#codex)). Two providers are claimed only for some models, and only those rows are left out: Ollama's cloud models (a `:cloud` or `-cloud` tag) run on Ollama's servers even through the local daemon, so they count under Ollama Cloud instead, and opencode's Antigravity plugin records a `google` provider with `antigravity-` models, which the Antigravity collector counts. A Codex rollout's prompts are the ones typed, and a subagent's or guardian's thread starts no session, read as the Codex collector reads them. Claude Code counts here while `ANTHROPIC_BASE_URL` is self-hosted (Ollama's `http://localhost:11434`, a LAN box), for every model but a Claude one, which a local gateway forwards on to Anthropic, and a cloud-tagged one, by the [Claude Code](#claude-code) rule; so do MiniMax Code replies on a custom provider whose `baseURL` is self-hosted, and, by the same rule, Kimi Code, Qwen Code, Hermes and Mistral Vibe requests whose recorded base URL is self-hosted, read by each one's own collector. There are no limits or balance.
+ 
++### Command Code
++
++Command Code's section reads the account's billing ledger, the same two answers its own `/usage` view is built from: `/alpha/billing/credits` (what the plan's windows and monthly pool have spent) and `/alpha/billing/subscriptions` (which plan is active, and when its period ends). These are the CLI's own routes rather than a published API, so a change there costs the numbers, not the panel.
++
++The three meters are the allowances that view shows: `5 hours` and `Weekly` are the plan's rolling windows, `used` of `cap` as the service reports them, and `Monthly` is the plan's credit pool (GOAT 70) against what is left of it. The balance under them is that remainder, so the bar and the figure are the same measurement. A window whose reset time has passed reads zero with no reset time until a fresh check dates the next one, and a plan the CLI's own plan table doesn't name gets no monthly meter rather than a guessed one.
++
++The key is `COMMANDCODE_API_KEY`, read from the environment first (where Ante and the CLI both take it), then from `~/.hermes/.env`, `~/.ante/auth/api_keys.json` and `~/.commandcode/.env`. It is only ever read. Every number is the account's, so the record says `scope: account` and carries no prompts or sessions to count.
++
+ ## Interactions
+ 
+ - Bar icon: left = panel, right = launch agent, middle = refresh. It turns
+diff --git a/shell/plugins/agents/assets/commandcode-light.svg b/shell/plugins/agents/assets/commandcode-light.svg
+new file mode 100644
+index 000000000..2bdeb2701
+--- /dev/null
++++ b/shell/plugins/agents/assets/commandcode-light.svg
+@@ -0,0 +1 @@
++<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#111"><title>Command Code</title><path d="M3.6 7.1 8.1 3.6l3.1 3.9a1.1 1.1 0 0 1-.3 1.6l-2 1.2a1.1 1.1 0 0 0-.4 1.5l1.1 1.8a1.1 1.1 0 0 0 1.5.4l2-1.2a1.1 1.1 0 0 1 1.6.4l2.6 4.1-4.5 3.5-1.5-2.4a3 3 0 0 0-4.1-1l-2 1.2-2.5-4.1a3 3 0 0 1 .9-4.1l.1-.1z"/><circle cx="18.1" cy="5.4" r="2.1"/></svg>
+diff --git a/shell/plugins/agents/assets/commandcode.svg b/shell/plugins/agents/assets/commandcode.svg
+new file mode 100644
+index 000000000..ff2c0429f
+--- /dev/null
++++ b/shell/plugins/agents/assets/commandcode.svg
+@@ -0,0 +1 @@
++<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#fff"><title>Command Code</title><path d="M3.6 7.1 8.1 3.6l3.1 3.9a1.1 1.1 0 0 1-.3 1.6l-2 1.2a1.1 1.1 0 0 0-.4 1.5l1.1 1.8a1.1 1.1 0 0 0 1.5.4l2-1.2a1.1 1.1 0 0 1 1.6.4l2.6 4.1-4.5 3.5-1.5-2.4a3 3 0 0 0-4.1-1l-2 1.2-2.5-4.1a3 3 0 0 1 .9-4.1l.1-.1z"/><circle cx="18.1" cy="5.4" r="2.1"/></svg>
+diff --git a/shell/plugins/agents/manifest.json b/shell/plugins/agents/manifest.json
+index 25b11cf54..0b844b7aa 100644
+--- a/shell/plugins/agents/manifest.json
++++ b/shell/plugins/agents/manifest.json
+@@ -41,7 +41,8 @@
+         "deepseek": { "enabled": true },
+         "fireworks": { "enabled": true },
+         "synthetic": { "enabled": true },
+-        "local": { "enabled": true }
++        "local": { "enabled": true },
++        "commandcode": { "enabled": true }
+       },
+       "refreshIntervalSec": 900,
+       "syncMode": "Off",
 diff --git a/shell/plugins/background/Background.qml b/shell/plugins/background/Background.qml
 index a05f110cf..88db8ec53 100644
 --- a/shell/plugins/background/Background.qml
@@ -2511,7 +2554,7 @@ index c80c2e5c4..022882371 100644
            maximumLineCount: 1
          }
 diff --git a/shell/plugins/panels/monitor/Panel.qml b/shell/plugins/panels/monitor/Panel.qml
-index a26fbd5b0..f85170f6a 100644
+index a26fbd5b0..6c5a8f0ee 100644
 --- a/shell/plugins/panels/monitor/Panel.qml
 +++ b/shell/plugins/panels/monitor/Panel.qml
 @@ -28,6 +28,24 @@ Panel {
@@ -2831,7 +2874,7 @@ index a26fbd5b0..f85170f6a 100644
 +
 +              PanelSectionHeader {
 +                id: resolutionHeader
-+                text: "RESOLUTION"
++                text: Commons.I18n.t("monitor.resolution")
 +                foreground: root.bar.foreground
 +                fontFamily: root.bar.fontFamily
 +                anchors.left: parent.left
@@ -2893,7 +2936,7 @@ index a26fbd5b0..f85170f6a 100644
            PanelSeparator {
              foreground: root.bar.foreground
 diff --git a/shell/plugins/panels/power/Panel.qml b/shell/plugins/panels/power/Panel.qml
-index 976bc8ee2..c14d93326 100644
+index 976bc8ee2..a5985df11 100644
 --- a/shell/plugins/panels/power/Panel.qml
 +++ b/shell/plugins/panels/power/Panel.qml
 @@ -19,6 +19,14 @@ Panel {
@@ -3057,7 +3100,7 @@ index 976bc8ee2..c14d93326 100644
 +
 +            PanelSectionHeader {
 +              id: chargeHeader
-+              text: "CHARGE LIMIT"
++              text: Commons.I18n.t("power.chargeLimitHeader")
 +              foreground: root.bar.foreground
 +              fontFamily: root.bar.fontFamily
 +              anchors.left: parent.left
