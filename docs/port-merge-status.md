@@ -70,7 +70,7 @@
 
 | 优先级 | 项目 | 当前证据 | 完成判据 |
 |---|---|---|---|
-| 高 | 统一系统动作入口的 niri 分流 | `bin/omarchy-system` 的 logout 仍是 `uwsm stop`，没有转交 `omarchy-niri-system`；旧文档“守卫已迁入”的描述与源码不符 | 给新统一入口补齐分流与隔离契约测试；注销/关机/重启的真实验收须另行确认，不能在工作会话中擅自触发 |
+| 高 | 统一系统动作入口的 niri 分流 | 已改：`bin/omarchy-system` 的 logout 在 `XDG_CURRENT_DESKTOP=niri` 时走 `niri msg action quit --skip-confirmation`，并把 `NIRI_SOCKET`、`XDG_CURRENT_DESKTOP` 传进 detach 出去的 worker（缺任何一个，worker 里都选不到 niri 分支、或连不上合成器）。`test/shell.d/system-power-test.sh` 补了 niri 路由契约，并把桌面与 `niri` 一起 mock/钉死——此前它继承真机环境，在 niri 会话里跑会真的把会话关掉（2026-10-29 实测发生） | 待办：注销/关机/重启的真实验收须另行确认，不能在工作会话中擅自触发；覆盖层 `niri.patch` 尚未包含该改动（见下条） |
 | 高 | 内置工作区部件的新 dispatch | 新部件走 `hyprctl dispatch o.workspaces.focus(...)`，而垫片将未知命令返回 0、不产生 niri action；Niri.dispatch 的实现未接到该调用链 | 单屏点击/滚轮生成正确 action，并有针对新表达式的测试 |
 | 高 | 工作区 monitor/event 模型 | 内置 Workspaces 仍读 Hyprland.monitorFor 并监听 Hyprland 事件；工作区列表换源不够 | 当前显示器、当前工作区、滚轮起点均来自 niri，且切换后刷新正确 |
 | 中 | 多屏工作区唯一标识 | Niri 映射使用每屏 idx 作为 id，不同输出可以同号；上游十个一组的全局编号假设不适用 | 双屏同号工作区不混淆、点击落到目标输出，不只验证单屏 |

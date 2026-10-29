@@ -18,7 +18,17 @@ fi
 
 action=${1:-}
 case $action in
-  logout) command=(uwsm stop) ;;
+  logout)
+    # niri has no uwsm, so `uwsm stop` would fail after every window was already
+    # gone. Ask the compositor to quit instead, the way a niri session logs out;
+    # --skip-confirmation skips niri's own "Press Enter to confirm" prompt, which
+    # a menu logout must not require.
+    if [[ ${XDG_CURRENT_DESKTOP:-} == niri ]]; then
+      command=(niri msg action quit --skip-confirmation)
+    else
+      command=(uwsm stop)
+    fi
+    ;;
   reboot) command=(systemctl reboot --no-wall) ;;
   shutdown) command=(systemctl poweroff --no-wall) ;;
   *) echo "$usage" >&2; exit 2 ;;
@@ -73,7 +83,8 @@ elif [[ ${2:-} == "--execute" ]]; then
 elif [[ -z ${2:-} ]]; then
   # Survive closing the terminal that requested the session exit.
   systemd-run --user --collect --quiet --property=Type=exec --property=RuntimeMaxSec=30s \
-    --setenv=PATH --setenv=HYPRLAND_INSTANCE_SIGNATURE --setenv=OMARCHY_PATH \
+    --setenv=PATH --setenv=HYPRLAND_INSTANCE_SIGNATURE --setenv=NIRI_SOCKET \
+    --setenv=XDG_CURRENT_DESKTOP --setenv=OMARCHY_PATH \
     "$0" "$action" --execute
 else
   echo "$usage" >&2
