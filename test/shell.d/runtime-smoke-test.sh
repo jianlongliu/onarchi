@@ -643,7 +643,7 @@ done
 jq -e 'any(.bar.layout[][]; .id? == "omarchy.elsewhen" and .cities? != null)' "$config" >/dev/null ||
   fail_with_log "Elsewhen saves its first-run cities before shell.json is edited"
 sed -i '$ d' "$config"
-cp "$config" "$TMPDIR/broken.json"
+cp "$config" "$SCRATCH_DIR/broken.json"
 for _ in {1..80}; do
   [[ $(center_ids) != *omarchy.microphone* ]] && break
   kill -0 "$QS_PID" 2>/dev/null || fail_with_log "test shell exited while reading an unreadable shell.json"
@@ -656,7 +656,7 @@ jq -e 'any(.bar.layout[][]; .id? == "omarchy.clock" and .format? == "HH:mm")' \
   <<<"$(shell_ipc shell listShellConfig)" >/dev/null ||
   fail_with_log "a bar change still applies in memory while shell.json is unreadable"
 sleep 0.5
-cmp -s "$config" "$TMPDIR/broken.json" || fail "a bar change leaves an unreadable shell.json as the user left it" "$(cat "$config")"
+cmp -s "$config" "$SCRATCH_DIR/broken.json" || fail "a bar change leaves an unreadable shell.json as the user left it" "$(cat "$config")"
 pass "a bar change leaves an unreadable shell.json as the user left it"
 
 printf '}\n' >>"$config"
