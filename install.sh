@@ -36,13 +36,32 @@ for f in "$REPO_DIR"/port-bin/*; do
 done
 
 # ---- 2. Omarchy config layer 1 (only if absent) ----
+# niri-config/shell.json is this port's template: the floating, frosted bar with
+# the capsule workspace dots, so a fresh install looks like the screenshots
+# instead of upstream's opaque edge-to-edge strip.
 log "Writing Omarchy config layer (~/.config/omarchy/shell.json) if absent"
 mkdir -p "$HOME_DIR/.config/omarchy"
 if [[ ! -f "$HOME_DIR/.config/omarchy/shell.json" ]]; then
   install -m 0600 "$REPO_DIR/niri-config/shell.json" "$HOME_DIR/.config/omarchy/shell.json"
 else
   warn "~/.config/omarchy/shell.json exists; leaving it (it holds your theme/font config)."
+  warn "  Its bar section came from an older template: to get the floating frosted bar,"
+  warn "  set \"background\": \"glassy\", \"floatGap\": 8 and \"id\": \"omarchy.bar\" in .bar,"
+  warn "  and move .bar.layout.centerAnchor into the centerBegin/center/centerEnd split."
 fi
+
+# ---- 2b. the bar widgets the template names ----
+# The template's left side is this port's Arch logo menu plus its capsule
+# workspace dots, and neither ships upstream. A bar that names a widget nobody
+# installed renders without it, so install both before the shell first reads the
+# config.
+log "Installing port bar widgets (~/.config/omarchy/plugins)"
+PLUGIN_DIR="$HOME_DIR/.config/omarchy/plugins"
+for plugin in "$REPO_DIR"/plugins/jianlongliu.*; do
+  [[ -d $plugin ]] || continue
+  mkdir -p "$PLUGIN_DIR/$(basename "$plugin")"
+  install -m 0644 "$plugin"/* "$PLUGIN_DIR/$(basename "$plugin")/"
+done
 
 # ---- 3. omarchy update/theme hooks ----
 log "Installing omarchy hooks (~/.config/omarchy/hooks)"

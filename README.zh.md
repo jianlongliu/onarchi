@@ -71,7 +71,7 @@ onarchi/
 │                     + materal-recolor 单元；配色走 Omarchy 主题
 │                     + materal-recolor.{path,service}；拷到 ~/.config/ 用，说明见该目录 README
 ├── config/       <- **上游 Omarchy 的默认配置树**（未改动，不是本机在用的那份）
-├── plugins/      <- 自研插件源码（jianlongliu.arch-logo；split-lock 自成一档）
+├── plugins/      <- 自研插件源码（jianlongliu.arch-logo、jianlongliu.workspaces；split-lock 自成一档）
 ├── split-greeter/、split-lock/  <- 自研登录器与锁屏，各带 install.sh + tests/
 ├── default/      <- 本机随仓库走的"上游形状"默认件（systemd 用户单元、omarchy 菜单 jsonc）
 ├── hooks/        <- post-update.d/10-niri-repatch, theme-set.d/{10-niri-border,20-materal}
@@ -137,7 +137,7 @@ onarchi/
 手动、逐条执行的步骤在 **`docs/INSTALL.zh.md`**（依赖、`~/bin` 胶水、config.kdl 合并、覆盖层、背光、每机检查）。
 这是手动参考路径，尚未在其他机器上端到端验证。
 
-可选的 `install.sh` 不会放置覆盖层和插件、改写已有 `config.kdl`、装包或修背光权限。它可能覆盖已有文件，repatch 失败也只警告；运行前请读 `docs/INSTALL.zh.md`。
+可选的 `install.sh` 会把 `port-bin/` 复制进 `~/bin`、把两个 bar 部件装进 `~/.config/omarchy/plugins/`、在没有 shell.json 时写入本移植的模板，并在覆盖层或 root 辅助件需要人工处理时给出提示。它不会改写已有 `config.kdl`、装包或修背光权限，且可能覆盖已有文件；运行前请读 `docs/INSTALL.zh.md`。
 
 简版：
 
@@ -149,6 +149,26 @@ cd onarchi
 ```
 
 然后按指南合并配置：模板直接启动 Quickshell，推荐改用有监督的 `omarchy-launch-shell`。完成配置后注销再登录。
+
+### 全新安装长什么样
+
+`niri-config/shell.json` 是本移植的模板，默认就是截图里那套，而不是上游的默认样子：
+
+| | 上游默认 | 本移植模板 |
+|---|---|---|
+| bar 表面 | `"background": "opaque"`，贴边铺满 | `"background": "glassy"` —— 磨砂，浮在壁纸之上 |
+| 间隙 | 无 | `"floatGap": 8`，bar 与屏幕边缘脱开 |
+| 工作区 | `omarchy.workspaces`（数字） | `jianlongliu.workspaces` —— 每个工作区一个实心点，当前那个拉长成胶囊 |
+| 左端 | `omarchy.menu` | `jianlongliu.arch-logo` —— Arch 图标，点开同一个菜单 |
+
+两个非上游部件都在本仓库 `plugins/` 下，`install.sh` 会把它们装进
+`~/.config/omarchy/plugins/`。想调整就改 `~/.config/omarchy/shell.json`：磨砂是
+`bar.background`（`glassy`、`none` 全透明、`opaque` 不透明），脱开距离是 `bar.floatGap`，
+圆角与模糊本身由 `niri.patch` 里的 `shell/plugins/bar/Bar.qml` 提供。
+
+若你已经有 `shell.json`，`install.sh` 不会碰它（里面存着你的主题与字体选择）。要手工套用新外观，
+就在它的 `bar` 块里设 `background`、`floatGap`、`id`，并把旧的 `centerAnchor` 迁到上游现在要求的
+`centerBegin` / `center` / `centerEnd` 三段式。
 
 ## 每机调整（必须检查）
 

@@ -1,33 +1,37 @@
 {
   "bar": {
-    "centerAnchor": "omarchy.clock",
+    "background": "glassy",
+    "floatGap": 8,
+    "id": "omarchy.bar",
+    "position": "top",
     "layout": {
-      "center": [
+      "left": [
+        {
+          "id": "jianlongliu.arch-logo"
+        },
+        {
+          "id": "jianlongliu.workspaces"
+        }
+      ],
+      "centerBegin": [
         {
           "id": "omarchy.indicators"
-        },
+        }
+      ],
+      "center": [
         {
           "format": "dddd HH:mm",
           "formatAlt": "d MMMM 'W'ww yyyy",
           "id": "omarchy.clock",
           "verticalFormat": "HH\n—\nmm"
-        },
-        {
-          "id": "omarchy.keyboard-layout"
-        },
+        }
+      ],
+      "centerEnd": [
         {
           "id": "omarchy.weather"
         },
         {
           "id": "omarchy.system-update"
-        }
-      ],
-      "left": [
-        {
-          "id": "omarchy.menu"
-        },
-        {
-          "id": "omarchy.workspaces"
         }
       ],
       "right": [
@@ -53,9 +57,7 @@
           "id": "omarchy.power"
         }
       ]
-    },
-    "position": "top",
-    "transparent": false
+    }
   },
   "idle": {
     "lock": 300,

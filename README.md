@@ -75,12 +75,13 @@ onarchi/
 │                     install.sh copies these into ~/bin (PATH-first, survives `omarchy update`)
 ├── niri-port/    <- overlay: niri.patch + Niri.qml (reapplied after each update)
 ├── niri-config/  <- local/*.kdl (what this machine runs) + omarchy.kdl.template (the other route)
-│                     + shell.json sample (Omarchy config layer 1)
+│                     + shell.json template (floating frosted bar, capsule dots)
 ├── local-config/ <- the machine's ~/.config layer: ghostty (decorations off, opacity, blur off)
 │                     + the materal-recolor units; colours come from the Omarchy theme
 │                     + materal-recolor.service/.path; copy over your own, see its README
 ├── config/       <- upstream Omarchy's default config tree, untouched (NOT this machine's)
-├── plugins/      <- self-written plugin sources (jianlongliu.arch-logo; split-lock has its own dir)
+├── plugins/      <- self-written plugin sources (jianlongliu.arch-logo, jianlongliu.workspaces;
+│                     split-lock has its own dir)
 ├── split-greeter/, split-lock/  <- self-written greeter and lock screen, each with install.sh + tests
 ├── default/      <- upstream-shaped defaults this machine ships (systemd/user units, omarchy menu jsonc)
 ├── hooks/        <- post-update.d/10-niri-repatch, theme-set.d/{10-niri-border,20-materal}
@@ -146,8 +147,10 @@ Install these on the target Arch machine. Everything below was verified in use o
 The manual, hand-run procedure is in **`docs/INSTALL.md`** (deps, `~/bin` glue, config.kdl merge, overlay,
 backlight, per-machine checks). It is a manual reference, not a tested installation guarantee.
 
-There is also an optional `install.sh` bootstrap, but it does not stage the overlay and plugins, rewrite
-an existing `config.kdl`, install packages or fix backlight permissions. It can overwrite files and warns on repatch failure; consult `docs/INSTALL.md` before running it.
+There is also an optional `install.sh` bootstrap. It copies `port-bin/` into `~/bin`, installs the two bar
+widgets under `~/.config/omarchy/plugins/`, writes the port's shell.json template when you have none, and
+warns when the overlay or a root helper needs a hand. It does not rewrite an existing `config.kdl`, install
+packages or fix backlight permissions, and it can overwrite files; consult `docs/INSTALL.md` before running it.
 
 Short version:
 
@@ -159,6 +162,29 @@ cd onarchi
 ```
 
 Then merge the config as described in the guide; the template starts bare Quickshell, whereas the recommended `omarchy-launch-shell` supervises it. Log out and back in after completing the setup.
+
+### What a fresh install looks like
+
+`niri-config/shell.json` is the port's template, and it ships the look in the
+screenshots rather than upstream's default:
+
+| | Upstream default | This port's template |
+|---|---|---|
+| Bar surface | `"background": "opaque"`, edge to edge | `"background": "glassy"` — frosted, floating over the wallpaper |
+| Gap | none | `"floatGap": 8`, so the bar detaches from the screen edge |
+| Workspaces | `omarchy.workspaces` (numbers) | `jianlongliu.workspaces` — one dot per workspace, the focused one stretched into a capsule |
+| Left end | `omarchy.menu` | `jianlongliu.arch-logo` — Arch mark that opens the same menu |
+
+Both non-upstream widgets live in `plugins/` here, and `install.sh` copies them
+into `~/.config/omarchy/plugins/`. To change any of it, edit
+`~/.config/omarchy/shell.json`: the frosted look is `bar.background` (`glassy`,
+`none` for fully clear, `opaque`), the detach is `bar.floatGap`, and the round
+corners plus the blur itself ride in `niri.patch`'s `shell/plugins/bar/Bar.qml`.
+
+If you already have a `shell.json`, `install.sh` leaves it alone — it holds your
+theme and font choices. To adopt the new look by hand, set `background`,
+`floatGap` and `id` in its `bar` block, and move any old `centerAnchor` into the
+`centerBegin` / `center` / `centerEnd` split upstream now expects.
 
 ## Per-machine adjustments (must check)
 
