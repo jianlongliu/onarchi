@@ -181,6 +181,12 @@ into `~/.config/omarchy/plugins/`. To change any of it, edit
 `none` for fully clear, `opaque`), the detach is `bar.floatGap`, and the round
 corners plus the blur itself ride in `niri.patch`'s `shell/plugins/bar/Bar.qml`.
 
+The frosted surface is `MultiEffect` blur, and it stops working under **Qt 6.12**
+— the bar and menu then render as opaque black cards. This machine pins 16 Qt
+packages at 6.11.2 for exactly that reason (see "Qt stays pinned at 6.11.2"
+below). If your distro ships 6.12, expect the layout above with a solid bar
+instead of frosted glass until `MultiEffect` is fixed upstream.
+
 If you already have a `shell.json`, `install.sh` leaves it alone — it holds your
 theme and font choices. To adopt the new look by hand, set `background`,
 `floatGap` and `id` in its `bar` block, and move any old `centerAnchor` into the

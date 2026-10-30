@@ -166,6 +166,10 @@ cd onarchi
 `bar.background`（`glassy`、`none` 全透明、`opaque` 不透明），脱开距离是 `bar.floatGap`，
 圆角与模糊本身由 `niri.patch` 里的 `shell/plugins/bar/Bar.qml` 提供。
 
+磨砂本身是 `MultiEffect` 模糊，在 **Qt 6.12** 下会失效——bar 和菜单会渲染成不透明的黑卡片。
+本机为此把 16 个 Qt 包钉在 6.11.2（见下文「Qt 钉在 6.11.2」）。若你的发行版是 6.12，
+铺出来的会是同样的布局，但 bar 是实心而不是磨砂，直到上游修好 `MultiEffect`。
+
 若你已经有 `shell.json`，`install.sh` 不会碰它（里面存着你的主题与字体选择）。要手工套用新外观，
 就在它的 `bar` 块里设 `background`、`floatGap`、`id`，并把旧的 `centerAnchor` 迁到上游现在要求的
 `centerBegin` / `center` / `centerEnd` 三段式。
