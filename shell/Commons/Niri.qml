@@ -50,7 +50,10 @@ QtObject {
     property var _monitorModes: ({})
 
     // Re-read both lists from scratch. Used on startup and by the event handlers.
+    // A call before the socket is resolved is dropped, not queued: `onReadyChanged`
+    // does one refresh of everything the moment the path is known.
     function refresh() {
+        if (!root.ready) return
         if (!wsProcess.running) wsProcess.running = true
         if (!winProcess.running) winProcess.running = true
         if (!outputProcess.running) outputProcess.running = true
@@ -58,12 +61,15 @@ QtObject {
 
     // Hyprland's own refresh hooks, so call sites port by renaming only.
     function refreshMonitors() {
+        if (!root.ready) return
         if (!outputProcess.running) outputProcess.running = true
     }
     function refreshWorkspaces() {
+        if (!root.ready) return
         if (!wsProcess.running) wsProcess.running = true
     }
     function refreshToplevels() {
+        if (!root.ready) return
         if (!winProcess.running) winProcess.running = true
     }
 
@@ -296,9 +302,46 @@ QtObject {
             winDebounce.restart()
     }
 
+    // `niri msg` finds the compositor through NIRI_SOCKET, and the value a shell
+    // inherits can outlive the compositor it named. Logging out and back in
+    // starts a new niri with a new socket path, but the user manager's already
+    // running children -- herdr, the terminal, this shell -- keep the old one in
+    // their environment, so every `niri msg` spawned here dies with "error
+    // connecting to the niri socket" and every list below stays empty. The
+    // failure is silent: monitors never arrives, an OverlayWindow gets no
+    // targetMonitor, never maps, and the menu stops opening while the bar draws
+    // against nothing.
+    //
+    // Quickshell.fileNameList cannot be used to look for the real one (measured:
+    // it returns no entries for /run/user/1000), so ask the shell. The socket is
+    // `niri.<wayland-display>.<pid>.sock` directly in the runtime dir, and the
+    // live compositor owns the highest pid.
+    property Process socketProbe: Process {
+        id: socketProbe
+        command: ["sh", "-c",
+            "ls -1 \"$0\"/niri.*.sock 2>/dev/null | sort -t. -k3 -n | tail -n 1",
+            Quickshell.env("XDG_RUNTIME_DIR") || ("/run/user/" + Quickshell.env("UID"))]
+        running: true
+        stdout: StdioCollector {
+            waitForEnd: true
+            onStreamFinished: {
+                var path = String(text || "").trim()
+                if (path.length > 0) root._socketPath = path
+            }
+        }
+        stderr: StdioCollector {}
+    }
+
+    // Empty until the probe answers. Each child is only spawned after that (see
+    // `ready`), so no `niri msg` ever runs against the stale path.
+    property string _socketPath: ""
+    readonly property bool ready: root._socketPath.length > 0
+    readonly property var _niriEnv: ({ "NIRI_SOCKET": root._socketPath })
+
     property Process wsProcess: Process {
         id: wsProcess
         command: ["niri", "msg", "-j", "workspaces"]
+        environment: root._niriEnv
         running: false
         stdout: StdioCollector {
             waitForEnd: true
@@ -310,6 +353,7 @@ QtObject {
     property Process winProcess: Process {
         id: winProcess
         command: ["niri", "msg", "-j", "windows"]
+        environment: root._niriEnv
         running: false
         stdout: StdioCollector {
             waitForEnd: true
@@ -323,6 +367,7 @@ QtObject {
     property Process outputProcess: Process {
         id: outputProcess
         command: ["niri", "msg", "-j", "outputs"]
+        environment: root._niriEnv
         running: false
         stdout: StdioCollector {
             waitForEnd: true
@@ -345,7 +390,10 @@ QtObject {
     property Process eventStream: Process {
         id: eventStream
         command: ["niri", "msg", "-j", "event-stream"]
-        running: true
+        environment: root._niriEnv
+        // Started only once the socket is resolved; `onReadyChanged` below kicks
+        // it off, and `streamRetry` reconnects after a compositor restart.
+        running: false
         stdout: SplitParser {
             onRead: line => root.handleEvent(line)
         }
@@ -357,7 +405,15 @@ QtObject {
 
     property Timer streamRetry: Timer {
         interval: 1000
-        onTriggered: if (!eventStream.running) eventStream.running = true
+        onTriggered: if (root.ready && !eventStream.running) eventStream.running = true
+    }
+
+    // The probe is the first thing to run; everything else waits for it so no
+    // child is ever spawned against the inherited (possibly dead) socket path.
+    onReadyChanged: {
+        if (!root.ready) return
+        root.refresh()
+        if (!eventStream.running) eventStream.running = true
     }
 
     Component.onCompleted: root.refresh()
