@@ -1518,7 +1518,7 @@ Item {
       // the full screen height, so a plain `blur true` frosts a band down the
       // whole right edge. Hand over the deck's own rect instead; the layer-rule
       // in effects.kdl sets only `xray`, leaving that region the sole blur area.
-      BackgroundEffect.blurRegion: Region { item: deck; radius: service.cornerRadius }
+      BackgroundEffect.blurRegion: Region { item: deck; radius: Style.cornerRadius }
 
       readonly property bool takesKeyboard: service.keyboardMode && service.targetDisplayName === String(modelData.name)
       WlrLayershell.keyboardFocus: takesKeyboard ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None

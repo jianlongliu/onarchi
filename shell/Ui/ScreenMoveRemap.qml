@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell
 
 // Hyprland leaves an already-mapped layer surface at its old global position
 // when its monitor moves within the layout: undocking disables the internal
@@ -37,7 +38,14 @@ Item {
 
   Connections {
     target: root.screen
-    function onXChanged() { settleTimer.restart() }
-    function onYChanged() { settleTimer.restart() }
+    // niri re-places layer surfaces itself, so the pulse is only needed under
+    // Hyprland, where the bug above is real. Under niri it is not harmless: the
+    // session's first output reconcile moves the origin, the background gets
+    // unmapped for 250ms, and that is the "wallpaper, black with a cursor,
+    // wallpaper again" flash on login. Measured on niri 26.04: eDP-1 moved
+    // 0,0 -> 1,0 -> 0,0 with the pulse suppressed left the bar and background
+    // correctly placed. NIRI_SOCKET is what niri exports into its sessions.
+    function onXChanged() { if (!Quickshell.env("NIRI_SOCKET")) settleTimer.restart() }
+    function onYChanged() { if (!Quickshell.env("NIRI_SOCKET")) settleTimer.restart() }
   }
 }
