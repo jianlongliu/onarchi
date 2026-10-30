@@ -206,8 +206,34 @@ because of that.
 | Bar decoration beyond frost (shadow, top highlight, forced 12 px radius) | Superseded by upstream's own bar design. Accepted the overwrite |
 | OSD card surface | Upstream moved OSD onto `OverlayWindow`, which requires a full-screen surface; the card-sized variant rendered nothing |
 | Notification blur via `popupColumn` | That element no longer exists upstream; the surface is a narrow strip now |
-| `omarchy-system` | Upstream uses a single `omarchy-system` entry; this snapshot's `bin/omarchy-system` does not route to `omarchy-niri-system`. Review the system action wiring before using it on niri |
+| `omarchy-system` | Fixed: `logout` routes to `niri msg action quit --skip-confirmation` on niri, and the detached worker receives `NIRI_SOCKET` and `XDG_CURRENT_DESKTOP` |
 | `omasnap`, `monologue`, `hype`, `signed` | All four need **Qt 6.12**; this machine pins Qt 6.11 (see below). `omasnap` additionally hard-depends on `hyprland`. Only `disktree-bin` from that batch runs |
+
+### Test suite: what is left to upstream
+
+`./test/shell` runs 411 files. Everything that failed because of the port itself is fixed; the
+open failures below are upstream's, and are left alone deliberately rather than patched around here.
+
+| Test | Why it is not fixed here |
+|---|---|
+| `bar-startup-budget`, `lock-appear-budget`, `menu-open-budget`, `panel-open-budgets` | They judge a layer surface through `hyprctl -j layers`, and niri reports a layer's namespace, level and output but not its pid or geometry. `require_hyprland_layers` skips them on niri; they still run under Hyprland |
+| `nvidia-kms-migration` | Simulates NVIDIA hardware the port does not touch. Its fixture never writes `00-omarchy-hooks.conf`, so the conditional reads an empty `HOOKS` and decides to rebuild on a hybrid machine |
+| `hardware-quirks` | Upstream's install orchestration: `install/hardware/input-group.sh` is dispatched by nothing, at `bc220e70` |
+| `background-intro-lifecycle` | `BackgroundIntro.qml` is byte-identical to upstream and the fixture's own retint assertion fails |
+| `agents-default-migration` | The expected bar layout predates upstream shipping `omarchy.keyboard-layout` |
+| `fontconfig-cjk` | Depends on the fonts installed on the machine |
+| `remote-session-service` | Needs an SSH peer the fixture cannot manufacture |
+
+`sudoers` fails because this machine adds `/etc/sudoers.d/omarchy-asdcontrol`, which that test
+requires every drop-in to register. The grant is machine-local, so registering it upstream would be
+wrong; it is left failing rather than silenced.
+
+`agent-account`, `monitor-modeless`, `passwordless-sudo-indicator`, `manifest-entrypoints` and
+`i18n-startup` fail only while the suite runs in parallel and pass on their own — file-level
+contention, not a real failure.
+
+`runtime-smoke` fails its transparent-bar wallpaper sample. It fails at `HEAD` with all working-tree
+changes stashed, so it is not caused by port work, and the root cause is not yet known.
 
 ### Qt stays pinned at 6.11.2
 
