@@ -13,6 +13,7 @@ set -euo pipefail
 source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/base-test.sh"
 
 require_quickshell "lock appear budget"
+require_hyprland_layers "lock appear budget"
 require_comparable_speed "lock appear budget"
 
 READY_BUDGET_MS=$(( ${OMARCHY_LOCK_READY_BUDGET_MS:-750} * SPEED_PERCENT / 100 ))

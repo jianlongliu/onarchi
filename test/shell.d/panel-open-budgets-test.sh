@@ -11,6 +11,7 @@ set -euo pipefail
 source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/base-test.sh"
 
 require_quickshell "panel open budgets"
+require_hyprland_layers "panel open budgets"
 require_comparable_speed "panel open budgets"
 
 FIRST_BUDGET_MS=$(( ${OMARCHY_PANEL_FIRST_OPEN_BUDGET_MS:-400} * SPEED_PERCENT / 100 ))

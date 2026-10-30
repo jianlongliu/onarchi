@@ -126,6 +126,20 @@ require_quickshell() {
   require_command jq
 }
 
+# Skips a test that judges a layer surface through `hyprctl -j layers`. niri
+# reports a layer's namespace, level and output but not its owning pid or its
+# geometry, so the shim cannot answer the question these tests ask and they
+# would fail on a healthy session. Anywhere Hyprland answers for real they still
+# run.
+require_hyprland_layers() {
+  local description="$1"
+
+  if [[ ${XDG_CURRENT_DESKTOP:-} == niri ]]; then
+    skip "niri does not report layer ownership or geometry; skipping $description"
+    exit 0
+  fi
+}
+
 QML_FIXTURE_TMP=""
 QML_FIXTURE_PID=""
 QML_FIXTURE_LOG=""
