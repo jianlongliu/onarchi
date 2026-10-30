@@ -128,7 +128,27 @@ else
   warn "No existing niri config.kdl; install the generated ~/.config/niri/omarchy.kdl as a starting point."
 fi
 
-# ---- 8. per-machine reminders ----
+# ---- 8. /usr/bin helpers (machine-wide; sudoers names the path) ----
+# A dev-link checkout keeps every command in $OMARCHY_PATH/bin, but parts of
+# Omarchy are addressed by absolute path. `omarchy-sudo-passwordless` is the one
+# that fails loudly: its sudoers grant names /usr/bin/omarchy-sudo-passwordless,
+# and the bar indicator polls `--active` on every refresh, so a missing helper
+# logs "a password is required" several times a minute forever. The grant itself
+# is only created when a user opts in, so the binary has to exist regardless.
+if [[ -x /usr/bin/omarchy-sudo-passwordless ]]; then
+  log "/usr/bin/omarchy-sudo-passwordless present"
+else
+  if [[ -n ${OMARCHY_INSTALL_ROOT_HELPERS:-} ]]; then
+    install -Dm0755 "$OMARCHY_PATH/bin/omarchy-sudo-passwordless" /usr/bin/omarchy-sudo-passwordless
+    log "Installed /usr/bin/omarchy-sudo-passwordless"
+  else
+    warn "/usr/bin/omarchy-sudo-passwordless is MISSING - passwordless sudo cannot work,"
+    warn "  and the bar indicator logs 'a password is required' on every refresh. Run once:"
+    warn "    pkexec install -Dm0755 $OMARCHY_PATH/bin/omarchy-sudo-passwordless /usr/bin/omarchy-sudo-passwordless"
+  fi
+fi
+
+# ---- 9. per-machine reminders ----
 warn ""
 warn "Per-machine checks (cannot be auto-detected reliably):"
 warn "  - monitor output name: run 'niri msg outputs' and adjust any hardcoded eDP-1."

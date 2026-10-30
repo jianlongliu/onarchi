@@ -42,6 +42,17 @@ if [[ -d $OVL/plugins ]]; then
   done
 fi
 
+# A dev-link checkout keeps commands in $OMARCHY_PATH/bin, but Omarchy's sudoers
+# grant names this one by absolute path. Leave it stale and the bar's poll logs
+# "a password is required" on every refresh. Installing it needs root, so only
+# say what to run.
+helper="$OMARCHY_PATH/bin/omarchy-sudo-passwordless"
+if [[ -f $helper && -x /usr/bin/omarchy-sudo-passwordless ]] &&
+  ! cmp -s "$helper" /usr/bin/omarchy-sudo-passwordless; then
+  echo "omarchy-niri-repatch: /usr/bin/omarchy-sudo-passwordless is out of date; refresh it once:" >&2
+  echo "  pkexec install -Dm0755 $helper /usr/bin/omarchy-sudo-passwordless" >&2
+fi
+
 if git apply --reverse --check "$OVL/niri.patch" 2>/dev/null; then
   echo "omarchy-niri-repatch: overlay already applied, nothing to do"
   exit 0
