@@ -78,7 +78,7 @@
 | `default/omarchy/omarchy-menu.jsonc` | `install.package`/`install.aur`/`remove.package` 的 `xdg-terminal-exec` 回退 | 随仓库/覆盖层 |
 | `docs/` | `INSTALL{,.zh}.md` + **主文档 `omarchy-on-niri-port.md`（当前事实 + 映射表）** + 模块卷 `visual/behavior/plugins/shims/upstream/migration/lock/local-overrides`（编号沿用原号），**正本就在 `docs/`** | 直接改 `docs/`，无第二副本 |
 
-- 覆盖层实际内容：**33 文件 / 106 hunk / 3098 行**（`--reverse --check` 通过、repatch 幂等）；**md5 `f6ef5a467795e2bd6f1ccf14161b185e`**（2026-10-05 三轮：① `shell/plugins/menu/Menu.qml` 的卡片投影、同日再改实现并按 bar 的实测剖面标定 alpha（105→106 hunk、2956→3022 行），见 `docs/visual.md` §8 第 45 条；② **`shell/Ui/KeyboardPanel.qml` 的弹层卡片投影换成同款环带 + 裁到卡片外沿**（hunk 数不变、3022→3088 行），见 `docs/visual.md` §8 第 43 条；③ **`shell/plugins/bar/Bar.qml` 的 1px 顶边高光**（hunk 数不变、3088→3098 行），见 `docs/visual.md` §8 第 46 条；上一版 3088 行 / md5 `423813f5702a120214ea09da21af1fc4` = 上面那步 ②；再上一版 `bcb5aca36ace33d829c6773da7026801` = 上面那步 ①；再上一版 `2cea1e9517bd498df185e02414595bc8` = 2026-10-04 **合并浮空 bar**：插件那 28 个文件并进 `shell/plugins/bar/` 后新增 `Bar.qml` 的 16 hunk、`README.md`、`widgets/{ActiveWindow,KeyboardLayout,Tray}.qml` 与两个新文件 `LICENSE`/`UPSTREAM.md`（+6 文件、82→105 hunk），`widgets/Workspaces.qml` 的 niri 适配（`Hyprland.*`→`Niri.*`）随这版补丁走（合并时该文件一度被插件那份覆盖回上游写法、与基线逐字节相同，2026-10-04 当天恢复，见 `docs/omarchy-on-niri-port.md` §3.2）；上一版 27 文件 / 82 hunk、md5 `cdc361f9f534e16dd9043ac21c3ce352` = 2026-10-04 加 `shell/Ui/KeyboardPanel.qml` 的卡片投影：18 行 / 1 hunk，81→82 hunk，见 §8 第 43 条；再上一版 27 文件 / 81 hunk、md5 `3c672ab5…` = 2026-09-30 加 `bin/omarchy-update`：那份文件顶部委派给 `~/bin` 垫片，4 hunk，见 §8 第 19 项；再上一版 26 文件 / 77 hunk、md5 `22dd2334…` = 2026-09-27 加 `bin/omarchy-default-agent`、`bin/omarchy-agent` 两条 ante 分支，见 `behavior.md` §8 第 40 条）
+- 覆盖层实际内容：**40 文件 / 131 hunk / 3412 行**（`--reverse --check` 通过、repatch 幂等）；**md5 `a9f9e10716bde4ddf16dca5efb377dfc`**（2026-10-30 起：新增 `bin/omarchy-system` 的 niri logout 分流，并把 `omarchy-capture-screenshot`、`omarchy-launch-tui`、`omarchy-launch-floating-terminal-with-presentation`、两个 panel QML 的 i18n/helper/动效改动带进来；此前 2026-10-05 三轮：① `shell/plugins/menu/Menu.qml` 的卡片投影、同日再改实现并按 bar 的实测剖面标定 alpha（105→106 hunk、2956→3022 行），见 `docs/visual.md` §8 第 45 条；② **`shell/Ui/KeyboardPanel.qml` 的弹层卡片投影换成同款环带 + 裁到卡片外沿**（hunk 数不变、3022→3088 行），见 `docs/visual.md` §8 第 43 条；③ **`shell/plugins/bar/Bar.qml` 的 1px 顶边高光**（hunk 数不变、3088→3098 行），见 `docs/visual.md` §8 第 46 条；上一版 3088 行 / md5 `423813f5702a120214ea09da21af1fc4` = 上面那步 ②；再上一版 `bcb5aca36ace33d829c6773da7026801` = 上面那步 ①；再上一版 `2cea1e9517bd498df185e02414595bc8` = 2026-10-04 **合并浮空 bar**：插件那 28 个文件并进 `shell/plugins/bar/` 后新增 `Bar.qml` 的 16 hunk、`README.md`、`widgets/{ActiveWindow,KeyboardLayout,Tray}.qml` 与两个新文件 `LICENSE`/`UPSTREAM.md`（+6 文件、82→105 hunk），`widgets/Workspaces.qml` 的 niri 适配（`Hyprland.*`→`Niri.*`）随这版补丁走（合并时该文件一度被插件那份覆盖回上游写法、与基线逐字节相同，2026-10-04 当天恢复，见 `docs/omarchy-on-niri-port.md` §3.2）；上一版 27 文件 / 82 hunk、md5 `cdc361f9f534e16dd9043ac21c3ce352` = 2026-10-04 加 `shell/Ui/KeyboardPanel.qml` 的卡片投影：18 行 / 1 hunk，81→82 hunk，见 §8 第 43 条；再上一版 27 文件 / 81 hunk、md5 `3c672ab5…` = 2026-09-30 加 `bin/omarchy-update`：那份文件顶部委派给 `~/bin` 垫片，4 hunk，见 §8 第 19 项；再上一版 26 文件 / 77 hunk、md5 `22dd2334…` = 2026-09-27 加 `bin/omarchy-default-agent`、`bin/omarchy-agent` 两条 ante 分支，见 `behavior.md` §8 第 40 条）
   （2026-09-26 重导出核，与 `~/.config/omarchy/niri-port/niri.patch` 逐字节一致；本次新增
   `shell/plugins/panels/monitor/Panel.qml` 的**分辨率滑块** —— 22→23 文件、48→62 hunk）。
   版本链（只留 md5，明细在各自卷）：`ef920a66ece784dfc207c7c87c479f5b`（2026-09-23，加菜单 `style.avatar.*` 三行，`docs/lock.md` §11.29）
@@ -612,8 +612,10 @@ hype / signed / monologue / omasnap:
 **所以已回退**：`pkexec pacman -R omasnap monologue hype signed poppler-qt6`，只留 `disktree-bin`。
 `satty` 重新装回（`pkexec pacman -S satty`），`bin/omarchy-capture-screenshot` 也恢复成
 `60663faf` 那份（上游已改成写死 `exec omasnap`，那份在本机等于截图直接坏掉）；
-顺带把编辑器默认值从 `tensaku-edit` 改成 `satty`、`--exec` 后拆成 `satty --filename <path>` 两段
-（原来拼成一整个字符串会当成一个程序名）。
+顺带把编辑器默认值从 `tensaku-edit` 改成 `satty`。**2026-10-30 更新**：通知不再是单个 `--exec`
+点击，而是两个 `--action` 按钮 + `--with <path>` —— 「编辑」调 `satty`、`打开` 调 `xdg-open`，
+文件路径由 `--with` 追加到两个按钮的 argv；文案改走 `omarchy-i18n` 的 `capture.screenshot*`
+四个 key（此前是硬编码英文，导致目录里这四个 key 成为孤儿）。
 
 **结论：这四个工具要等 Qt 6.12 解钉**。解钉的代价是 bar/menu 可能黑屏（`MultiEffect` 失效，
 见上文 Qt 6.12 那段），**用户 2026-10-28 决定暂不解**，截图继续用 satty、录屏继续用 wf-recorder。

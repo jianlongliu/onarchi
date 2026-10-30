@@ -11,7 +11,7 @@
 | 上游基线 | 已同步 | `bc220e7028d5ab0ee467a0f094dd1a8da98b6c0a`，提交日期为 2026-10-27；不是对远端最新版本的声明 |
 | 本次跨度 | 已合入运行树，并补齐仓库源码 | 旧运行基线 `60663faf` 到新基线，原合并记录为 846 个提交；Onarchi 保存的是源码快照，不是将这 846 个提交逐条导入自身历史 |
 | 源码交付 | 已收口 | 上游受控文件与移植补丁重建源码，补齐新文件，移除上游已删除的旧文件；保留项目自有目录、文档、服务和权限规则 |
-| 覆盖层 | 已验证可重放 | 当前 `niri-port/niri.patch` 为 39 文件、131 hunk、3385 行；独立的 Niri singleton 和 blurwallpaper 插件随覆盖层文件交付 |
+| 覆盖层 | 已验证可重放 | 当前 `niri-port/niri.patch` 为 40 文件、131 hunk、3412 行；独立的 Niri singleton 和 blurwallpaper 插件随覆盖层文件交付 |
 | 运行环境 | 本次未改 | 没有安装包、运行迁移、解钉 Qt、覆盖用户配置或重启桌面 |
 | 全量功能验收 | 未完成 | 工作区和系统动作有明确适配缺口；多屏、旋转、首次安装仍需验收 |
 
@@ -70,7 +70,7 @@
 
 | 优先级 | 项目 | 当前证据 | 完成判据 |
 |---|---|---|---|
-| 高 | 统一系统动作入口的 niri 分流 | 已改：`bin/omarchy-system` 的 logout 在 `XDG_CURRENT_DESKTOP=niri` 时走 `niri msg action quit --skip-confirmation`，并把 `NIRI_SOCKET`、`XDG_CURRENT_DESKTOP` 传进 detach 出去的 worker（缺任何一个，worker 里都选不到 niri 分支、或连不上合成器）。`test/shell.d/system-power-test.sh` 补了 niri 路由契约，并把桌面与 `niri` 一起 mock/钉死——此前它继承真机环境，在 niri 会话里跑会真的把会话关掉（2026-10-29 实测发生） | 待办：注销/关机/重启的真实验收须另行确认，不能在工作会话中擅自触发；覆盖层 `niri.patch` 尚未包含该改动（见下条） |
+| 高 | 统一系统动作入口的 niri 分流 | 已改：`bin/omarchy-system` 的 logout 在 `XDG_CURRENT_DESKTOP=niri` 时走 `niri msg action quit --skip-confirmation`，并把 `NIRI_SOCKET`、`XDG_CURRENT_DESKTOP` 传进 detach 出去的 worker（缺任何一个，worker 里都选不到 niri 分支、或连不上合成器）。`test/shell.d/system-power-test.sh` 补了 niri 路由契约，并把桌面与 `niri` 一起 mock/钉死——此前它继承真机环境，在 niri 会话里跑会真的把会话关掉（2026-10-29 实测发生） | 该改动已随覆盖层重生成进入 `niri-port/niri.patch`（40 文件 / 131 hunk / 3412 行，md5 `a9f9e10716bde4ddf16dca5efb377dfc`，与 `~/.config/omarchy/niri-port/niri.patch` 同值，`omarchy-niri-repatch` 幂等）。待办：注销/关机/重启的真实验收须另行确认，不能在工作会话中擅自触发 |
 | 高 | 内置工作区部件的新 dispatch | 新部件走 `hyprctl dispatch o.workspaces.focus(...)`，而垫片将未知命令返回 0、不产生 niri action；Niri.dispatch 的实现未接到该调用链 | 单屏点击/滚轮生成正确 action，并有针对新表达式的测试 |
 | 高 | 工作区 monitor/event 模型 | 内置 Workspaces 仍读 Hyprland.monitorFor 并监听 Hyprland 事件；工作区列表换源不够 | 当前显示器、当前工作区、滚轮起点均来自 niri，且切换后刷新正确 |
 | 中 | 多屏工作区唯一标识 | Niri 映射使用每屏 idx 作为 id，不同输出可以同号；上游十个一组的全局编号假设不适用 | 双屏同号工作区不混淆、点击落到目标输出，不只验证单屏 |
