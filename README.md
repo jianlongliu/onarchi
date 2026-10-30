@@ -183,7 +183,7 @@ corners plus the blur itself ride in `niri.patch`'s `shell/plugins/bar/Bar.qml`.
 
 The frosted surface is `MultiEffect` blur, and it stops working under **Qt 6.12**
 — the bar and menu then render as opaque black cards. This machine pins 16 Qt
-packages at 6.11.2 for exactly that reason (see "Qt stays pinned at 6.11.2"
+packages at 6.11.2 for exactly that reason (see "Holding Qt at 6.11.2"
 below). If your distro ships 6.12, expect the layout above with a solid bar
 instead of frosted glass until `MultiEffect` is fixed upstream.
 
@@ -270,15 +270,54 @@ contention rather than a distinct defect.
 `runtime-smoke` fails its transparent-bar wallpaper sample. It fails at `HEAD` with all working-tree
 changes stashed, so it is not caused by port work, and the root cause is not yet known.
 
-### Qt stays pinned at 6.11.2
+### Holding Qt at 6.11.2 — read this before you upgrade
 
-`/etc/pacman.conf` holds 16 packages in `IgnorePkg`, all of them Qt or Qt-linked. The reason is
-recorded there: under Qt 6.12, `MultiEffect` blur becomes a no-op, so the bar and menu render as
-opaque black cards. Upstream's only 6.12-related commit (`b83d3df08`) is a QML palette-syntax fix,
-not a rendering repair, and `git log --grep` finds no `MultiEffect` work. Verified on 6.11.2 as a
-baseline: `MultiEffect { blurEnabled: true; blur: 1.0; blurMax: 48 }` produces a real gradient
-(104 of 150 sampled points mid-tone). Lifting the pin needs all 16 packages moved together; the
-payoff is four tools that all have working substitutes.
+**The frosted bar does not survive Qt 6.12.** `MultiEffect`'s blur becomes a no-op, and the bar,
+menu and panels paint as exactly `(0,0,0)` opaque black — the layout is intact, which makes it look
+like a theming bug rather than a library one. If you followed the look above and suddenly have a
+solid black bar, this is why.
+
+Verified, not assumed: a minimal `MultiEffect { blurEnabled: true; blur: 0.6 }` in a `qml6` sandbox
+gives a hard edge on 6.12 and a real gradient on 6.11.2. The porting machine's own baseline at
+6.11.2 measures a gradient (104 of 150 sampled points mid-tone). Upstream has no fix: its only
+6.12-touching commit (`b83d3df08`) is a QML palette-syntax change, and `git log --grep=MultiEffect`
+finds nothing.
+
+To hold Qt back, this machine pins **16** packages in `/etc/pacman.conf`'s `IgnorePkg`. They are not
+independent choices — they move as one set:
+
+```ini
+IgnorePkg = qt6-5compat qt6-base qt6-declarative qt6-imageformats qt6-multimedia
+            qt6-multimedia-ffmpeg qt6-shadertools qt6-svg qt6-translations qt6-wayland
+            qt6ct fcitx5-qt quickshell
+            opencv python-opencv vtk
+```
+
+- The ten `qt6-*` packages are the library itself.
+- **`qt6ct` and `fcitx5-qt` ship Qt plugins** (5 and 6 of them respectively). Qt refuses a plugin
+  built against a different minor version, so leaving them at 6.12 while the libraries go back to
+  6.11 breaks them at load time rather than failing cleanly. **`quickshell` links the Qt libraries
+  directly** and has to move with them for the same reason.
+- **`opencv`, `python-opencv` and `vtk` are collateral.** They are compiled against Qt 6.12, so
+  holding only the `qt6-*` set fails at dynamic link: `libopencv_highgui.so.500` wants
+  `QVariant(QString&&)`, `libopencv_viz.so.500` wants `vtkImplicitArray::SetValueEx`.
+
+That last group has a nasty symptom worth knowing: a **disappearing face-unlock (howdy)**. PAM still
+runs `omarchy-lock-face`; its `compare.py` dies on `import cv2` and the lock screen reports
+`Error while authenticating: "System error" (code 4)`. Do not trust the UI — check
+`journalctl -t omarchy-shell | grep -A3 omarchy-lock-face` for the traceback, or just run
+`python3 -c "import cv2"`.
+
+Check your own state with `pacman-conf IgnorePkg` (should list all 16) and `pacman -Qu` (those
+entries show `[ignored]`).
+
+**To lift the pin**, delete the `IgnorePkg` line and run `pacman -Syu`; all 16 move together. If a
+package later declares `qt6-base>=6.12`, `-Syu` stops with a dependency error — that is the signal
+to re-evaluate, not a silent breakage. `krita` is left unpinned deliberately (not used here).
+
+What you gain by lifting it: `omasnap`, `monologue`, `hype` and `signed`, which need 6.12. Three of
+them are not needed on niri — `omasnap` hard-depends on `hyprland` — so the trade is a working
+frosted shell for four tools that all have substitutes.
 
 ### Open items
 

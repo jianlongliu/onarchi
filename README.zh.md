@@ -167,7 +167,7 @@ cd onarchi
 圆角与模糊本身由 `niri.patch` 里的 `shell/plugins/bar/Bar.qml` 提供。
 
 磨砂本身是 `MultiEffect` 模糊，在 **Qt 6.12** 下会失效——bar 和菜单会渲染成不透明的黑卡片。
-本机为此把 16 个 Qt 包钉在 6.11.2（见下文「Qt 钉在 6.11.2」）。若你的发行版是 6.12，
+本机为此把 16 个 Qt 包钉在 6.11.2（见下文「把 Qt 按在 6.11.2」）。若你的发行版是 6.12，
 铺出来的会是同样的布局，但 bar 是实心而不是磨砂，直到上游修好 `MultiEffect`。
 
 若你已经有 `shell.json`，`install.sh` 不会碰它（里面存着你的主题与字体选择）。要手工套用新外观，
@@ -221,13 +221,48 @@ cd onarchi
 | 经 `popupColumn` 的通知霜化 | 该元素上游已不存在，表面现在是窄条带 |
 | `omasnap`、`monologue`、`hype`、`signed` | 四个都要 **Qt 6.12**，本机钉在 6.11（见下）。`omasnap` 还硬依赖 `hyprland`。同批只有 `disktree-bin` 能跑 |
 
-### Qt 钉在 6.11.2
+### 把 Qt 按在 6.11.2 —— 升级前先读这段
 
-`/etc/pacman.conf` 的 `IgnorePkg` 里有 16 个包，全是 Qt 或 Qt 相关。理由就写在旁边：Qt 6.12 下
-`MultiEffect` 的模糊变成空操作，bar 和菜单会渲染成不透明黑卡。上游唯一与 6.12 相关的提交
-（`b83d3df08`）是 QML palette 语法兼容，**不是**渲染修复；`git log --grep` 也找不到 `MultiEffect`
-相关工作。6.11.2 上实测基线：`MultiEffect { blurEnabled: true; blur: 1.0; blurMax: 48 }` 有真实渐变
-（150 个采样点里 104 个中间调）。解钉需要 16 个包一起动，换来的是四个都有替代品的工具。
+**磨砂 bar 在 Qt 6.12 下活不下来。** `MultiEffect` 的模糊变成空操作，bar、菜单、面板会画成
+**精确 `(0,0,0)` 的不透明黑**——布局还是对的，所以看着像主题坏了，其实是库的问题。如果你照着上文
+配好了外观、突然得到一条实心黑 bar，原因就在这里。
+
+这是实测不是推测：`qml6` 沙盒里一个最小的 `MultiEffect { blurEnabled: true; blur: 0.6 }`，6.12 下是
+硬边、6.11.2 下有真渐变。本机 6.11.2 的基线量到渐变（150 个采样点里 104 个中间调）。上游没有修复：
+唯一碰到 6.12 的提交（`b83d3df08`）是 QML palette 语法改动，`git log --grep=MultiEffect` 什么都
+找不到。
+
+要按住 Qt，本机在 `/etc/pacman.conf` 的 `IgnorePkg` 里钉了 **16** 个包。它们不是各自独立的选项——
+必须**整组**一起动：
+
+```ini
+IgnorePkg = qt6-5compat qt6-base qt6-declarative qt6-imageformats qt6-multimedia
+            qt6-multimedia-ffmpeg qt6-shadertools qt6-svg qt6-translations qt6-wayland
+            qt6ct fcitx5-qt quickshell
+            opencv python-opencv vtk
+```
+
+- 十个 `qt6-*` 就是库本身。
+- **`qt6ct`、`fcitx5-qt` 带 Qt 插件**（分别 5 个和 6 个）。Qt 拒绝加载按不同次版本编译的插件，
+  所以把它们留在 6.12、只把库退回去，它们会在加载期直接挂掉，而不是干净地报错。
+  **`quickshell` 直接链接 Qt 库**，同理必须跟着一起动。
+- **`opencv`、`python-opencv`、`vtk` 是连带项。** 它们按 Qt 6.12 编译，只按住 `qt6-*` 一组会在
+  动态链接期挂符号：`libopencv_highgui.so.500` 要 `QVariant(QString&&)`，
+  `libopencv_viz.so.500` 要 `vtkImplicitArray::SetValueEx`。
+
+最后一组有个坑值得记住：**人脸解锁（howdy）会凭空消失**。PAM 照样跑 `omarchy-lock-face`，但它的
+`compare.py` 在 `import cv2` 时就死了，锁屏报 `Error while authenticating: "System error" (code 4)`。
+**别信界面**，去 `journalctl -t omarchy-shell | grep -A3 omarchy-lock-face` 看 traceback，或者直接
+`python3 -c "import cv2"`。
+
+查自己机器：`pacman-conf IgnorePkg`（应列出全部 16 个）、`pacman -Qu`（这些会标 `[ignored]`）。
+
+**要解钉**：删掉 `IgnorePkg` 那行，`pacman -Syu`，16 个一起走。若将来某个包声明
+`qt6-base>=6.12`，`-Syu` 会直接停在依赖错误——那是**重新评估的信号**，不是静默出错。`krita`
+故意没钉（本机不用）。
+
+解钉能换来什么：`omasnap`、`monologue`、`hype`、`signed` 四个要 6.12 的工具。其中三个在 niri 上
+用不上——`omasnap` 硬依赖 `hyprland`——所以这笔交易是「一个能用的磨砂 shell」换「四个都有替代品的工具」。
 
 ### 未完成项
 
