@@ -177,8 +177,8 @@ The overview backdrop needs no adjustment: niri draws that layer itself, so the 
 ## Upstream sync status
 
 The port currently tracks upstream `quattro` at **`bc220e70`** (2026-10-27), fast-forwarded from
-`60663faf` on 2026-10-28 — 846 commits. The current `niri.patch` has **39 files / 3385 lines**,
-md5 `63856901c5d4bce08d14f36e5ce4fd24` (untracked overlay files are separate).
+`60663faf` on 2026-10-28 — 846 commits. The current `niri.patch` has **40 files / 131 hunks / 3412
+lines**, md5 `a9f9e10716bde4ddf16dca5efb377dfc` (untracked overlay files are separate).
 
 Upstream still has **no niri support**: `grep -ri niri shell/ bin/` returns nothing at `bc220e70`,
 while Hyprland coupling grew (19 files / 54 sites → 26 files / 118 sites). Everything below exists
@@ -197,6 +197,7 @@ because of that.
 | Apps grid frost | Upstream's new `omarchy.dock` grid spans the screen and relies on Hyprland's `ignore_alpha`. Given a client region plus an `omarchy-dock-apps` layer rule |
 | Bar icon centring | `OpticalGlyph` reported the ink centre before rotation, so the pocket's mark (which turns 90° when it opens) was placed as if it had not. `BarIconButton` also gained `contentOffsetY` for glyphs whose ink is far shorter than their line box |
 | Screenshot | Reverted to the pre-merge satty version — see "Dropped" |
+| System actions (`omarchy-system`) | Upstream's unified entry ran `uwsm stop` for logout, which does not exist on niri: every window closed and then the menu reported "Logout failed". `logout` now asks the compositor to quit (`niri msg action quit --skip-confirmation`), and the detached worker is given `NIRI_SOCKET` and `XDG_CURRENT_DESKTOP` — without both it cannot pick the niri branch |
 
 ### Dropped, and why
 
@@ -206,7 +207,6 @@ because of that.
 | Bar decoration beyond frost (shadow, top highlight, forced 12 px radius) | Superseded by upstream's own bar design. Accepted the overwrite |
 | OSD card surface | Upstream moved OSD onto `OverlayWindow`, which requires a full-screen surface; the card-sized variant rendered nothing |
 | Notification blur via `popupColumn` | That element no longer exists upstream; the surface is a narrow strip now |
-| `omarchy-system` | Fixed: `logout` routes to `niri msg action quit --skip-confirmation` on niri, and the detached worker receives `NIRI_SOCKET` and `XDG_CURRENT_DESKTOP` |
 | `omasnap`, `monologue`, `hype`, `signed` | All four need **Qt 6.12**; this machine pins Qt 6.11 (see below). `omasnap` additionally hard-depends on `hyprland`. Only `disktree-bin` from that batch runs |
 
 ### Test suite: what is left to upstream
@@ -228,9 +228,12 @@ open failures below are upstream's, and are left alone deliberately rather than 
 requires every drop-in to register. The grant is machine-local, so registering it upstream would be
 wrong; it is left failing rather than silenced.
 
-`agent-account`, `monitor-modeless`, `passwordless-sudo-indicator`, `manifest-entrypoints` and
-`i18n-startup` fail only while the suite runs in parallel and pass on their own — file-level
-contention, not a real failure.
+`agent-account`, `monitor-modeless`, `passwordless-sudo-indicator` and `i18n-startup` fail only
+under the parallel runner and pass on their own — file-level contention, not a real failure.
+`manifest-entrypoints` does the same, though its symptom is different: its assertions all pass and
+the file exits non-zero only when its cleanup races a concurrent write (`rm: cannot remove ...
+Directory not empty`). That reproduces roughly once in four standalone runs, so it is the same
+contention rather than a distinct defect.
 
 `runtime-smoke` fails its transparent-bar wallpaper sample. It fails at `HEAD` with all working-tree
 changes stashed, so it is not caused by port work, and the root cause is not yet known.
@@ -266,8 +269,8 @@ payoff is four tools that all have working substitutes.
 ## Why it's not a single-click guarantee
 
 The port reuses Omarchy's own install but swaps Hyprland for niri via the `hyprctl` shim and a
-`Niri.qml` Quickshell model. Because Omarchy scripts call `hyprctl` ~50 times, the shim must be on
-`PATH` for the shell to function. Files in `~/.local/share/omarchy` are patched in the working tree and
+`Niri.qml` Quickshell model. Because `hyprctl` appears about 200 times across 66 commands in `bin/` alone, plus 11 files under
+`shell/`, the shim must be on `PATH` for the shell to function at all. Files in `~/.local/share/omarchy` are patched in the working tree and
 kept **uncommitted** so the `niri.patch` overlay can be reapplied after each `omarchy update` — do not
 commit inside `~/.local/share/omarchy` or the fast-forward update will break.
 

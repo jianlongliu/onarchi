@@ -167,7 +167,7 @@ cd onarchi
 ## 上游同步状态
 
 本移植当前跟到上游 `quattro` 的 **`bc220e70`**（2026-10-27）—— 2026-10-28 从 `60663faf` 快进，
-共 846 个提交。当前 `niri.patch` 为 **39 文件 / 3385 行**，md5 `63856901c5d4bce08d14f36e5ce4fd24`（未跟踪的覆盖层文件另计）。
+共 846 个提交。当前 `niri.patch` 为 **40 文件 / 131 hunk / 3412 行**，md5 `a9f9e10716bde4ddf16dca5efb377dfc`（未跟踪的覆盖层文件另计）。
 
 上游**仍然没有 niri 支持**：`bc220e70` 上 `grep -ri niri shell/ bin/` 零命中，而 Hyprland 耦合反而
 加重（19 文件 54 处 → 26 文件 118 处）。下面每一条都是这个前提的产物。
@@ -185,6 +185,7 @@ cd onarchi
 | Apps 网格霜化 | 上游新增的 `omarchy.dock` 网格铺满屏幕、在 Hyprland 上靠 `ignore_alpha`。补了客户端区域 + `omarchy-dock-apps` 的 layer 规则 |
 | bar 图标居中 | `OpticalGlyph` 报的是**旋转前**的墨迹中心，pocket 的标记展开时转 90° ⇒ 按没转的位置摆。另外 `BarIconButton` 新增 `contentOffsetY`，给墨迹远矮于行盒的字形用 |
 | 截图 | 退回合并前的 satty 版 —— 见下节 |
+| 系统动作（`omarchy-system`） | 上游统一入口的 logout 走 `uwsm stop`，niri 上没有 uwsm：所有窗口先关掉，再报「Logout failed」。现在 logout 改为请求合成器退出（`niri msg action quit --skip-confirmation`），并把 `NIRI_SOCKET`、`XDG_CURRENT_DESKTOP` 传进 detach 出去的 worker —— 缺任何一个，worker 里都选不到 niri 分支 |
 
 ### 放弃的东西，以及原因
 
@@ -194,7 +195,6 @@ cd onarchi
 | 霜化之外的 bar 装饰（投影、顶边高光、强制 12px 圆角） | 被上游自己的 bar 设计取代。接受覆盖 |
 | OSD 的卡片化表面 | 上游把 OSD 迁到 `OverlayWindow`，而后者要求全屏表面；卡片化版本渲染出来是空白 |
 | 经 `popupColumn` 的通知霜化 | 该元素上游已不存在，表面现在是窄条带 |
-| `omarchy-system` | 上游使用统一入口；当前 `bin/omarchy-system` 未转发到 `omarchy-niri-system`，在 niri 使用系统动作前须检查接线 |
 | `omasnap`、`monologue`、`hype`、`signed` | 四个都要 **Qt 6.12**，本机钉在 6.11（见下）。`omasnap` 还硬依赖 `hyprland`。同批只有 `disktree-bin` 能跑 |
 
 ### Qt 钉在 6.11.2
@@ -220,10 +220,36 @@ cd onarchi
 - **Omarchy 源对升级的影响**。`[omarchy]` 排在 `[core]` 之前。`omarchy-nvim` 会替换 `neovim`、
   `omarchy-power-profiles-daemon` 会替换 `power-profiles-daemon`——两者目前都没装。
 
+### 测试套件：剩下的都留给上游
+
+`./test/shell` 跑 411 个文件。凡是移植自身造成的失败都已修好；下表是仍然失败的项，**故意不动**，
+理由是不该在这个仓库里绕过上游的问题。
+
+| 测试 | 为什么不在这里修 |
+|---|---|
+| `bar-startup-budget`、`lock-appear-budget`、`menu-open-budget`、`panel-open-budgets` | 它们靠 `hyprctl -j layers` 判断图层，而 niri 只报 namespace / level / output，不报 pid 和尺寸。`require_hyprland_layers` 在 niri 上跳过，Hyprland 上照跑 |
+| `nvidia-kms-migration` | 模拟移植不涉及的 NVIDIA 硬件。其夹具从不写 `00-omarchy-hooks.conf`，条件判断读到空 `HOOKS`，于是在混合显卡机器上误判要重建 |
+| `hardware-quirks` | 上游安装编排问题：`install/hardware/input-group.sh` 在 `bc220e70` 上没有任何脚本调用 |
+| `background-intro-lifecycle` | `BackgroundIntro.qml` 与上游逐字节一致，是夹具自己的 retint 断言不过 |
+| `agents-default-migration` | 期望的 bar 布局早于上游新增 `omarchy.keyboard-layout` |
+| `fontconfig-cjk` | 依赖本机装的字体 |
+| `remote-session-service` | 需要夹具造不出来的 SSH peer |
+
+`sudoers` 失败是因为本机加了 `/etc/sudoers.d/omarchy-asdcontrol`，而该测试要求每个 drop-in 都必须登记。
+这条授权是本机私有的，登记到上游测试表是错的，所以让它失败而不是静默掉。
+
+`agent-account`、`monitor-modeless`、`passwordless-sudo-indicator`、`i18n-startup` 只在并行跑时失败，
+单跑都过——文件级争用，不是真故障。`manifest-entrypoints` 同理，只是症状不同：断言全过，仅在清理阶段
+撞上并发写入时非零退出（`rm: cannot remove ... Directory not empty`），单跑约四次复现一次。
+
+`runtime-smoke` 的透明 bar 采样壁纸那条失败。我 `git stash` 清掉全部工作树改动后在 `HEAD` 上仍然失败，
+所以不是移植改动造成的；根因尚未确定。
+
 ## 为什么它不是"一键保证"
 
 本移植复用 Omarchy 自己的安装，只是通过 `hyprctl` 垫片和 `Niri.qml` Quickshell 模型把 Hyprland 换成 niri。
-由于 Omarchy 脚本约 50 次调用 `hyprctl`，垫片必须在 `PATH` 上外壳才能工作。`~/.local/share/omarchy` 里的文件是在
+由于 `hyprctl` 光在 `bin/` 的 66 个命令里就出现约 200 次，`shell/` 下另有 11 个文件引用，垫片必须在
+`PATH` 上外壳才能工作。`~/.local/share/omarchy` 里的文件是在
 工作树里打 patch 并**保持未提交**，这样 `niri.patch` 覆盖层才能在每次 `omarchy update` 后重放——**不要**在
 `~/.local/share/omarchy` 里面提交，否则快进更新会断。
 
