@@ -15,9 +15,15 @@
 include "input.kdl"
 
 environment {
-    // 迁移后本机（jianlongliu）路径。niri 不展开 $HOME/$PATH，必须写全字面量。
+    // niri 不展开 $HOME/$PATH，以下两处必须写全字面量。
     XDG_CURRENT_DESKTOP "niri"
     QT_QPA_PLATFORMTHEME "qt6ct"
+    // GTK 应用在 niri 上拿不到输出缩放：niri 不设 GDK_SCALE（那是 Hyprland 的
+    // omarchy-hyprland-monitor-scaling 干的活），GTK 就退回 1x，于是 nautilus 这类
+    // 原生 Wayland 的 GTK 窗口字体和控件只有火箭壳层的一半大。
+    // 与 monitor.kdl 的 `scale 2.0` 对齐。**不要再加 GDK_DPI_SCALE**：GDK_SCALE=2 时
+    // 字体已经翻倍，再设 DPI_SCALE 会二次放大。
+    GDK_SCALE "2"
     OMARCHY_PATH "/home/<user>/.local/share/omarchy"
     PATH "/home/<user>/bin:/home/<user>/.local/share/omarchy/bin:/home/<user>/.local/bin:/home/<user>/.ante/bin:/home/<user>/.npm-global/bin:/home/<user>/.grok/bin:/usr/local/bin:/usr/local/sbin:/usr/bin:/usr/sbin:/bin:/sbin:/var/lib/flatpak/exports/bin:/usr/lib/jvm/default/bin"
 }
@@ -28,7 +34,7 @@ cursor {
     xcursor-size 20
     hide-when-typing
     // 开机加载期那根箭头：会话里指针没动过 → 1s 后自己消失（niri 无"立刻藏"接口）。
-    hide-after-inactive-ms 1000
+    hide-after-inactive-ms 10000
 }
 
 include "monitor.kdl"
@@ -46,7 +52,6 @@ include "layout.kdl"
 // 壁纸从会话第一帧就在：swaybg 几十 ms 就铺上"当前壁纸"软链指向的图，
 // Quickshell 的 omarchy.background 插件要 ~1.4s 才画出图（实测两份逐像素一致 ⇒ 无缝）。
 // ⚠ 必须排在下面 omarchy-launch-shell 之前：同一 background 层里后映射的在上。
-spawn-at-startup "swaybg" "-i" "/home/<user>/.local/state/omarchy/current/background" "-m" "fill"
 
 spawn-sh-at-startup "omarchy-launch-shell"
 

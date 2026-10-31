@@ -2,6 +2,25 @@
 // Find more information on the wiki:
 // https://niri-wm.github.io/niri/Configuration:-Window-Rules
 
+// Every window opens as a maximized column (maximize-column: fills the workspace,
+// keeps niri's 8px gaps, rounded corners and the bar). This matches Hyprland's
+// "first window on an empty workspace is already big" feel, which niri does not
+// have: niri's scrolling layout opens every window at default-column-width
+// (0.5 here), regardless of whether the workspace is empty.
+//
+// Deliberately global and placed FIRST: niri applies window rules in file order and
+// a later matching rule overrides an earlier value, so the per-app rules further
+// down (floating panels, WeChat/Zen, etc.) still win where they disagree.
+//
+// Two consequences to remember:
+//   * Mod+F now starts from maximized and its first press makes the window
+//     SMALLER (back to the 0.5 column) -- maximize is a toggle.
+//   * This is a size, not a state: a window opening on a workspace that already
+//     has columns also opens maximized (niri has no "workspace is empty" matcher).
+window-rule {
+    open-maximized true
+}
+
 // Work around WezTerm's initial configure bug
 // by setting an empty default-column-width.
 window-rule {
@@ -12,6 +31,27 @@ window-rule {
     default-column-width {}
 }
 
+// Firefox: force the tiled state so the window stops dictating its own geometry.
+// Symptom it fixes: a cold-started Firefox opened at 1535 logical px (neither the
+// 0.5 column preset nor full width), so Mod+F took it 1535 -> 1584 -> 788 and read
+// as "the first press does nothing".
+// Cause, measured 2026-10-31: Firefox scales the window size it saved in
+// xulstore.json by its own device-pixel ratio and pushes it with
+// xdg_surface.set_window_geometry, which niri honours for untiled clients.
+// gsettings text-scaling-factor was 1.2222, so 1276 CSS px became 1531
+// (evidence: with the factor temporarily at 1.0 the same window opened at 1271;
+// 653 * 1.2 = 784 too). niri's `default-column-width { fixed 900; }` could NOT
+// override it -- per the wiki "the window itself always has a final say".
+// `tiled-state true` tells the client it is tiled, which drops the self-sizing:
+// three cold starts then opened at 788, and one Mod+F reached 1584.
+// This is deliberately a state, not a size: it keeps working when the panel
+// resolution, scale, or the GTK text-scaling factor changes.
+window-rule {
+    match app-id=r#"^firefox$"#
+    exclude title="^Picture-in-Picture$"
+    tiled-state true
+}
+
 // Open the Firefox picture-in-picture player as floating by default.
 window-rule {
     // This app-id regular expression will work for both:
@@ -19,6 +59,7 @@ window-rule {
     // - Flatpak Firefox (app-id is "org.mozilla.firefox")
     match app-id=r#"firefox$"# title="^Picture-in-Picture$"
     open-floating true
+    open-maximized false
 }
 
 // Example: block out two password managers from screen capture.
@@ -71,6 +112,7 @@ window-rule {
 window-rule {
     match app-id=r#"^org\.omarchy\.terminal$"#
     open-floating true
+    open-maximized false
     default-column-width { proportion 0.6; }
     default-window-height { proportion 0.7; }
     // Ghostty paints its own 0.85 background (background-opacity in ~/.config/ghostty/config),
@@ -112,6 +154,40 @@ window-rule {
     }
 }
 
+// ChatGPT desktop (chatgpt-bin) and Discord: both Electron windows that paint an
+// opaque surface, and Discord usually lands on Xwayland. Same mechanism as the
+// WeChat rule above -- a background effect only shows through a semitransparent
+// window, so `opacity` is what presses alpha onto the surface; without it the blur
+// rule is silently invisible. Both carry their own CSD titlebar, hence
+// draw-border-with-background false (the focus ring would otherwise draw behind the
+// translucent window and show through it).
+// app-id of Discord depends on whether it runs native Wayland (`discord`) or on
+// Xwayland (`discord` as well, but some builds report `com.discordapp.Discord`), so
+// both spellings are matched; `match` directives are OR'd.
+window-rule {
+    match app-id=r#"^chatgpt$"#
+    match app-id=r#"^discord$"#
+    match app-id=r#"^com\.discordapp\.Discord$"#
+    opacity 0.85
+    draw-border-with-background false
+    // ChatGPT/Discord (Electron) ask to be maximized when restoring their saved
+    // window state, and niri turns that into "maximize to edges" -- a state with no
+    // gaps, no border, and no rounded corners (official wiki: "you will still see
+    // your bar, but not struts, gaps, or borders"; measured: the window's leftmost
+    // column of dark pixels sits at x=0 with no corner curve). That is what reads as
+    // "the window has no rounded corners", and why pressing Mod+F twice fixes it:
+    // the first press un-maximizes the full-width column, the second re-maximizes it
+    // as a *column* (gaps + radius intact).
+    // Blocking the request here keeps them as ordinary maximized columns instead.
+    // Only works when the client asks during its initial configure; a client that
+    // asks for maximize after mapping bypasses this rule (see the wiki).
+    open-maximized-to-edges false
+    background-effect {
+        xray false
+        blur true
+    }
+}
+
 // --- Floating app windows (2026-09-20) ---
 // Window-opening properties CANNOT live in a keybind: `spawn "x"; open-floating true;`
 // makes niri reject the whole config ("only one action is allowed per keybind") and it
@@ -125,6 +201,7 @@ window-rule {
 window-rule {
     match app-id="^org.gnome.Nautilus$"
     open-floating true
+    open-maximized false
     default-column-width { proportion 0.6; }
     default-window-height { proportion 0.7; }
     opacity 0.72
@@ -142,6 +219,7 @@ window-rule {
 window-rule {
     match app-id=r#"^org\.omarchy\.float-tui$"#
     open-floating true
+    open-maximized false
     default-column-width { proportion 0.7;}
     default-window-height { proportion 0.7;}
     opacity 0.85
@@ -169,6 +247,7 @@ window-rule {
 window-rule {
     match app-id=r#"^org\.omarchy\.about$"#
     open-floating true
+    open-maximized false
     default-column-width { fixed 1020; }
     default-window-height { fixed 700; }
     // Same story as org.omarchy.terminal / org.omarchy.float-tui: ghostty's own 0.85 background

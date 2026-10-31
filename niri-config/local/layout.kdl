@@ -3,7 +3,7 @@
 // https://niri-wm.github.io/niri/Configuration:-Layout
 layout {
   // 开机到壁纸画出来之间那一屏的底色（niri 默认 #404040 的灰）。
-  background-color "#BDBDBE"
+  background-color "#000000"
     // Set gaps around windows in logical pixels.
     gaps 8
 
@@ -55,7 +55,7 @@ layout {
 
         // How many logical pixels the ring extends out from the windows.
         width 2
-        active-gradient from="#feb0d2ff" to="#f2bb98ff" angle=135
+        active-gradient from="#c6c0ffff" to="#ebb8cfff" angle=135
 
         // Colors can be set in a variety of ways:
         // - CSS named colors: "red"
@@ -67,13 +67,13 @@ layout {
         // active-border gradient -- the same token the Omarchy menu ring is drawn from.
         // niri takes two stops per gradient, so a three-stop theme gradient is split over
         // the ring and the border below: ring = first half, border = second half.
-        active-color "#feb0d2ff"
+        active-color "#c6c0ffff"
 
         // Color of the ring on inactive monitors.
         //
         // The focus ring only draws around the active window, so the only place
         // where you can see its inactive-color is on other monitors.
-        inactive-color "#9d8c92aa"
+        inactive-color "#928f99aa"
 
         // You can also use gradients. They take precedence over solid colors.
         // Gradients are rendered the same as CSS linear-gradient(angle, from, to).
@@ -100,8 +100,8 @@ layout {
 
         width 2
         inactive-gradient from="#00000000" to="#00000000" angle=135
-        active-gradient from="#f2bb98ff" to="#6d3350ff" angle=135
-        active-color "#f2bb98ff"
+        active-gradient from="#ebb8cfff" to="#444078ff" angle=135
+        active-color "#ebb8cfff"
         inactive-color "#00000000"
 
         // Color of the border around windows that request your attention.

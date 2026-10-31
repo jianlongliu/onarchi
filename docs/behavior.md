@@ -39,6 +39,7 @@
 
 - 42. **通用剪贴板 `Super+C/V/X` + 终端里复制/剪切的 OSD 卡片（2026-09-27）**：niri 抓键（`binds.kdl` 三条 `spawn-sh "omarchy-universal-clipboard copy|paste|cut"`），垫片按焦点窗口注入——终端 → `Ctrl+Insert`/`Shift+Insert`，其他 → `Ctrl+C/V`，剪切恒 `Ctrl+X`（上游 Hyprland 靠 `send_key_state`，niri 只能 spawn ⇒ 自造 uinput 注入器 `omarchy-sendkeys`、零安装）；终端里复制/剪切额外弹一次**壳层 OSD 卡片**（`omarchy-osd`，关机/重启同款）——ghostty 自己的 `app-notifications = clipboard-copy` 走 libnotify 吐司、在本机根本不显示，所以那边保持关闭。机制、两条硬约束（注入设备必须声明 1..248 全段键码、物理按住的 SUPER 会并进和弦）、≈0.45 s/键 与验法见 `docs/shims.md`「通用剪贴板垫片」（= `§8 第 42 条`）
 - 47. **omarchy-battery-care：把"停在阈值之上"的电自动放回 STOP（2026-10-17）**：装置在仓库 `battery-care/`（脚本 + 两个 systemd 单元 + `install.sh` + `README.md` + 契约测试）。解决的问题＝滞环只决定"以后充不充"，EC 只停充**不放电** ⇒ 用过 Full(95–100) 再切回 Protect(75/80) 后包停在 99% 插着电不动（自放电 ~1–3%/月）。判据、冗余刹车与实测见 §8 第 47 条正文
+- 48. **窗口默认最大化（Hyprland 观感移植）：全局 `open-maximized true` + 浮动窗口显式豁免（2026-10-31）**：niri 的滚动平铺**没有** Hyprland 那种"空工作区首个窗口自动铺满"，新窗口一律吃 `default-column-width`（本机 0.5）⇒ 加一条无 `match` 的全局 `open-maximized true`（= `maximize-column`，满宽但保留 8px gaps、圆角与 bar），并给 5 处 `open-floating true` 补 `open-maximized false`，否则浮动面板会被全局规则一起撑满。**副作用如实记录**：构造顺序变了 ⇒ Mod+F 第一次按是"变小"；且 niri 没有"工作区为空"匹配器 ⇒ 非空工作区的新窗口也满宽。求值顺序、验法与回退见 §8 第 48 条正文
 
 ---
 
@@ -946,6 +947,46 @@ Omarchy 有两层配置，只有层1在 niri 上真正生效：
       `$(<file)` 读特例（实测三种写法对照）；要判可读性就 `[[ -r f ]] && v=$(<f)`。顶层 `case` 分支里写
       `local` ⇒ `can only be used in a function` 且**在输出中途崩**（后面几行不打印）。**一条消息里并发两条
       `pkexec` 会双双静默挂死**（本次复现：监视与一条 pkexec 并发，两条都挂到被我 kill）。
+
+48. **窗口默认最大化（Hyprland 观感移植）：全局 `open-maximized true` + 浮动窗口显式豁免（2026-10-31）**
+    - **是什么**：`~/.config/niri/window-rules.kdl` 顶部加一条**无 `match`** 的全局规则 `open-maximized true`
+      （`niri-config/local/` 已同步）。它等价于对每个新窗口跑一次 `maximize-column`：铺满工作区，但**保留
+      niri 的 8px gaps、12px 圆角与 bar**（不是 `maximize-window-to-edges` 那种贴边、也不是 `open-fullscreen`）。
+      给 5 处原本 `open-floating true` 的规则（Firefox PiP、`org.omarchy.terminal`、Nautilus、`org.omarchy.float-tui`、
+      `org.omarchy.about`）各补一行 `open-maximized false`，否则浮窗会被全局规则一起撑成满宽。
+    - **要解决的问题**：用户要的是 Hyprland 的观感——"空工作区起 app 就已经是大的"。niri **没有**这个语义：
+      滚动平铺对空工作区/非空工作区一视同仁，新窗口一律吃 `layout.kdl` 的 `default-column-width`
+      （本机 `proportion 0.5`）⇒ 冷启动永远是半窗，得自己按 Super+F。
+    - **为什么是全局而不是"只在空工作区"**：niri 的窗规则匹配器**没有**"工作区为空"这一项（可用的只有
+      `title`/`app-id`/`is-active`/`is-focused`/`is-active-in-column`/`is-floating`/`is-window-cast-target`/
+      `is-urgent`/`at-startup`）。要精确复刻只能写一个监听 `niri msg event-stream` 的守护，代价是新增脚本 +
+      systemd 单元，且 niri IPC 不暴露"这列是否已最大化"，守护还得绕开 `open-maximized` 的窗口避免反向切换。
+      用户拍板取**全局、零守护**这一版。
+    - **求值顺序（为什么插在文件最前）**：niri 的窗规则**按文件出现顺序**处理，后匹配的规则覆盖先前的值 ⇒
+      全局那条放最前，下面各 app 专用规则（浮动面板、WeChat/Zen 的 `open-maximized`、ChatGPT/Discord 的
+      `open-maximized-to-edges false`）仍能盖住它。反过来放末尾会把所有这些专用设置一起冲掉。
+    - **副作用（必须知道，不是 bug）**：①`maximize-column` 是 **toggle** ⇒ 现在是"启动即满宽，按第一次
+      Super+F 变**小**（回 0.5 列）"，与改之前的方向相反；②这是**尺寸**不是状态 ⇒ 已经有列的工作区上新开
+      窗口也会满宽（上一条说的匹配器缺失所致）。
+    - **验法**：`niri msg action load-config-file` 后，空工作区起任一 app，
+      `niri msg --json windows | grep -o '"tile_size":\[[0-9.]*'` 应为满宽 `1584`（改前是 `788`）；
+      浮窗仍浮：Nautilus 实测 `is_floating=true`、`960x666`（没被撑满即 `open-maximized false` 生效）；
+      再按一次 Super+F 应掉回 `788`。
+    - **回退**：删掉 `window-rules.kdl` 顶部那条全局 `open-maximized true`（以及 5 行 `open-maximized false`，
+      留着也无害）后 `niri msg action load-config-file`。改前的整份文件在
+      `~/.local/state/backups/window-rules.kdl.bak-20261031-2`。
+    - **附带修掉的问题：Firefox 冷启动宽度不受控（同一轮定位，同一条规则文件）**。症状是"启动后第一次
+      Super+F 像没反应，要按两次"。实测冷启动列宽 **1535**（既不是 0.5 列 `788` 也不是满宽 `1584`），
+      按一次到 `1584`、再按一次才回 `788`。**根因**：Firefox 把 `xulstore.json` 里保存的窗口宽度（CSS px）
+      乘上它自己的 device-pixel-ratio，用 `xdg_surface.set_window_geometry` 推给合成器；niri 对**未标记为
+      平铺**的客户端照单全收。当时 `gsettings text-scaling-factor = 1.2222` ⇒ `1276 × 1.2 = 1531`。
+      决定性证据：把该因子临时改成 `1.0`，同一 profile 同一份存档立刻开成 **1271**（`1276×1.0`）；
+      `653 × 1.2 = 784` 也对得上。**试过但无效**：`default-column-width { fixed 900; }` 压不住它——
+      niri wiki 原话是"the window itself always has a final say"（`default-column-width` 只在初始 configure
+      时生效）。**正解**：`match app-id=r#"^firefox$"#` + `exclude title="^Picture-in-Picture$"` 上加
+      `tiled-state true`——告诉客户端"你是平铺的"，它就不再自报尺寸。三次冷启动均 `788`，一次 Super+F 到
+      `1584`。**刻意选的是状态而非尺寸**，所以换分辨率/缩放/字号都不会失效。这一条与上面全局最大化的
+      构造叠加后：Firefox 冷启动即满宽，Super+F 第一次是变小。
 
 ---
 

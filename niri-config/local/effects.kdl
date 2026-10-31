@@ -113,6 +113,18 @@ layer-rule {
     }
 }
 
+// Apps grid (upstream's omarchy.dock, summoned from the menu, 2026-10-28).
+// Same shape as the menu: a full-screen transparent surface with one centered
+// card, so `blur true` would frost the whole display. The client sends the
+// card's rounded rect; only `xray` is set here so that region stays the sole
+// blur area.
+layer-rule {
+    match namespace="^omarchy-dock-apps$"
+    background-effect {
+        xray false
+    }
+}
+
 // Status-bar popups (audio/bluetooth/network/power/clock/monitor/tailscale/
 // weather/dropbox + the agent panel) are full-screen transparent PanelWindows
 // with a card. Quickshell sends an ext_background_effect region tracking the
@@ -124,6 +136,22 @@ layer-rule {
 // tiled window.
 layer-rule {
     match namespace="^omarchy-keyboard-panel$"
+    background-effect {
+        xray false
+    }
+}
+
+// Spotlight Apps (third-party plugin io.github.jeocrypto.launchpad, 2026-10-22).
+// Its panel is a full-screen transparent PanelWindow with one centered card, so
+// a plain `blur true` would frost the whole display -- niri has no Hyprland
+// `ignore_alpha`. The plugin now sends an ext_background_effect region that
+// tracks the card (one line at the top of Launchpad.qml), so only `xray false`
+// is set here and that client region stays the sole blur area.
+// No `shadow` here on purpose: the surface is full-screen, so niri would shadow
+// the whole display rather than the card. The card draws its own shadow (its
+// MultiEffect in Launchpad.qml), so nothing is missing.
+layer-rule {
+    match namespace="^launchpad$"
     background-effect {
         xray false
     }

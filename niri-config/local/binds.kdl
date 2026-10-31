@@ -38,6 +38,9 @@ Ctrl+Shift+Escape hotkey-overlay-title="btop" { spawn-sh "omarchy-launch-termina
 // dropped: Mod+Alt+Space (与 Mod+D 完全相同的 apps 面板)
 // Mod+Alt+Space hotkey-overlay-title="Apps menu" { spawn-sh "omarchy-menu toggle apps"; }
 Mod+Ctrl+V hotkey-overlay-title="Clipboard manager" { spawn-sh "omarchy-shell shell toggle omarchy.clipboard"; }
+// Spotlight Apps（第三方插件 io.github.jeocrypto.launchpad）：Alt+Space 唤出应用面板。
+// 面板是固定屏幕的，toggle 第二次关；Esc 也关。绑定走壳层 IPC，不依赖插件自己设键。
+Alt+Space hotkey-overlay-title="Spotlight Apps" { spawn-sh "omarchy-shell shell toggle io.github.jeocrypto.launchpad"; }
 Mod+Ctrl+E hotkey-overlay-title="Emojis" { spawn-sh "omarchy-shell shell toggle omarchy.emojis"; }
 Mod+Ctrl+A hotkey-overlay-title="Audio" { spawn-sh "omarchy-shell shell toggle omarchy.audio"; }
 Mod+Ctrl+B hotkey-overlay-title="Bluetooth" { spawn-sh "omarchy-shell shell toggle omarchy.bluetooth"; }
