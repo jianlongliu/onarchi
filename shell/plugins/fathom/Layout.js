@@ -94,12 +94,82 @@ function deepPlane(stage, r) {
     };
 }
 
+
+// ------------------------------------------------------------ the sounding line
+
+// The gauge beside the Deep reads depth the way a lead line reads water: the
+// surface (depth 0, now) at `top`, MAX_DEPTH at `bottom`.
+function soundingY(depth, top, bottom, maxDepth) {
+    var limit = maxDepth > 0 ? maxDepth : 8;
+    var value = Math.max(0, Math.min(limit, Number(depth) || 0));
+    return top + (bottom - top) * value / limit;
+}
+
+// One mark per window: its y on the gauge and a column, so windows at nearly
+// the same depth sit side by side instead of on top of each other. Beyond
+// `maxColumns` a mark is hidden and the last visible mark of the row counts
+// them (`more`), so a crowded depth says how crowded it is.
+function soundingMarks(depths, top, bottom, maxDepth, spacing, maxColumns) {
+    var list = depths || [];
+    var gap = spacing > 0 ? spacing : 6;
+    var limit = maxColumns > 0 ? Math.floor(maxColumns) : Infinity;
+    var marks = [];
+    var rows = [];
+    for (var i = 0; i < list.length; i++) {
+        var y = soundingY(list[i], top, bottom, maxDepth);
+        var row = null;
+        for (var j = 0; j < rows.length; j++) {
+            if (Math.abs(rows[j].y - y) < gap) {
+                row = rows[j];
+                break;
+            }
+        }
+        if (!row) {
+            row = { y: y, count: 0, last: -1 };
+            rows.push(row);
+        }
+        var column = row.count;
+        row.count++;
+        var hidden = column >= limit;
+        var mark = { y: row.y, column: column, hidden: hidden, more: 0 };
+        if (hidden) marks[row.last].more++;
+        else row.last = marks.length;
+        marks.push(mark);
+    }
+    return marks;
+}
+
+// ------------------------------------------------------------ the map
+
+// The rectangle a workspace's minimap has to show: the viewport, grown to
+// include every window outside it. A scrolling layout parks windows to the
+// left and right of the screen; the whole strip is shown, compressed.
+function minimapBounds(viewport, windows) {
+    var left = viewport.x;
+    var top = viewport.y;
+    var right = viewport.x + viewport.width;
+    var bottom = viewport.y + viewport.height;
+    var list = windows || [];
+    for (var i = 0; i < list.length; i++) {
+        var w = list[i];
+        if (!w || !(w.width > 0) || !(w.height > 0) || !isFinite(w.x) || !isFinite(w.y)) continue;
+        left = Math.min(left, w.x);
+        top = Math.min(top, w.y);
+        right = Math.max(right, w.x + w.width);
+        bottom = Math.max(bottom, w.y + w.height);
+    }
+    return { x: left, y: top, width: Math.max(1, right - left), height: Math.max(1, bottom - top) };
+}
+
 // The shell imports this file as a QML library; the tests load it with node.
 if (typeof module !== "undefined") {
   module.exports = {
     deepStage: deepStage,
     deepPlane: deepPlane,
     stepSum: stepSum,
+    soundingY: soundingY,
+    soundingMarks: soundingMarks,
+    minimapBounds: minimapBounds,
     VISIBLE_STEPS: VISIBLE_STEPS
   }
 }

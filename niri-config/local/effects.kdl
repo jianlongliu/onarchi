@@ -168,3 +168,16 @@ layer-rule {
     match namespace="^omarchy-blurwallpaper$"
     place-within-backdrop true
 }
+
+// Fathom Alt-Tab (experimental, docs/fathom.md). Like the menu and the status
+// bar popups, the field is a full-screen transparent surface with cards on it,
+// and Quickshell sends the cards' rounded rects as an ext-background-effect
+// region -- so NO `blur true` here: that would frost everything the surface
+// covers. `xray false` frosts the live windows behind the cards, which is the
+// point: the field is glass over the desktop, not a panel hiding it.
+layer-rule {
+    match namespace="^omarchy-fathom$"
+    background-effect {
+        xray false
+    }
+}

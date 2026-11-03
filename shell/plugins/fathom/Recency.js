@@ -61,11 +61,16 @@ function buildField(windows, now, focusedId) {
         // debounced away by niri's own MRU bookkeeping.
         var seconds = active ? 0 : (at === null || now === null ? Infinity : Math.max(0, now - at))
 
+        var appId = String(window.app_id || "")
         entries.push({
             address: address,
             id: window.id,
             title: String(window.title || ""),
-            appId: String(window.app_id || ""),
+            appId: appId,
+            // The label under an icon, and the icon itself (a themed name or a
+            // file URL), filled by the controller once it has looked the app up.
+            appName: appId,
+            icon: "",
             workspaceId: window.workspace_id,
             active: active,
             urgent: !!window.is_urgent,
@@ -103,6 +108,39 @@ function stepSelection(index, delta, count) {
     return next < 0 ? next + count : next
 }
 
+// ------------------------------------------------------------ workspaces
+
+// Group the field's entries by workspace, for the map under the Deep. Each
+// group carries the indices of its entries in recency order, so the map can
+// highlight the same windows the Deep shows.
+function workspaceGroups(entries) {
+    var list = entries || []
+    var byId = {}
+    var groups = []
+    for (var i = 0; i < list.length; i++) {
+        var entry = list[i]
+        if (!entry) continue
+        var key = entry.workspaceId === null || entry.workspaceId === undefined
+            ? "none" : String(entry.workspaceId)
+        var group = byId[key]
+        if (!group) {
+            group = { id: entry.workspaceId, entries: [] }
+            byId[key] = group
+            groups.push(group)
+        }
+        group.entries.push(i)
+    }
+    // Workspaces are already numbered by niri; sort by that id so the map
+    // reads left to right the way the bar does.
+    groups.sort(function(a, b) {
+        var ai = a.id === null || a.id === undefined ? Infinity : Number(a.id)
+        var bi = b.id === null || b.id === undefined ? Infinity : Number(b.id)
+        if (ai !== bi) return ai < bi ? -1 : 1
+        return 0
+    })
+    return groups
+}
+
 // The shell imports this file as a QML library; the tests load it with node.
 if (typeof module !== "undefined") {
   module.exports = {
@@ -112,6 +150,7 @@ if (typeof module !== "undefined") {
     initialSelection: initialSelection,
     stepSelection: stepSelection,
     depthForSeconds: depthForSeconds,
+    workspaceGroups: workspaceGroups,
     MAX_DEPTH: MAX_DEPTH
   }
 }
