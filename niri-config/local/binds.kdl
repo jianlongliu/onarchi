@@ -55,8 +55,13 @@ Mod+Ctrl+Alt+D hotkey-overlay-title="Calendar" { spawn-sh "omarchy-shell shell t
 Mod+Ctrl+Shift+W hotkey-overlay-title="WeChat" { spawn "/home/<user>/bin/wechat"; }
 // Fix XWayland window-mapping wedge (NoMachine nxrunner poisons satellite).
 Ctrl+Alt+B hotkey-overlay-title="Fix XWayland" { spawn-sh "$HOME/.local/bin/fix-xwayland.sh"; }
-// Alt+Tab family lives in config.kdl's `recent-windows { binds { } }` block —
-// those actions (next-window / previous-window) are only valid there.
+// Alt+Tab belongs to the Fathom field (shell/plugins/fathom), an experimental
+// depth-based switcher. It opens over everything and takes the keyboard, so
+// the chord only has to open it; the field handles Tab, Enter and Escape
+// itself from there. Experimental: if it is retired, delete these two lines
+// and restore the `recent-windows` block in config.kdl.
+Alt+Tab hotkey-overlay-title="Switch windows" { spawn-sh "omarchy-shell omarchy.fathom next"; }
+Alt+Shift+Tab hotkey-overlay-title="Switch windows (back)" { spawn-sh "omarchy-shell omarchy.fathom previous"; }
 
 
 // Use spawn-sh to run a shell command. Do this if you need pipes, multiple commands, etc.

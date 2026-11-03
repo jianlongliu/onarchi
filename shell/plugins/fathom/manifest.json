@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "omarchy.fathom",
+  "name": "Fathom Alt-Tab",
+  "version": "0.1.0",
+  "author": "jianlongliu",
+  "description": "A depth-based Alt-Tab: every window as deep as it is old. Experimental.",
+  "kinds": [
+    "overlay"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "overlay": "Fathom.qml"
+  }
+}
