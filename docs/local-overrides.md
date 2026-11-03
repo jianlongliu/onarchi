@@ -627,6 +627,38 @@ hype / signed / monologue / omasnap:
 `pkexec pacman -R omasnap monologue hype signed disktree-bin`。原文件在
 `/etc/pacman.conf.bak-20261028-*`。
 
+### 8.1.1 网络测速客户端（2026-11-03 装）
+
+**症状**：Wi-Fi / 网络面板里点测速（`omarchy.speedtest`）面板能弹，但上下行都只报
+`The speed test client is missing: install the omarchy-speedtest package`（`license`/退出码 1）。
+
+**为什么本机缺**：`bin/omarchy-network-speedtest` 硬要 `/usr/lib/omarchy/speedtest`，那是
+**`omarchy-speedtest` 包**的文件，而它**在 `install/` 的任何清单里都没有** —— 上游靠 `omarchy` 元包的
+`Depends On: omarchy-speedtest` 带进来（**实测 4.0.6 stable 的元包没有这条**，4.5.0rc3 的 edge/rc 才有），
+本移植是 git checkout 形态、不装元包 ⇒ 依赖链断。`pacman -Ss omarchy-speedtest` 在加过 `[omarchy]`
+源后能查到（0.2.1），各渠道 x86_64/aarch64 **两种构建都齐**（`stable/x86_64`、`edge/x86_64`、
+`rc/x86_64` 与三个 aarch64 同名库内均能解出 `omarchy-speedtest-0.2.1-1`）。
+
+```sh
+pkexec pacman -S --needed omarchy-speedtest   # 2.75 MiB → /usr/lib/omarchy/speedtest（6.46 MiB）
+```
+
+**装完实测**（本机 x86_64，2026-11-03）：
+
+- `omarchy-network-speedtest down` → 退出码 0，逐行打印 3.5 / 4.0 / 4.2 … / 4.5 Mbps（协议与面板的
+  `SplitParser` 一致，面板 `omarchy.speedtest` 截图里 DOWNLOAD 指针实时跳到 1.7–4.9 Mbps）。
+- `omarchy-network-speedtest up` → **退出码 1**，`Speed test failed: speed test connection timed out`。
+  这**不是缺包**：同一时刻 `curl` 上行 5 MB 实测 **159 KB/s ≈ 1.25 Mbps**（耗时 31 s），客户端在预热窗口内
+  等不到足够数据就主动放弃。面板把这条 stderr 原样显示在双盘下方，并留着「Run Again」= 预期行为。
+  **上行链路慢到这个量级时测速必然失败**，别当 bug 修。
+- 视觉验证：`omarchy-shell shell summon omarchy.speedtest` 两次截图（下载中 / 失败后），标题 `ETHERNET`、
+  双盘、错误文案与 Run Again 按钮位置都对，无裁切或重叠。
+
+**回退**：`pkexec pacman -R omarchy-speedtest`（回到"面板弹得出、两向都报缺包"的状态）。
+
+**换机可复现**：已写进 `docs/INSTALL.md` / `INSTALL.zh.md` 第 1 节「系统包」，因为 `install/*.packages`
+是**上游镜像**（2026-10-28 的同步提交整体覆盖过该目录）、改那里会在下次同步被冲掉。
+
 ---
 
 ## 9. 一句话回退索引

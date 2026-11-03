@@ -29,6 +29,19 @@ sudo pacman -S --needed \
 
 `qt6-imageformats` 是关键：没有它 Qt 解不了 `.webp` 壁纸，你会得到一片黑背景。
 
+**网络测速要一个 Omarchy 自家仓库的包。** `omarchy-network-speedtest` 跑的是 `/usr/lib/omarchy/speedtest`，
+由 `omarchy-speedtest` 提供，而 `install/` 下任何一份包清单都没写它：上游把它挂在 `omarchy` 元包的依赖上，
+本移植用 git checkout 跑 Omarchy、不装那个元包。缺了它，面板照样弹出，但上下行都会报
+「install the omarchy-speedtest package」。它在 `[omarchy]` 源里，所以先把这个源加上（顺带也是
+`disktree-bin` 等 Omarchy 专属工具的来源），然后：
+
+```sh
+sudo pacman -S --needed omarchy-speedtest
+```
+
+key 与 `pkgs.omarchy.org/stable/$arch` 那行 server 见 [`local-overrides.md`](local-overrides.md) §8.1；
+该包在各渠道都同时提供 x86_64 与 aarch64 两种构建。
+
 ---
 
 ## 2. 把移植胶水放进 `~/bin`

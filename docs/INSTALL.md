@@ -33,6 +33,20 @@ sudo pacman -S --needed \
 `qt6-imageformats` is critical: without it Qt can't decode the `.webp` wallpapers and you get a black
 background.
 
+**The network speed test needs one package from Omarchy's own repository.** `omarchy-network-speedtest` runs
+`/usr/lib/omarchy/speedtest`, which `omarchy-speedtest` provides, and no package list under `install/` names it:
+upstream carries it as a dependency of the `omarchy` meta-package, and this port runs Omarchy from a git
+checkout instead of installing that meta-package. Without it the panel opens and reports "install the
+omarchy-speedtest package" for both directions. It is in `[omarchy]`, so add that repository first (it also
+carries `disktree-bin` and the other Omarchy-only tools), then:
+
+```sh
+sudo pacman -S --needed omarchy-speedtest
+```
+
+The key and the `pkgs.omarchy.org/stable/$arch` server line are in
+[`local-overrides.md`](local-overrides.md) §8.1; the package is built for x86_64 and aarch64 on every channel.
+
 ---
 
 ## 2. Put the port glue in `~/bin`
