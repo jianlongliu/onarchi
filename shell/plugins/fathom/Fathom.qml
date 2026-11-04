@@ -46,6 +46,11 @@ Item {
   property var openStep: undefined
   // id -> { url, status } for the captured frames, filled after opening.
   property var previews: ({})
+  // The window that had focus last time the warmer ran. A focus change only
+  // alters what those two windows show, so only they are captured again; every
+  // other still is reused. Without this, committing a switch re-captured every
+  // window on screen.
+  property string lastFocusedId: ""
   property bool previewsDone: false
 
   // Windows in the field. Kept as its own int rather than `field.length`: a JS
@@ -215,10 +220,44 @@ Item {
   // One shell captures the given windows, waits for each PNG to stop growing
   // (niri writes from a worker thread and returns first), and drops files for
   // windows that no longer exist.
-  function captureBatch(ids) {
-    var lines = ['d="' + root.captureDir + '"', 'mkdir -p "$d"']
+  // Windows whose still must be re-rendered even though a file exists: gaining
+  // or losing focus is the only thing that changes a window's own pixels. A
+  // plain space-separated string, not an array -- array methods on a
+  // `property var` do not behave here.
+  property string alwaysRefresh: ""
+
+  // `focused` comes from the caller, which already parsed the window list:
+  // reading `root.field` here returns an empty array (measured), and with it an
+  // empty refresh list, which made every still look stale.
+  function captureBatch(ids, focusedId) {
+    var refresh = ""
+    var previous = root.lastFocusedId
+    var focused = String(focusedId || "")
+    if (focused) refresh = focused
+    if (previous && previous !== focused) refresh = refresh + " " + previous
+    root.lastFocusedId = focused
+    root.alwaysRefresh = refresh
+    console.log("KEEPCHK ids=" + ids.length + " refresh=[" + refresh + "]")
+    // A plain object, not an array: `indexOf` on an array assigned to a
+    // `property var` does not match anything here (measured: 4 captured,
+    // 0 merged).
+    var marks = ({})
+    for (var m = 0; m < ids.length; m++) marks[ids[m]] = true
+    root.batchIds = marks
+    // niri's screenshot-window sets the image as the clipboard selection, so a
+    // batch would cost the user whatever they had copied. Save once, restore
+    // after: no other caller has to remember.
+    var lines = ['d="' + root.captureDir + '"', 'mkdir -p "$d"',
+      'clip="' + root.clipboardFile + '"',
+      'wl-paste --no-newline 2>/dev/null | base64 -w0 > "$clip"',
+      // A still that already exists is reused: a window's pixels only change
+      // when it gains or loses focus, and both of those windows are in the
+      // always-refresh list below.
+      'keep=" ' + root.alwaysRefresh + ' "']
     for (var j = 0; j < ids.length; j++) {
       lines.push('f="$d/' + ids[j] + '.png"')
+      // Skip a still that is already there, unless the window just changed.
+      lines.push('case "$keep" in *" ' + ids[j] + ' "*) ;; *) [ -s "$f" ] && continue ;; esac')
       lines.push('niri msg action screenshot-window --id ' + ids[j]
         + ' -d true --path "$f" >/dev/null 2>&1')
       lines.push('prev=-1; for i in $(seq 60); do sz=$(stat -c %s "$f" 2>/dev/null || echo 0); '
@@ -227,6 +266,7 @@ Item {
     // Drop stills of windows that closed: their ids never come back.
     lines.push('for f in "$d"/*.png; do [ -e "$f" ] || continue; '
       + 'id=$(basename "$f" .png); case " ' + ids.join(" ") + ' " in *" $id "*) ;; *) rm -f "$f";; esac; done')
+    lines.push('[ -s "$clip" ] && base64 -d "$clip" | wl-copy 2>/dev/null; rm -f "$clip"')
     lines.push("printf done")
     captureProcess.command = ["sh", "-c", lines.join("; ")]
     captureProcess.running = true
@@ -242,11 +282,25 @@ Item {
     return "file://" + root.captureDir + "/" + String(id) + ".png#" + stamp
   }
 
+  // Merge the batch into the cache rather than rebuilding it: a still that was
+  // not captured keeps its old stamp, so it stays cached and the warmer can
+  // tell it did not change.
   function finishCaptures() {
     root.captureStamp++
-    root.previews = root.stillsFor(root.field)
+    var merged = ({})
+    var old = root.previews
+    for (var key in old) merged[key] = old[key]
+    for (var i = 0; i < root.field.length; i++) {
+      var id = String(root.field[i].id)
+      if (root.batchIds[id]) merged[id] = { stamp: root.captureStamp }
+    }
+    root.previews = merged
     root.previewsDone = true
+
   }
+
+  // The ids the running batch captured, keyed for lookup.
+  property var batchIds: ({})
 
   // Warm the cache once at shell start, so the first Alt+Tab of a session is
   // already served from disk rather than showing icon-only cards.
@@ -265,8 +319,6 @@ Item {
     root.previewsDone = false
     reload()
     watchdog.restart()
-    // The captures run once the window list is known (applyWindows).
-    capturePrepare.running = true
   }
 
   function close() {
@@ -458,11 +510,17 @@ Item {
         } catch (e) {
           list = []
         }
+        // Every window, in order. captureBatch decides which of them actually
+        // need rendering -- it checks the files on disk, so the cache lives
+        // where it cannot go stale: in the stills themselves.
         var ids = []
+        var focused = ""
         for (var i = 0; i < list.length && ids.length < root.previewLimit; i++) {
-          if (list[i]) ids.push(String(list[i].id))
+          if (!list[i]) continue
+          ids.push(String(list[i].id))
+          if (list[i].is_focused) focused = String(list[i].id)
         }
-        if (ids.length > 0) root.captureBatch(ids)
+        if (ids.length > 0) root.captureBatch(ids, focused)
       }
     }
   }
@@ -476,33 +534,12 @@ Item {
     }
   }
 
-  // Keep the clipboard for the duration of the batch: niri sets each captured
-  // image as the selection, so without this a switch would cost the user
-  // whatever they had copied.
-  Process {
-    id: capturePrepare
-    command: ["sh", "-c",
-      'wl-paste --no-newline 2>/dev/null | base64 -w0 > "' + root.clipboardFile + '" 2>/dev/null; printf ok']
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: captureProcess.running = true
-    }
-  }
-
   Process {
     id: captureProcess
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: root.finishCaptures()
     }
-  }
-
-  Process {
-    id: captureRestore
-    command: ["sh", "-c",
-      'f="' + root.clipboardFile + '"; '
-        + '[ -s "$f" ] && base64 -d "$f" | wl-copy 2>/dev/null; rm -f "$f"; printf ok']
-    stdout: StdioCollector { waitForEnd: true }
   }
 
   // ------------------------------------------------------------ the field

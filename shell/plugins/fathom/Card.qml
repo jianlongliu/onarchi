@@ -106,7 +106,11 @@ Item {
       source: card.previewUrl
       fillMode: Image.PreserveAspectFit
       asynchronous: true
-      cache: false
+      // Cached, not discarded on every close: the field reopens to stills it
+      // already decoded, instead of re-reading several 3000 px PNGs from disk
+      // each time. The URL carries the batch stamp, so a genuinely
+      // re-captured window still decodes once.
+      cache: true
       smooth: true
       opacity: 1 - card.fog * 0.6
       // niri writes the still at full window size (~3200 px wide). Asking Qt
