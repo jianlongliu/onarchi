@@ -6,6 +6,12 @@ source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/base-test.sh"
 
 migration="$ROOT/migrations/1786605598.sh"
 packaged_hooks="$ROOT/etc/mkinitcpio.conf.d/omarchy_hooks.conf"
+# The drop-in only *adjusts* a HOOKS array; 00-omarchy-hooks.conf is what puts
+# one there. Without it the conditional reads an empty HOOKS, finds no kms to
+# drop, and the migration rebuilds on machines that keep kms — a hybrid one
+# included. The fixture has to supply it or it tests that bug instead of the
+# migration.
+packaged_baseline="$ROOT/etc/mkinitcpio.conf.d/00-omarchy-hooks.conf"
 
 test_tmp=$(mktemp -d)
 trap 'rm -rf "$test_tmp"' EXIT
@@ -40,9 +46,11 @@ chmod +x "$stub_bin"/*
 
 hooks_conf="$test_tmp/omarchy_hooks.conf"
 nvidia_conf="$test_tmp/nvidia.conf"
+baseline_conf="$test_tmp/00-omarchy-hooks.conf"
 rebuild_marker="$test_tmp/rebuild-complete"
 
 cp "$packaged_hooks" "$hooks_conf"
+cp "$packaged_baseline" "$baseline_conf"
 echo 'MODULES+=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)' >"$nvidia_conf"
 
 # Each argument is a PCI device as "vendor:class", in sysfs's own format.
