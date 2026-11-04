@@ -16,12 +16,12 @@ import "Recency.js" as Recency
 //
 // Two departures from Fathom, both forced by what niri exposes:
 //
-//   * The card frames are one-shot stills, not live streams. niri has no
-//     per-window capture protocol, but `niri msg action screenshot-window
-//     --id N` renders a single window off screen -- including windows on other
-//     workspaces -- and writes it to a file. That call also replaces the
-//     clipboard (niri sets the image as the selection), so the clipboard is
-//     saved before the captures and put back afterwards.
+//   * Cards carry no window frames. The only per-window capture niri offers is
+//     `niri msg action screenshot-window`, which unconditionally replaces the
+//     clipboard and raises a "Screenshot captured" notification per call --
+//     on every focus change that made the field interrupt whatever the user
+//     was doing. Capture is off until niri ships toplevel image-copy; cards
+//     fall back to the app icon, title and age. See docs/fathom.md.
 //   * No "release Alt to commit". A modifier released after a surface grabbed
 //     the keyboard never reaches that surface, so Enter commits instead, and a
 //     watchdog closes the field if it is abandoned.
@@ -45,13 +45,12 @@ Item {
   // The step the opening chord asked for, held until the window list lands.
   property var openStep: undefined
   // id -> { url, status } for the captured frames, filled after opening.
-  property var previews: ({})
   // The window that had focus last time the warmer ran. A focus change only
   // alters what those two windows show, so only they are captured again; every
   // other still is reused. Without this, committing a switch re-captured every
   // window on screen.
   property string lastFocusedId: ""
-  property bool previewsDone: false
+
 
   // Windows in the field. Kept as its own int rather than `field.length`: a JS
   // array assigned to a `property var` is wrapped by QML, and a binding on its
@@ -124,28 +123,7 @@ Item {
     } else if (root.selectedIndex >= root.count) {
       root.selectedIndex = root.count > 0 ? root.count - 1 : -1
     }
-    // Nothing is captured here. Whatever the background warmer wrote is what
-    // the cards show; a window it has not reached yet falls back to its icon
-    // and app name, which is the whole of the opening cost.
-    if (!root.opened) return
-    root.previews = root.stillsFor(root.field)
-    root.previewsDone = true
   }
-
-  // Map each entry to its cached still. The stamp is the file's age in the
-  // session, kept stable across openings so Qt keeps its decoded texture.
-  function stillsFor(entries) {
-    var out = ({})
-    for (var i = 0; i < entries.length; i++) {
-      var key = String(entries[i].id)
-      out[key] = { stamp: root.captureStamp }
-    }
-    return out
-  }
-
-  // Bumped after each background batch; it is what makes Qt decode a rewritten
-  // still again (see previewFor).
-  property int captureStamp: 0
 
   // Icons and human names come from the desktop entry that matches the
   // window's app id, through Quickshell's own index: no process, no file I/O.
@@ -198,114 +176,6 @@ Item {
 
   // ------------------------------------------------------------ captures
 
-  // niri can render a single window off screen, so every card gets a still,
-  // including windows on other workspaces. The command writes the image as
-  // well as setting it as the clipboard selection; the clipboard is saved once
-  // before the batch and restored once after it.
-  // Quickshell env has XDG_RUNTIME_DIR but not UID, so derive the scratch
-  // directory from it: a private place for stills that the session cleans up.
-  readonly property string runtimeDir: Quickshell.env("XDG_RUNTIME_DIR") || ""
-  readonly property string captureDir: runtimeDir + "/omarchy-fathom"
-  readonly property string clipboardFile: runtimeDir + "/omarchy-fathom-clip"
-
-  // `screenshot-window` costs ~200 ms per window (offscreen render + PNG
-  // encode), so the batch for a full field would take about a second -- far
-  // too slow to run when the field opens. Instead every window is captured in
-  // the background as focus moves, and opening the field only reads what is
-  // already on disk. A still is named after its window id, so it survives the
-  // field closing; Qt's per-batch cache busting is not needed because the mtime
-  // changes when the file is rewritten (see previewFor).
-  readonly property int previewLimit: 24
-
-  // One shell captures the given windows, waits for each PNG to stop growing
-  // (niri writes from a worker thread and returns first), and drops files for
-  // windows that no longer exist.
-  // Windows whose still must be re-rendered even though a file exists: gaining
-  // or losing focus is the only thing that changes a window's own pixels. A
-  // plain space-separated string, not an array -- array methods on a
-  // `property var` do not behave here.
-  property string alwaysRefresh: ""
-
-  // `focused` comes from the caller, which already parsed the window list:
-  // reading `root.field` here returns an empty array (measured), and with it an
-  // empty refresh list, which made every still look stale.
-  function captureBatch(ids, focusedId) {
-    var refresh = ""
-    var previous = root.lastFocusedId
-    var focused = String(focusedId || "")
-    if (focused) refresh = focused
-    if (previous && previous !== focused) refresh = refresh + " " + previous
-    root.lastFocusedId = focused
-    root.alwaysRefresh = refresh
-    console.log("KEEPCHK ids=" + ids.length + " refresh=[" + refresh + "]")
-    // A plain object, not an array: `indexOf` on an array assigned to a
-    // `property var` does not match anything here (measured: 4 captured,
-    // 0 merged).
-    var marks = ({})
-    for (var m = 0; m < ids.length; m++) marks[ids[m]] = true
-    root.batchIds = marks
-    // niri's screenshot-window sets the image as the clipboard selection, so a
-    // batch would cost the user whatever they had copied. Save once, restore
-    // after: no other caller has to remember.
-    var lines = ['d="' + root.captureDir + '"', 'mkdir -p "$d"',
-      'clip="' + root.clipboardFile + '"',
-      'wl-paste --no-newline 2>/dev/null | base64 -w0 > "$clip"',
-      // A still that already exists is reused: a window's pixels only change
-      // when it gains or loses focus, and both of those windows are in the
-      // always-refresh list below.
-      'keep=" ' + root.alwaysRefresh + ' "']
-    for (var j = 0; j < ids.length; j++) {
-      lines.push('f="$d/' + ids[j] + '.png"')
-      // Skip a still that is already there, unless the window just changed.
-      lines.push('case "$keep" in *" ' + ids[j] + ' "*) ;; *) [ -s "$f" ] && continue ;; esac')
-      lines.push('niri msg action screenshot-window --id ' + ids[j]
-        + ' -d true --path "$f" >/dev/null 2>&1')
-      lines.push('prev=-1; for i in $(seq 60); do sz=$(stat -c %s "$f" 2>/dev/null || echo 0); '
-        + 'if [ "$sz" != "0" ] && [ "$sz" = "$prev" ]; then break; fi; prev=$sz; sleep 0.03; done')
-    }
-    // Drop stills of windows that closed: their ids never come back.
-    lines.push('for f in "$d"/*.png; do [ -e "$f" ] || continue; '
-      + 'id=$(basename "$f" .png); case " ' + ids.join(" ") + ' " in *" $id "*) ;; *) rm -f "$f";; esac; done')
-    lines.push('[ -s "$clip" ] && base64 -d "$clip" | wl-copy 2>/dev/null; rm -f "$clip"')
-    lines.push("printf done")
-    captureProcess.command = ["sh", "-c", lines.join("; ")]
-    captureProcess.running = true
-  }
-
-  // A still's URL. The file's mtime is appended so Qt decodes the new frame
-  // instead of reusing the previous one from its cache -- a local file URL has
-  // no query part, and Qt would look for a file literally named "60.png?v=1",
-  // so the stamp goes in a fragment, which Qt strips.
-  function previewFor(id) {
-    var entry = root.previews[String(id)]
-    var stamp = entry && entry.stamp ? entry.stamp : 0
-    return "file://" + root.captureDir + "/" + String(id) + ".png#" + stamp
-  }
-
-  // Merge the batch into the cache rather than rebuilding it: a still that was
-  // not captured keeps its old stamp, so it stays cached and the warmer can
-  // tell it did not change.
-  function finishCaptures() {
-    root.captureStamp++
-    var merged = ({})
-    var old = root.previews
-    for (var key in old) merged[key] = old[key]
-    for (var i = 0; i < root.field.length; i++) {
-      var id = String(root.field[i].id)
-      if (root.batchIds[id]) merged[id] = { stamp: root.captureStamp }
-    }
-    root.previews = merged
-    root.previewsDone = true
-
-  }
-
-  // The ids the running batch captured, keyed for lookup.
-  property var batchIds: ({})
-
-  // Warm the cache once at shell start, so the first Alt+Tab of a session is
-  // already served from disk rather than showing icon-only cards.
-  Component.onCompleted: recaptureTimer.restart()
-
   // ------------------------------------------------------------ lifecycle
 
   function open() {
@@ -316,7 +186,6 @@ Item {
     if (root.opened) return
     root.opened = true
     root.openStep = step
-    root.previewsDone = false
     reload()
     watchdog.restart()
   }
@@ -430,8 +299,6 @@ Item {
         windows: root.count,
         selected: root.selectedIndex,
         workspaces: root.groups.length,
-        previewsDone: root.previewsDone,
-        previews: Object.keys(root.previews).length,
         screen: panel.targetScreen ? String(panel.targetScreen.name || "") : ""
       })
     }
@@ -449,8 +316,8 @@ Item {
           workspace: e.workspaceId,
           seconds: isFinite(e.seconds) ? Math.round(e.seconds * 10) / 10 : null,
           depth: Math.round(e.depth * 1000) / 1000,
-          preview: root.previewFor(e.id),
-          hasStill: !!root.previews[String(e.id)]
+          preview: "",
+          hasStill: false
         })
       }
       return JSON.stringify(rows)
@@ -459,71 +326,12 @@ Item {
 
   // ------------------------------------------------------------ processes
 
-  // The compositor's own event stream drives the background capture: a window
-  // entering the MRU order, or gaining focus, is the moment its still is worth
-  // refreshing. Debounced so a burst of focus changes costs one batch, and
-  // skipped while the field is open, where the frames are already being shown.
-  Process {
-    id: eventsProcess
-    command: ["niri", "msg", "-j", "event-stream"]
-    running: true
-
-    stdout: SplitParser {
-      onRead: function(line) {
-        var msg = null
-        try {
-          msg = JSON.parse(line)
-        } catch (e) {
-          return
-        }
-        if (!msg) return
-        // WindowFocusChanged is the one that reorders the field; the others
-        // mean a window appeared, closed, or moved.
-        if (msg.WindowFocusChanged || msg.WindowsChanged || msg.WindowOpenedOrChanged
-            || msg.WindowClosed || msg.WorkspaceActivated)
-          recaptureTimer.restart()
-      }
-    }
-  }
-
-  // A quiet moment after the last focus change, so switching quickly through
-  // several windows does not spawn a capture batch per step.
-  Timer {
-    id: recaptureTimer
-    interval: 400
-    onTriggered: {
-      if (root.opened) return
-      recaptureWindows.running = true
-    }
-  }
-
-  // Fetch the window list without disturbing the field, then capture.
-  Process {
-    id: recaptureWindows
-    command: ["niri", "msg", "-j", "windows"]
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: {
-        var list = []
-        try {
-          list = JSON.parse(text)
-        } catch (e) {
-          list = []
-        }
-        // Every window, in order. captureBatch decides which of them actually
-        // need rendering -- it checks the files on disk, so the cache lives
-        // where it cannot go stale: in the stills themselves.
-        var ids = []
-        var focused = ""
-        for (var i = 0; i < list.length && ids.length < root.previewLimit; i++) {
-          if (!list[i]) continue
-          ids.push(String(list[i].id))
-          if (list[i].is_focused) focused = String(list[i].id)
-        }
-        if (ids.length > 0) root.captureBatch(ids, focused)
-      }
-    }
-  }
+  // Screenshot capture is removed. niri writes every still to the clipboard
+  // and raises one "Screenshot captured" notification per window with no way
+  // to opt out, and it fires on every focus change -- so a background warmer
+  // kept interrupting the user while they worked. The cards show the app icon
+  // and title instead; window frames wait for niri to expose toplevel
+  // image-copy (see docs/fathom.md, "现状：暂停").
 
   Process {
     id: windowsProcess
@@ -531,14 +339,6 @@ Item {
     stdout: StdioCollector {
       waitForEnd: true
       onStreamFinished: root.applyWindows(text)
-    }
-  }
-
-  Process {
-    id: captureProcess
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: root.finishCaptures()
     }
   }
 

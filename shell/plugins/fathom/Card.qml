@@ -43,12 +43,11 @@ Item {
     ? theme.fogStrength * Math.min(0.7, Math.max(0, Math.min(1, r)) * (0.12 + 0.75 * Math.min(1, entry.depth / 8)) + 0.05 * Math.max(0, r - 1))
     : 0
   readonly property string titleText: entry ? String(entry.title || entry.appName || "") : ""
-  // Whether the warmer has a still for this window, and where it lives. The
-  // URL is built from the controller so the cache-busting stamp it carries is
-  // the same one the field reports.
-  readonly property bool hasPreview: controller !== null && entry !== null
-    && !!controller.previews[String(entry.id)]
-  readonly property string previewUrl: controller && entry ? controller.previewFor(entry.id) : ""
+  // No window frames: screenshot capture was removed because niri forces a
+  // clipboard write and a notification per still (docs/fathom.md). Cards show
+  // the app icon, title and age until toplevel image-copy exists.
+  readonly property bool hasPreview: false
+  readonly property string previewUrl: ""
 
   x: geometry.x - geometry.width / 2
   y: geometry.y - geometry.height / 2
@@ -93,8 +92,10 @@ Item {
       : (card.urgent ? card.theme.urgent : card.theme.cardBorder)
     clip: true
 
-    // The window's frame, captured off screen by niri when the field opened.
-    Image {
+    // Where a window frame would go. Without capture there is no frame; this
+    // box only anchors the placeholder that takes its place, so the header and
+    // the fog keep their proportions.
+    Item {
       id: frame
 
       anchors.fill: parent
@@ -102,32 +103,15 @@ Item {
       anchors.bottomMargin: card.pad
       anchors.leftMargin: card.pad
       anchors.rightMargin: card.pad
-      visible: card.hasPreview
-      source: card.previewUrl
-      fillMode: Image.PreserveAspectFit
-      asynchronous: true
-      // Cached, not discarded on every close: the field reopens to stills it
-      // already decoded, instead of re-reading several 3000 px PNGs from disk
-      // each time. The URL carries the batch stamp, so a genuinely
-      // re-captured window still decodes once.
-      cache: true
-      smooth: true
-      opacity: 1 - card.fog * 0.6
-      // niri writes the still at full window size (~3200 px wide). Asking Qt
-      // for a card-sized decode keeps the cost per card small and stops the
-      // decoder stalling the frame the field opens on.
-      sourceSize.width: Math.max(64, Math.round(width))
-      sourceSize.height: Math.max(64, Math.round(height))
 
       Rectangle {
         anchors.fill: parent
-        visible: parent.status !== Image.Ready
         color: card.theme.bed
         radius: 2 * card.unit * card.animatedScale
       }
     }
 
-    // No frame yet, or none possible: the app's name over its bed.
+    // The app's name over its bed.
     Text {
       anchors.centerIn: frame
       visible: !card.hasPreview
@@ -140,10 +124,10 @@ Item {
       horizontalAlignment: Text.AlignHCenter
     }
 
-    // Fog over the capture: older windows sink into the backdrop.
+    // Fog over the placeholder: older windows sink into the backdrop.
     Rectangle {
       anchors.fill: frame
-      visible: card.hasPreview && card.fog > 0
+      visible: card.fog > 0
       radius: 2
       color: card.theme.fog
       opacity: card.fog
