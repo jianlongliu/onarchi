@@ -43,7 +43,7 @@
   与两个新文件 `LICENSE`、`UPSTREAM.md`，共 +6 文件；`shell/plugins/bar/widgets/Workspaces.qml` 的 niri 适配（`Hyprland.*`→`Niri.*`）
   仍在这份补丁里（合并时该文件一度被插件那份覆盖回上游写法、与基线逐字节相同，2026-10-04 当天恢复，见 `docs/omarchy-on-niri-port.md` §3.2）
   —— 上面起步名单里那两个 bar 文件同属 `shell/plugins/bar/`。
-  ——这 33 个文件正是 `niri.patch` 的内容（**33 个文件 / 106 hunk / 3098 行**，md5 `f6ef5a467795e2bd6f1ccf14161b185e`，2026-10-05 核（同日前一版 3088 行 / md5 `423813f5…` = 弹层投影）；3022 行 / md5 `bcb5aca36ace33d829c6773da7026801` 为当天早些的 menu 投影版；105 hunk / 2956 行那版为 md5 `2cea1e9517bd498df185e02414595bc8`（2026-10-04 合并浮空 bar）；
+  ——这 40 个文件正是 `niri.patch` 的内容（**40 个文件 / 131 hunk / 3412 行**，md5 `b7d3f453e99631823bd76b0d2f477f25`，2026-11-04 核（同日重导出：通知霜化那行在补丁里写成 `service.cornerRadius`，而该文件没有这个属性、根对象是裸 `Item`，重放会把圆角变成 0；工作树本来是对的 `Style.cornerRadius`，只补丁陈旧 ⇒ 行数/hunk 不变、md5 由 `a9f9e107…` 变为此值）；2026-10-05 那版为 33 文件 / 106 hunk / 3098 行、md5 `f6ef5a467795e2bd6f1ccf14161b185e`；同日前一版 3088 行 / md5 `423813f5…` = 弹层投影；3022 行 / md5 `bcb5aca36ace33d829c6773da7026801` 为当天早些的 menu 投影版；105 hunk / 2956 行那版为 md5 `2cea1e9517bd498df185e02414595bc8`（2026-10-04 合并浮空 bar）；
   合并前为 27 个文件 / 82 hunk、md5 `cdc361f9f534e16dd9043ac21c3ce352`；
   2026-09-30 为 27 文件 / 81 hunk、md5 `3c672ab5…`；2026-09-27 为 26 文件 / 77 hunk；
   2026-09-26 为 24 文件 / 72 hunk；
@@ -360,14 +360,19 @@ git stash pop                                  # 冲突集中在这一步
   按数组写 `data.length` 是 `undefined`，循环一次都不跑，monitor 全 `width:0`
 - `current_mode` 是**索引**，真实分辨率在 `modes[current_mode]`；scale 在 `logical.scale`
 
-**验证**：938 个 bash 脚本 `bash -n` 全过；400 个 shell QML `qmllint` 0 错；真机重启后
-`qs ipc call shell ping` → `ok`、`omarchy-menu ping` → `ok`；bar 浮动+圆角+霜化实测（带内 12/12
-采样点不同）；菜单 10 项全部渲染；电池 `Holding at 75-80%`；monitor 5 档完整。
+**验证**（2026-11-04 复测）：1028 个 shell 脚本 `bash -n` 全过（含 `bin/`、`port-bin/`、`install/`、
+`migrations/`、`hooks/`、`scripts/`、`test/` 等所有带 bash/`sh` shebang 的受控文件）；24 个 Python 文件
+`compileall` 0 错；`port-bin/` 四个垫片测试 70/70 绿（`hyprctl` 40、`uwsm-app` 13、`clamshell` 10、`yay` 7）；
+`scripts/check-doc-refs.py` 22 卷 / 984 条引用 0 失效。真机侧（此前一轮重启后核）：`qs ipc call shell ping` → `ok`、
+`omarchy-menu ping` → `ok`；bar 浮动+圆角+霜化实测（带内 12/12 采样点不同）；菜单 10 项全部渲染；
+电池 `Holding at 75-80%`；monitor 5 档完整。400 个 shell QML `qmllint` 0 错（当轮记录，本轮未重跑 `qmllint`）。
 
-**补丁已重导出（2026-10-28）**：`niri.patch` 现在是 **30 文件 / 136 hunk / 3355 行、md5 `9797a9374011ad25ac5875c92bff043b`**，两项检查都过：
+**补丁已重导出（2026-11-04）**：`niri.patch` 现在是 **40 文件 / 131 hunk / 3412 行、md5 `b7d3f453e99631823bd76b0d2f477f25`**，两项检查都过：
 
 - `git apply --reverse --check` → 通过（patch 精确等于当前工作区）
 - 在纯净 `HEAD`（`bc220e70`）的 `git archive` 副本上 `git apply --check` → 通过（更新后可重放）
+
+（上一版 2026-10-28 为 30 文件 / 136 hunk / 3355 行、md5 `9797a9374011ad25ac5875c92bff043b`。）
 
 **导出时剔掉了 10 个"假改动"**：`bin/omarchy-{channel-set,refresh-pacman,restart-shell,sudo-passwordless,update-restart,update-stay-awake}`、
 `config/omarchy/hooks/pre-refresh-pacman.d/add-custom-repo.sample`、`docs/update-process.md`、`manual/48-security.md` ——
