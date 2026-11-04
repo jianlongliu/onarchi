@@ -176,6 +176,56 @@ bash test/shell.d/fathom-test.sh
 - **深处卡片**：`Layout.VISIBLE_STEPS = 5` 之后淡出；实际超过 4 个窗口时后几张卡片缩略图可能未解码
 - 浮动窗口与平铺窗口一视同仁，没有特殊标记
 
+## 现状：暂停（2026-11-04）
+
+工程中止，等 niri 发布自带窗口级捕获协议的稳定版本后继续。
+
+### 为什么要停
+
+缩略图目前走 `niri msg action screenshot-window`。这条路径有三个无法在下游解决的问题：
+
+- **每次焦点变化重抓全部窗口**，一次切换约 1 秒；
+- niri **无条件把每张截图写入剪贴板**，`-d` 只控制是否落盘，没有跳过剪贴板的开关；
+- niri 每写一张截图就发一条 `Screenshot captured` 通知（`src/utils/mod.rs` 的 `show_screenshot_notification`），抓 5 个窗口弹 5 条，且没有配置项可关。
+
+拦截 D-Bus 通知会连带吞掉用户自己截图的提示，不可接受。
+
+### 正确的替代路径
+
+标准协议链：
+
+```
+ext-foreign-toplevel-list
+  → ext-foreign-toplevel-image-capture-source   ← niri 缺
+  → ext-image-copy-capture                       ← niri 26.04 缺
+  → Quickshell 接收
+  → Fathom Card
+```
+
+核实结果：
+
+| 端 | 状态 |
+|---|---|
+| niri 26.04（已装） | 只有 `zwlr-screencopy`（整屏），无 `ext-image-copy-capture` |
+| niri 上游 PR #4599 | 未合并，改动 6 文件 / +536 −217，Cargo 依赖零变动 |
+| Quickshell 0.3.1（已装） | 有 `ext-image-copy-capture` 与 output 级 source，缺 toplevel 级 source |
+
+PR #4599 建立在 `main` 已有的 `src/handlers/image_copy_capture.rs` 上，而 26.04 没有该文件，因此无法直接套用，需要连带移植整套 handler。
+
+### 继续时的起手式
+
+1. 确认 niri 是否已合并 PR #4599 并发布；
+2. 升级 niri，确认 `ext_image_copy_capture` 与 `ext_foreign_toplevel_image_capture_source_manager` 出现在 `strings /usr/bin/niri`；
+3. 补 Quickshell 客户端一半；
+4. 用独立客户端验证「跨工作区可捕获、不碰剪贴板、不弹通知、关闭窗口释放资源」，再动 Fathom；
+5. 替换捕获后端后，删除全部截图与剪贴板相关代码。
+
+**不要**用调低截图频率、屏蔽通知、调整 opacity 之类的方式"继续优化"——这些都是在错误的数据通道上打补丁。
+
+### 当前代码状态
+
+截图后端在 `experiment/fathom-alttab` 分支，包含未验证的增量捕获逻辑。卡片预览跨开关缓存已实测有效。其余部分（布局、动画、磨砂、图标、键位）工作正常，可独立使用。
+
 ## 回退
 
 全部改动只在分支 `experiment/fathom-alttab` 上，主分支 `quattro` 不含任何 fathom 文件。
