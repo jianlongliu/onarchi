@@ -10,6 +10,7 @@ matching guide before starting:
 - [`agents/skills/acceptance-tests.md`](agents/skills/acceptance-tests.md) - writing or running graphical acceptance tests under `test/acceptance.d/`
 - [`agents/skills/visual-verification.md`](agents/skills/visual-verification.md) - verifying any change with a visual effect in the running UI
 - [`agents/skills/migrations.md`](agents/skills/migrations.md) - creating or changing migrations under `migrations/`
+- [`agents/skills/sanitization.md`](agents/skills/sanitization.md) - before committing docs, configs, or anything that could carry a credential or this machine's identity; run `scripts/check-sanitized.py`
 
 # Documentation Layout
 
