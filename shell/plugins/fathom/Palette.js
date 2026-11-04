@@ -27,8 +27,8 @@ var SOFT_SHARE = 0.34;
 var FAINT_SHARE = 0.5;
 
 // Opacity of the veil over the (blurred) desktop, top to bottom.
-var DARK_VEIL = [0.75, 0.8, 0.86];
-var LIGHT_VEIL = [0.82, 0.86, 0.9];
+var DARK_VEIL = [0.58, 0.64, 0.7];
+var LIGHT_VEIL = [0.7, 0.76, 0.82];
 
 var WHITE = { r: 1, g: 1, b: 1, a: 1 };
 var BLACK = { r: 0, g: 0, b: 0, a: 1 };

@@ -94,6 +94,36 @@ Qt 按 `Card.qml` 的 `sourceSize` 解码到卡片尺寸，不加载 3200px 原�
 
 本地文件 URL 不支持 query string（`60.png?v=1` 会被当成文件名）。改用 URL fragment 携带批次戳（`60.png#2`），Qt 会剥离 fragment 但视其为不同 URL，从而重新解码。
 
+## 磨砂
+
+背景由 niri 磨砂，浮层自己不画背景图：卡片之外的区域透出模糊后的真实窗口。
+
+实现分两处：
+
+```kdl
+// ~/.config/niri/effects.kdl
+layer-rule {
+    match namespace="^omarchy-fathom$"
+    background-effect {
+        blur true
+        xray false
+    }
+}
+```
+
+QML 侧**不设置** `BackgroundEffect.blurRegion`。客户端区域方案实测会在卡片缩略图解码完成后失效（niri 重算区域时算成空，磨砂只维持一两秒），改用规则里的 `blur true` 后由 niri 自己按表面形状模糊，不再依赖区域同步。
+
+前提是表面必须半透明，否则完全遮住背景效果：
+
+| 层 | alpha | 说明 |
+|---|---|---|
+| veil | 0.58–0.70 | `Palette.js` 的 `DARK_VEIL`，渐变压暗 |
+| 卡片填充 | 0.82 | `Card.qml` 的 `fillOpacity`，够实以保住标题可读 |
+
+壁纸层已移除。Fathom 原版在 veil 下画当前壁纸，那层会盖住 niri 的磨砂，使背景完全不可见。
+
+> `grim` 截图看不到磨砂：niri 的背景效果在合成阶段绘制，不在 `wlr-screencopy` 路径里。截图里背景呈纯黑，只能靠肉眼验证。
+
 ## 交互
 
 | 键 | 动作 |

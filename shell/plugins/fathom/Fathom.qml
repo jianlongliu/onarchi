@@ -2,7 +2,6 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
-import Quickshell.Wayland._BackgroundEffect
 import qs.Commons
 import qs.Ui
 import "Recency.js" as Recency
@@ -491,25 +490,11 @@ Item {
     shown: root.opened
     WlrLayershell.namespace: "omarchy-fathom"
 
-    // Frost exactly the cards, never the full-screen scrim: a `blur true` on a
-    // surface this size would fog the whole display (see effects.kdl). One
-    // nested Region per card, since the protocol takes a region, not a list.
-    // Frost the cards, never the full-screen scrim: `blur true` on a surface
-    // this size would fog the whole display (see effects.kdl).
-    //
-    // A Region's child list is declarative only (a Repeater is rejected with
-    // "expected PendingRegion"), so the cards cannot be collected into one
-    // region dynamically. Instead each Card carries its own single-item
-    // region, exposed as `blurItems`, and they are chained here by hand for
-    // the fixed number of depths the Deep actually shows.
-    BackgroundEffect.blurRegion: Region {
-      Region { item: field.cardSurfaces.length > 0 ? field.cardSurfaces[0] : null }
-      Region { item: field.cardSurfaces.length > 1 ? field.cardSurfaces[1] : null }
-      Region { item: field.cardSurfaces.length > 2 ? field.cardSurfaces[2] : null }
-      Region { item: field.cardSurfaces.length > 3 ? field.cardSurfaces[3] : null }
-      Region { item: field.cardSurfaces.length > 4 ? field.cardSurfaces[4] : null }
-    }
-
+    // No client blur region. Asking for one (BackgroundEffect.blurRegion) made
+    // the frost die a couple of seconds after opening -- measured: it survives
+    // until the card stills finish decoding, then niri recomputes the region
+    // and ends up with nothing. The rule in effects.kdl carries `blur true`, so
+    // niri blurs the surface itself and no region has to stay in sync.
     FieldView {
       id: field
 

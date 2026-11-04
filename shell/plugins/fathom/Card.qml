@@ -55,9 +55,11 @@ Item {
   // overlay can ask niri to frost exactly these rectangles.
   readonly property alias surfaceItem: surface
 
-  // How much of the card's own tint sits over the frost. Low enough that the
-  // blurred desktop reads through, high enough to keep the header legible.
-  property real fillOpacity: 0.55
+  // How much of the card's own tint sits over the frost. The field is frosted
+  // as a whole now (see Fathom.qml), so a card can be almost solid without
+  // losing the glass: at 0.82 the header stays crisp and the blur still shows
+  // around the edges.
+  property real fillOpacity: 0.82
 
   Rectangle {
     id: surface

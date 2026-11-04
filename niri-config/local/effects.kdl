@@ -178,6 +178,7 @@ layer-rule {
 layer-rule {
     match namespace="^omarchy-fathom$"
     background-effect {
+        blur true
         xray false
     }
 }

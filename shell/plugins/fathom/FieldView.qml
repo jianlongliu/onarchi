@@ -20,13 +20,6 @@ Item {
 
   property var controller: null
 
-  readonly property var wallpaperUrl: {
-    const home = Quickshell.env("HOME")
-    if (!home) return ""
-    const path = home + "/.local/state/omarchy/current/background"
-    return "file://" + path.split("/").map(encodeURIComponent).join("/")
-  }
-
   // Every color the field draws with, derived from the theme and derived
   // again when the theme changes.
   readonly property var theme: Palette.derive({
@@ -57,25 +50,6 @@ Item {
   }
 
   // ------------------------------------------------------------ backdrop
-
-  // The wallpaper under the veil, loaded only while the field is shown so a
-  // quick Alt+Tab decodes nothing, and never cached so a new wallpaper shows
-  // at the next opening.
-  Image {
-    anchors.fill: parent
-    source: view.controller && view.controller.opened ? view.wallpaperUrl : ""
-    fillMode: Image.PreserveAspectCrop
-    asynchronous: true
-    cache: false
-    sourceSize.width: width
-    sourceSize.height: height
-    opacity: status === Image.Ready ? 0.55 : 0
-    visible: opacity > 0
-
-    Behavior on opacity {
-      NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
-    }
-  }
 
   Rectangle {
     anchors.fill: parent
