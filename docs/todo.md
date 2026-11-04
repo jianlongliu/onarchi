@@ -44,3 +44,29 @@
   `omarchy-sleep-lock.service` 已收口一致）：`~/.config/systemd/user/` 下的
   `omarchy-crash-watch.service`、`omarchy-picker-warmup.service` 本机有、仓库里没有对应副本。
   要不要收进 `local-config/systemd/user/` 由用户定；收之前别当成仓库 bug 去"修"。
+
+### 2026-11-04 工程审核遗留（已修的见各卷，下面只留未决）
+
+- **`/etc/sudoers.d/` 与 `/etc/polkit-1/rules.d/` 无法非特权核对**：两个目录 root-only，`sudo -n` 要密码。
+  所以 `omarchy-asdcontrol` 那条授权**是否真装在本机**仍未确认（仓库侧已删、`--overwrite` 已摘、
+  迁移 `1793791066` 会删掉那条原样的授权）。要定论得跑一次 `pkexec ls -l /etc/sudoers.d /etc/polkit-1/rules.d`。
+  ⚠ 顺带记一条**这次踩过的坑**：`pacman --overwrite` 只决定解包冲突怎么处理，**不删文件** ——
+  「摘掉 `--overwrite` 就等于清理」是错的，清理得靠 migration（先例：`1791769486.sh` 清 USB/雷电授权）。
+  同理 `49-tlp.rules` 是否在位、`omarchy-sudo-passwordless` 有无永久授权残留，都只是文档自述。
+- **`omarchy-monitor-state` 面板开着时每 5 s 烧 443 ms CPU**（实测 user+sys，约 8.9% 单核持续）。
+  拆开看：`hyprctl monitors all -j` 走 python 垫片 108 ms + `omarchy-brightness-display` 143 ms +
+  `omarchy-hyprland-monitor-scaling` 131 ms。**这两个脚本都在 `niri.patch` 路径表里**，改它们必须同步
+  重导出补丁（规程见 `docs/upstream.md` §8.7），所以没擅自动。可选方向：把 5 s 拉到 15–30 s，或让面板
+  只在 `!stateProc.running` 时刷新（现状已有守卫，纯粹的固定开销）。
+- **agents 的 900 s 轮询常开**：`shell/plugins/agents/Main.qml:148` 的 `running: true`，不开面板也跑，
+  实测 `omarchy-agent-usage-update` 1.5–2.4 s / 25 个 collector。延后它有真实取舍 —— bar 图标靠
+  `Panel.qml:212` 的 `alarming` 变红，而 `alarming` 由这些记录算出来；完全不跑会让提示失准。
+  manifest 里的 `"activation": "on-demand"` 在 QML 侧没有实现（全树 grep 无命中），想做就照
+  `shell/Ui/KeyboardPanel.qml` 的 `content` + `Loader.active` 那套改。
+- **`shell/plugins/bar/Bar.qml:72-95` 是死代码**：`refreshGapsOut()` 全仓无调用者，`gapsOutProbe`
+  也没有 `running` 绑定 ⇒ 零成本，但读代码的人会以为它在跑。删之前确认没人打算接上它。
+- **`test/shell.d/nvidia-kms-hook-test.sh` 与 `nvidia-kms-migration-test.sh` 是两件事**：
+  后者 2026-11-04 已补 `00-omarchy-hooks.conf` 夹具并转绿；前者测的是 drop-in 本身，没动过。
+- **并行池里的偶发失败**：`preinstalls`、`agent-account` 在 `./test/all` 的 24 路并行下偶发失败，
+  单独跑全绿（`preinstalls` 单跑 3/3）。属文件间竞争，不是缺陷；`agent-account-exec` 单跑也失败，
+  已在 README 的已知失败里。
