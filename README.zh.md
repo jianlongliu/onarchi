@@ -191,7 +191,7 @@ cd onarchi
 ## 上游同步状态
 
 本移植当前跟到上游 `quattro` 的 **`bc220e70`**（2026-10-27）—— 2026-10-28 从 `60663faf` 快进，
-共 846 个提交。当前 `niri.patch` 为 **40 文件 / 131 hunk / 3412 行**，md5 `a9f9e10716bde4ddf16dca5efb377dfc`（未跟踪的覆盖层文件另计）。
+共 846 个提交。当前 `niri.patch` 为 **40 文件 / 131 hunk / 3412 行**，md5 `b7d3f453e99631823bd76b0d2f477f25`（未跟踪的覆盖层文件另计）。
 
 上游**仍然没有 niri 支持**：`bc220e70` 上 `grep -ri niri shell/ bin/` 零命中，而 Hyprland 耦合反而
 加重（19 文件 54 处 → 26 文件 118 处）。下面每一条都是这个前提的产物。
@@ -294,8 +294,13 @@ IgnorePkg = qt6-5compat qt6-base qt6-declarative qt6-imageformats qt6-multimedia
 | `fontconfig-cjk` | 依赖本机装的字体 |
 | `remote-session-service` | 需要夹具造不出来的 SSH peer |
 
-`sudoers` 失败是因为本机加了 `/etc/sudoers.d/omarchy-asdcontrol`，而该测试要求每个 drop-in 都必须登记。
-这条授权是本机私有的，登记到上游测试表是错的，所以让它失败而不是静默掉。
+`sudoers` 以前失败是因为本仓发布了 `/etc/sudoers.d/omarchy-asdcontrol`，而该测试要求每个 drop-in 都必须登记。
+现在改为**直接删掉**而不是登记：上游已经删过同一条授权（`df819a6f9`，"Close three paths from an
+unprivileged session to root"），`test/acceptance.d/security-test.sh` 本来就断言这个文件不该被发布，
+而且它是全树最宽的一条 —— 引擎写 `(ALL)` 而不是 `(root)`，且不写参数表（sudoers 把空参数读作"任意参数"）。
+`bin/omarchy-upgrade-to-quattro` 不再 `--overwrite` 它，由迁移 `1793791066` 从已装机器上删掉 ——
+只摘 `--overwrite` 是不够的：pacman 的 `--overwrite` 决定解包冲突怎么处理，**不负责删文件**。
+该迁移只删这一条一模一样的授权，手写的 drop-in 原样留着。
 
 `agent-account`、`monitor-modeless`、`passwordless-sudo-indicator`、`i18n-startup` 只在并行跑时失败，
 单跑都过——文件级争用，不是真故障。`manifest-entrypoints` 同理，只是症状不同：断言全过，仅在清理阶段

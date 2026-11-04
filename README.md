@@ -210,7 +210,7 @@ The overview backdrop needs no adjustment: niri draws that layer itself, so the 
 
 The port currently tracks upstream `quattro` at **`bc220e70`** (2026-10-27), fast-forwarded from
 `60663faf` on 2026-10-28 — 846 commits. The current `niri.patch` has **40 files / 131 hunks / 3412
-lines**, md5 `a9f9e10716bde4ddf16dca5efb377dfc` (untracked overlay files are separate).
+lines**, md5 `b7d3f453e99631823bd76b0d2f477f25` (untracked overlay files are separate).
 
 Upstream still has **no niri support**: `grep -ri niri shell/ bin/` returns nothing at `bc220e70`,
 while Hyprland coupling grew (19 files / 54 sites → 26 files / 118 sites). Everything below exists
@@ -256,9 +256,16 @@ open failures below are upstream's, and are left alone deliberately rather than 
 | `fontconfig-cjk` | Depends on the fonts installed on the machine |
 | `remote-session-service` | Needs an SSH peer the fixture cannot manufacture |
 
-`sudoers` fails because this machine adds `/etc/sudoers.d/omarchy-asdcontrol`, which that test
-requires every drop-in to register. The grant is machine-local, so registering it upstream would be
-wrong; it is left failing rather than silenced.
+`sudoers` used to fail because this repo shipped `/etc/sudoers.d/omarchy-asdcontrol`, a grant that
+test refuses to accept unless every drop-in is registered. It is now removed rather than registered:
+upstream dropped the same grant (`df819a6f9`, "Close three paths from an unprivileged session to
+root"), `test/acceptance.d/security-test.sh` already asserts the file must not be shipped, and it was
+the widest grant in the tree — `(ALL)` instead of `(root)`, and no argument list, which sudoers reads
+as "any arguments". `bin/omarchy-upgrade-to-quattro` no longer `--overwrite`s it, and migration
+`1793791066` deletes it from machines that already have it — dropping the `--overwrite` alone only
+stops it being recreated, because pacman's `--overwrite` decides how to resolve a file conflict, not
+whether to delete one. The migration removes that exact grant and leaves a hand-written drop-in
+alone.
 
 `agent-account`, `monitor-modeless`, `passwordless-sudo-indicator` and `i18n-startup` fail only
 under the parallel runner and pass on their own — file-level contention, not a real failure.

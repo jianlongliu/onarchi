@@ -1284,7 +1284,6 @@ run_final_system_package_upgrade() {
     --overwrite '/etc/modprobe.d/omarchy-usb-autosuspend.conf' \
     --overwrite '/etc/sddm.conf.d/10-theme.conf' \
     --overwrite '/etc/sddm.conf.d/10-wayland.conf' \
-    --overwrite '/etc/sudoers.d/omarchy-asdcontrol' \
     --overwrite '/etc/sudoers.d/omarchy-passwd-tries' \
     --overwrite '/etc/sudoers.d/omarchy-tzupdate' \
     --overwrite '/etc/sysctl.d/90-omarchy-file-watchers.conf' \
