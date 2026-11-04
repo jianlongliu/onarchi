@@ -8,17 +8,18 @@ echo "Retire the asdcontrol sudoers grant"
 # argument list — sudoers reads that as "any arguments" — until it is deleted.
 #
 # Only that grant is retired. A grant the user wrote themselves is left alone,
-# as is a machine whose sudoers cannot be read without a password here (the
-# login-time run and the next `omarchy update` retry it).
+# and a machine where sudo needs a password here is left for the login-time run
+# or the next `omarchy update` to retry.
 grant=/etc/sudoers.d/omarchy-asdcontrol
 retired=$'%wheel ALL=(ALL) NOPASSWD: /usr/bin/asdcontrol'
 
-[[ -e $grant ]] || exit 0
+# /etc/sudoers.d is 0750 root:root, so `[[ -e $grant ]]` is false for every
+# non-root caller whether the file exists or not — it tests the directory's
+# permissions, not the file. Ask through sudo, or this migration exits 0 on
+# exactly the machines it was written for.
+contents=$(sudo cat "$grant" 2>/dev/null) || exit 0
 
-if [[ $(sudo cat "$grant" 2>/dev/null) != "$retired" ]]; then
-  echo "$grant is not the grant Omarchy shipped; leaving it alone."
-  exit 0
-fi
+[[ $contents == "$retired" ]] || exit 0
 
 sudo rm -f "$grant"
 
