@@ -33,7 +33,7 @@
 - 19. **耗电/续航专项（2026-09-19 测过一轮，下次接着做）**：表现为"感觉慢 + 续航差"。已排除的
 - 35. **Herdr 键位：`Super+Ctrl+Return` 必须经终端启动（裸 `herdr` 在 niri 下没有 tty，必死）（2026-09-24）**：`binds.kdl` 里那行原本是裸调 `herdr`
 - 38. **电池面板加 CHARGE LIMIT 档位切换（充电阈值可写）（2026-09-26）**：两档 Protect 75–80 / Full 95–100，点击走 `pkexec tlp setcharge`（规则 `/etc/polkit-1/rules.d/49-tlp.rules`）；**真根因＝`omarchy-battery-status` 优先信 UPower 而 UPower 缓存阈值不重读 ⇒ 已改成 sysfs 优先**；`setcharge` 只写运行时 ⇒ Full 一次性
-- 39. **Setup > Security 新增 "Paru (AUR)" 开关（paru 的执行位＝本机 AUR 总开关，2026-09-27）**：新命令 `port-bin/omarchy-setup-security-paru` 一身两半（用户半身念警告 + `gum confirm`，root 半身 `chmod ±x /usr/bin/paru`）+ `/usr/bin` root 属主副本 + polkit 规则 `49-paru.rules`（**没放行 chmod**）；菜单侧全在扩展文件（**零补丁**），并给 `install.aur`/`remove.package`/`update.aur` 加 `when` 守卫；⚠ **覆盖默认项必须整条复述**（解析器把每个字段补成默认值 ⇒ 只写 `when` 会把 `action` 冲空、条目静默消失）
+- 39. **Setup > Security 新增 "Paru (AUR)" 开关（paru 的执行位＝本机 AUR 总开关，2026-09-27）**：新命令 `port-bin/omarchy-setup-security-paru` 一身两半（用户半身念警告 + `gum confirm`，root 半身 `chmod ±x /usr/bin/paru`）+ `/usr/bin` root 属主副本 + polkit 规则 `49-paru.rules`（**没放行 chmod**）；菜单侧全在扩展文件（**零补丁**），并给 `install.aur`/`remove.package`/`update.aur` 加 `when` 守卫（`remove.package` 那条 2026-10-31 摘掉：垫片对 `-Q*` 回落 pacman，卸载不吃 AUR）；⚠ **覆盖默认项必须整条复述**（解析器把每个字段补成默认值 ⇒ 只写 `when` 会把 `action` 冲空、条目静默消失）
 - 40. **ante 进菜单的"默认 agent"列表（2026-09-27）**：菜单那一行在扩展文件（零补丁），补丁落在命令侧两处上游脚本 —— `bin/omarchy-default-agent` 新增 `agent_self_managed` 分支（ante 不能被 mise 装、自己 `ante update` 自升级）+ `bin/omarchy-agent` 新增 `ante --yolo`（它的 `--prompt` 是 headless 语义，故不转发）⇒ 补丁 24 → **26 文件 / 77 hunk**、md5 `22dd2334…`（2026-09-30 再加 `bin/omarchy-update` 那版 ⇒ **27 文件 / 81 hunk**、md5 `3c672ab5…`，见 §8.7）
 - 41. **vantage 退休并公开归档（2026-09-27）**：自写 TUI `~/Projects/vantage` 的四个功能全部搬进菜单/面板后，用户要求"推到远程仓库、标记归档、二进制发 release、先脱敏"⇒ `github.com/jianlongliu/vantage`（**PUBLIC + 已归档**），release `v2026.8.19` 挂由该 tag 源码构建的 `vantage-x86_64-linux-gnu` + `.sha256`；README 精简成退休说明、`.gitignore` 照抄本仓库基线、commit 用 noreply 身份；⚠ **归档前必须先建 release**（归档后只读）、`gh release create` 里的 `<file>#<name>` 那个 `#` 是 label 不是文件名
 
@@ -824,7 +824,9 @@ Omarchy 有两层配置，只有层1在 niri 上真正生效：
     - **是什么**：菜单 Security 区多一条 `Paru (AUR)`，切换 `/usr/bin/paru` 的执行位。**执行位即总开关**：本机 AUR
       全走 `~/bin/yay` 垫片（`docs/shims.md` §8 第 34 条），而垫片是**按 "PATH 上找得到可执行的 paru"** 挑真帮手的
       （`[[ -f $dir/paru && -x $dir/paru ]]`，找不到就报 `yay(shim): paru not found on PATH …`）⇒ `chmod -x` 一次停掉
-      `install.aur` 与 `remove.package` 两条路（`/usr/bin/paru` 由 pacman 拥有，没有用户副本能 shadow 它）。
+      `install.aur` 那条路（`/usr/bin/paru` 由 pacman 拥有，没有用户副本能 shadow 它）。
+      ⚠ **`remove.package` 不在其列（2026-10-31 改）**：垫片现在对 `-Q*` 本地库查询回落 pacman，而 Remove → Package
+      的列表（`-Qqe`）与预览（`-Qi`）都属于这类；卸载本体本来就是 `sudo pacman -Rns`，AUR 包也在 pacman 库。
       语义 = 整机不再碰 AUR：AUR 装过的包照旧能用，只是不再能升级。
     - **实现三处（都在补丁之外；菜单侧零补丁）**：
       ① `port-bin/omarchy-setup-security-paru` → `~/bin`（PATH 首位）：**一身两半**，按 `EUID` 分。用户半身提供
@@ -840,14 +842,15 @@ Omarchy 有两层配置，只有层1在 niri 上真正生效：
     - **菜单侧**（`~/.config/omarchy/extensions/omarchy-menu.jsonc`，热监听 + 合并）：`setup.security.paru`
       （icon 󰣇、label `Paru (AUR)`、勾选走 `--status`、动作照 Security 区其余五条套
       `omarchy-launch-floating-terminal-with-presentation` —— 脚本要先念警告，需要一块能等回车的终端）+
-      **三条 `when` 守卫**（`install.aur`、`remove.package`、`update.aur`）：paru 关掉后这些入口本来只会失败，于是
+      **`when` 守卫**（`install.aur`、`update.aur`，以及 2026-09-27 当天的 `remove.package` ——
+      后者已于 2026-10-31 摘掉）：paru 关掉后这些入口本来只会失败，于是
       跟着消失；开关自身**不带**守卫（否则关掉就开不回来）。
     - ⚠ **覆盖默认项必须整条复述**：`parseMenuJsonc` 把**每个字段**都补成默认值（`action:""`，`kind` 由 action 推），
       合并是**逐字段覆盖** ⇒ 用户层只写 `when` 会把默认项的 `action` 冲成空串，条目退化成"没有子项的子菜单"、
       `isVisible` 判 false、**静默消失**（install 面板 14 → 11 行）。改默认项就要一并复述 `icon`/`label`/`action`。
     - **验法**：`scripts/menu-model-render.js <面板 id>` 走的是壳层同一份 parse → merge → guard → isVisible。paru 开时
-      install 12 行（含 `AUR`）、remove 6 行（含 `Package`）、update 10 行（含 `AUR`）、`setup.security` 6 行；
-      关掉后 12→11 / 6→5 / 10→9，而 `setup.security` 恒 6 行。提权那一跳：
+      install 12 行（含 `AUR`）、remove 7 行（含 `Package`）、update 10 行（含 `AUR`）、`setup.security` 6 行；
+      关掉后 12→11 / **7 不变**（2026-10-31 起 `remove.package` 不再跟 paru 走）/ 10→9，而 `setup.security` 恒 6 行。提权那一跳：
       `pkexec /usr/bin/omarchy-setup-security-paru --enable|--disable` 应 rc=0 且**不弹认证**（= 规则在生效）。
       ⚠ 用鼠标点那条开关本机验不了（`wtype` 送不进菜单，也没有 `dotool`/`ydotool`）。
     - **回退**：`pkexec rm` 掉 `/usr/bin` 副本与那条规则 + `systemctl restart polkit`（逐条见 `docs/local-overrides.md` §5）。

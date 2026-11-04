@@ -123,7 +123,7 @@
   //     见 docs/local-overrides.md §5），干活的 root 半身是 `/usr/bin/omarchy-setup-security-paru`
   //     —— root 属主副本，不是指回用户可写树的软链。动作外面套演示终端是照 Security 区其它五条
   //     的形状：脚本要先念警告再 `gum confirm`，需要一块能等回车的终端。
-  //   - 下面两条 when 守卫是配套：paru 一关，菜单里所有走 AUR 帮手的入口会直接失败（垫片报
+  //   - 下面这条 when 守卫是配套的：paru 一关，走 AUR 帮手的**安装**入口会直接失败（垫片报
   //     "paru not found on PATH"），所以跟着消失（`update.aur` 的守卫写在上文它自己那行，
   //     那条是本文件新增的、字段齐全，所以只加 when 不动其它）。
   //     ⚠ 覆盖默认项必须**整条复述**，不只是 label/icon：`parseMenuJsonc` 会把每个字段补成默认值
@@ -132,7 +132,11 @@
   //     行数 14→11）。所以 action 逐字照抄默认项。
   "setup.security.paru": {"icon":"󰣇","label":"Paru (AUR)","checked":"[[ \"$(omarchy-setup-security-paru --status)\" == \"enabled\" ]]","action":"omarchy-launch-floating-terminal-with-presentation omarchy-setup-security-paru"},
   "install.aur": {"icon":"󰣇","label":"AUR","when":"omarchy-setup-security-paru --enabled","action":"if command -v xdg-terminal-exec >/dev/null 2>&1; then xdg-terminal-exec --app-id=org.omarchy.terminal omarchy-pkg-aur-install; else omarchy-launch-floating-terminal-with-presentation omarchy-pkg-aur-install; fi"},
-  "remove.package": {"icon":"󰣇","label":"Package","when":"omarchy-setup-security-paru --enabled","action":"if command -v xdg-terminal-exec >/dev/null 2>&1; then xdg-terminal-exec --app-id=org.omarchy.terminal omarchy-pkg-remove; else omarchy-launch-floating-terminal-with-presentation omarchy-pkg-remove; fi"},
+  // Remove → Package 不跟着 paru 走：它的列表（`yay -Qqe`）和预览（`yay -Qi`）读的是
+  // pacman 本地库，垫片现在在这两个查询上回落 pacman，所以 AUR 关着也能用；真正卸载那条
+  // 命令本来就是 `sudo pacman -Rns`（AUR 包也在 pacman 库，实测 40/40）。
+  // 2026-10-31 摘掉这条的 when，只留 install.aur 那条（AUR 安装确实非 paru 不可）。
+  "remove.package": {"icon":"󰣇","label":"Package","action":"if command -v xdg-terminal-exec >/dev/null 2>&1; then xdg-terminal-exec --app-id=org.omarchy.terminal omarchy-pkg-remove; else omarchy-launch-floating-terminal-with-presentation omarchy-pkg-remove; fi"},
 
   // 2026-09-27 用户要求（"把 ante 以补丁的方式加入 omarchy menu ai 列表"）：把 ante 加进
   // Setup > Default Agent 那 14 条里。**菜单这行不需要补丁**——本文件就是覆盖层（热监听 +

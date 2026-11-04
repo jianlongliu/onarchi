@@ -62,7 +62,28 @@ for dir in "${path_dirs[@]}"; do
     fi
 done
 
+# --- local-database queries fall back to pacman ----------------------------------
+# `-Q*` reads the local db and nowhere else: paru hands those straight to pacman
+# (`yay -Qi PKG` and `pacman -Qi PKG` print byte-identical output on this machine).
+# So the two calls in `omarchy-pkg-remove` — `-Qqe` for the list, `-Qi` for the
+# preview — work with no AUR helper at all. That matters while paru's execute bit
+# is off: turning the AUR off (`omarchy-setup-security-paru`) would otherwise blank
+# Remove → Package, even though uninstalling never touches the AUR (`pacman -Rns`
+# is the line that does the work, and AUR packages live in pacman's own db).
+local_query=0
+for arg in "$@"; do
+    case $arg in
+    --*) continue ;;
+    -*Q*) local_query=1; break ;;
+    -*) ;;
+    *) break ;;
+    esac
+done
+
 if [[ -z $real_paru ]]; then
+    if ((local_query)) && command -v pacman >/dev/null 2>&1; then
+        exec pacman "$@"
+    fi
     echo "yay(shim): paru not found on PATH — the AUR paths of the Omarchy menu need it" >&2
     exit 127
 fi

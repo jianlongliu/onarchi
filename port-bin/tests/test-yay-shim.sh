@@ -66,6 +66,26 @@ check "upstream's tail -n +5 yields full PKGBUILD" \
 # --- 3. nothing else gets a header ----------------------------------------------
 check "-Slqa list verbatim (menu TUI)" "$(PATH="$runpath" "$YAY" -Slqa)" $'PASSTHROUGH:-Slqa'
 
+# --- 4. local-db queries survive a missing/disabled paru ------------------------
+# `omarchy-pkg-remove` builds its list with `-Qqe` and its preview with `-Qi`;
+# both read pacman's local db, so they must work while the AUR is switched off.
+# The dir holds pacman but no paru on purpose — and a paru without its execute
+# bit reads as absent, which is exactly the `omarchy-setup-security-paru` shape.
+mkdir -p "$tmp/noparubin"
+cat >"$tmp/noparubin/pacman" <<'SH'
+#!/bin/bash
+printf 'PACMAN:%s\n' "$*"
+SH
+chmod +x "$tmp/noparubin/pacman"
+noparu_path="$tmp/shimdir:$tmp/noparubin:/usr/bin:/bin"
+
+check "-Qqe falls back to pacman without paru" \
+    "$(PATH="$noparu_path" "$YAY" -Qqe)" "PACMAN:-Qqe"
+check "-Qi falls back to pacman without paru" \
+    "$(PATH="$noparu_path" "$YAY" -Qi zen)" "PACMAN:-Qi zen"
+PATH="$noparu_path" "$YAY" -S --noconfirm foo >/dev/null 2>&1
+check "AUR install still refuses without paru" "$?" "127"
+
 bash -n "$SHIM" 2>/dev/null
 check "shim parses (bash -n)" "$?" "0"
 

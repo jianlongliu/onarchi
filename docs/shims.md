@@ -19,7 +19,7 @@
 - 5. **hyprctl schema 精度**：个别 Hyprland-only 字段可能是占位值；如遇脚本异常再补映射。
 - 7. **TUI 编辑器启动已修**：`omarchy-launch-tui` 原本走 `uwsm-app`+`xdg-terminal-exec`（Hyprland/uwsm
 - 22. **应用启动类调用统一到一个 `uwsm-app` 垫片（2026-09-19 修）**：上游 Omarchy `bin/` 里有 ~30 处
-- 34. **AUR 助手统一成 `yay` → paru 垫片（`~/bin/yay`，2026-09-22 修）**：上游的 AUR 调用全走 `yay`，本机只有 paru
+- 34. **AUR 助手统一成 `yay` → paru 垫片（`~/bin/yay`，2026-09-22 修；2026-10-31 补 `-Q*` 回落 pacman）**：上游的 AUR 调用全走 `yay`，本机只有 paru
 - 〔§11〕**`omarchy-powerprofiles-{list,set}` 垫片：power-saver 档联动屏幕亮度（2026-09-24 加）** —— 本卷**不设专节**，语义与调法（三级优先 `环境变量 → …/powerprofiles/saver-brightness → 10`、智能恢复只在亮度仍等于压过的值时才回）见 `docs/behavior.md` 的「电池面板 POWER PROFILE 区为空」一条；同处也更正了「档位到底谁说了算」（壳层记忆 vs `TLP_PROFILE_AC/BAT`）
 - 〔§23〕**`omarchy-launch-screensaver` 垫片：闲置「不插电到点锁屏」（2026-09-24 加）** —— 本卷**不设专节**。上游那份在终端跑 ASCII 屏保、且早被本机 `screensaver-off` 开关停掉；垫片接管它的那个时机（`idle.screensaver`，那天从 150 改成 300）：**不插电且非全屏**才 `omarchy-system-lock`（灭屏交给锁自己），插电 / 全屏 / 已锁一概不动——**不装 swayidle**。规格、四分支实测与回退见 `docs/behavior.md` 的 §8 第 23 条「screensaver 关掉并屏蔽」
 - **通用剪贴板垫片 `omarchy-universal-clipboard` + `omarchy-sendkeys`（2026-09-27 加，`§8 第 42 条`）** —— niri 版 `Super+C/V/X`：niri 抓键，垫片按焦点窗口注入（终端 → `Ctrl+Insert`/`Shift+Insert`，其他 → `Ctrl+C/V`，剪切恒 `Ctrl+X`）。上游的 Hyprland `send_key_state` 在 niri 没有对应物 ⇒ 自造 uinput 注入原语（纯标准库、零安装）。⚠ 两条硬约束：**必须声明 1..248 全段键码**（否则 udev 只给 `ID_INPUT_KEY`、libinput 不当键盘）、**物理按住的 SUPER 会并进注入的和弦**（终端侧靠 ghostty 的 `super+ctrl+insert` 变体接住）；每次按键 ≈ 0.45 s（CPU 仅 36 ms）。终端里复制/剪切额外弹一次**壳层 OSD 卡片**（`omarchy-osd`，就是关机/重启那种卡片；**不用** ghostty 自带的 libnotify 通知，本机那条链路不显示）。见本卷「通用剪贴板垫片」
@@ -389,8 +389,14 @@ root 改动 ⇒ **等用户拍板**；真要做：`cp` 备份到 `~/.local/state
     只打裸 PKGBUILD，**垫片把四行补回来** —— 否则 alt-b 预览会静默吃掉 PKGBUILD 的头四行。
     垫片扫 PATH 找真 paru 时跳过自己所在目录，且**不依赖外部命令**（`dirname` 在被裁过的调用环境
     `env PATH=/usr/bin:/bin` 里会失败，跳过自身目录随之静默失效 —— 这条是离线测试当场抓出来的）。
-    验证：`port-bin/tests/test-yay-shim.sh`（离线，假 paru，4 项：参数原样透传 / `-Gp` 补头且
-    `tail -n +5` 拿到完整 PKGBUILD / 非 `-Gp` 不加头 / `bash -n`），4/4 绿；真机在 pty 里跑了菜单那两个
+    **`-Q*` 本地库查询回落 pacman（2026-10-31 加）**：`-Q*` 只读 pacman 本地库，paru 本来就是把它原样交给
+    pacman（`yay -Qi PKG` 与 `pacman -Qi PKG` 输出逐字节相同，实测）。所以把 paru 的执行位摘掉之后，
+    `omarchy-pkg-remove` 依赖的 `-Qqe`（列表）和 `-Qi`（预览）仍然可用 ⇒ `chmod -x` 只停 AUR 安装，
+    不再连带把 Remove → Package 变成空面板（卸载那行本来就是 `sudo pacman -Rns`，AUR 包也在 pacman 库，
+    `pacman -Qqem` 的 40 个全在里面）。非 `-Q*` 的调用在 paru 缺失时仍报 `yay(shim): paru not found on PATH` 并 rc=127。
+    验证：`port-bin/tests/test-yay-shim.sh`（离线，假 paru，7 项：参数原样透传 / `-Gp` 补头且
+    `tail -n +5` 拿到完整 PKGBUILD / 非 `-Gp` 不加头 / `-Qqe` 与 `-Qi` 在无 paru 时回落 pacman /
+    AUR 安装在无 paru 时仍 rc=127 / `bash -n`），7/7 绿；真机在 pty 里跑了菜单那两个
     TUI（Install → AUR 列表 119811 条 + 信息面板、alt-b 预览首行 `# Maintainer: …`、Remove 的
     `paru -Qi` 预览），原始输出是合法 UTF-8、零 U+FFFD，装包数 1191 前后不变。回退：`rm ~/bin/yay`。
 
