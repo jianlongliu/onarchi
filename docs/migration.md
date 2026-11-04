@@ -63,7 +63,7 @@ sudo snapper -c root create -d "pre-dms-removal"
 sudo snapper -c home create -d "pre-dms-removal"
 ```
 
-- 本机 snapper 有 `root` / `home` / `data` / `opencode` 四个配置；`root` 的 `SUBVOLUME="/"`（含 `/etc`，即锁屏 PAM 文件），`home` 单独一份 → 主账户家目录保得住。
+- 本机 snapper 有 `root` / `home` / `data` 三个配置；`root` 的 `SUBVOLUME="/"`（含 `/etc`，即锁屏 PAM 文件），`home` 单独一份 → 主账户家目录保得住。（原第四个 `opencode` 配置与 `/opt/opencode` 子卷 2026-11-02 已整套拆除，见 `local-overrides.md`。）
 - pacman 钩子已在（`05-snap-pac-pre` / `10-snap-pac-removal` / `zz-snap-pac-post`），装/卸包会自动前后打点；上面两张手打是**保险**（钩子只管受该配置管辖的 pacman 事务）。
 - 回滚：`sudo snapper -c root undo <N>` / `-c home undo <N>`。
 - 另外把 DMS 的家目录配置单独 tar 一份到 `/data`（`~/.config` 与 `~/.local/share` 里 DMS/Quickshell 相关项）——快照不等于备份，家目录里还有 DMS 的登录态与缓存。
@@ -185,7 +185,7 @@ omarchy plugin list | grep lock     # 应只有 jianlongliu.split-lock enabled
 
 **0. 前置**
 - 全程要 root 或 `sudo`：`$DEV_HOME` 是 0600，主账户自己读不到源。
-- 快照（本机 btrfs + snapper，已有配置 `root`=/(含 /etc)、`home`=/home、`data`、`opencode`）：
+- 快照（本机 btrfs + snapper，已有配置 `root`=/(含 /etc)、`home`=/home、`data`）：
   ```bash
   sudo snapper -c root create -d "pre-migration"
   sudo snapper -c home create -d "pre-migration"
