@@ -35,7 +35,13 @@ Item {
   readonly property real unit: Math.max(0.75, Math.min(1.6, height / 1000))
   readonly property real textUnit: unit * Math.max(0.85, Math.min(1.6, Number(Style.fontScale) || 1))
   readonly property real margin: Math.max(16, width * 0.022)
-  readonly property var entry: controller ? controller.selection : null
+  // Reading through the accessor each time the selection moves: a plain
+  // `controller.selection` binding would cache the first null it saw.
+  readonly property var entry: {
+    if (!controller) return null
+    var ignored = controller.selectedIndex
+    return controller.selectionAt()
+  }
   readonly property bool empty: controller !== null && controller.opened && controller.count === 0
 
   opacity: controller && controller.opened ? 1 : 0
@@ -163,7 +169,7 @@ Item {
     MouseArea {
       anchors.fill: parent
       cursorShape: Qt.PointingHandCursor
-      onClicked: if (view.controller && view.controller.selection) view.controller.commit()
+      onClicked: if (view.controller && view.controller.selectionAt()) view.controller.commit()
     }
 
     AppIcon {
@@ -173,6 +179,8 @@ Item {
       size: 38 * view.unit
       source: view.entry ? view.entry.icon : ""
       name: view.entry ? view.entry.appName : ""
+
+      onSourceChanged: console.log("DBGCAP icon=" + JSON.stringify(source) + " name=" + JSON.stringify(name))
     }
 
     Column {

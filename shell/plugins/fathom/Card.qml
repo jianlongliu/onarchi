@@ -29,10 +29,16 @@ Item {
   readonly property bool selected: controller !== null && slot === controller.selectedIndex
   readonly property bool urgent: !!(entry && entry.urgent)
   readonly property var geometry: stage ? Layout.deepPlane(stage, r) : ({ x: 0, y: 0, width: 1, height: 1, scale: 0, opacity: 0, z: 0 })
-  readonly property real depthScale: Math.min(1, geometry.scale)
+  // Text, padding and corners follow the card through the same 260 ms its
+  // geometry takes. Binding them straight to the plane's scale makes them jump
+  // on the frame the card starts sliding, which reads as a glitch rather than
+  // a move.
+  property real animatedScale: Math.min(1, geometry.scale)
+
+  Behavior on animatedScale { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
   readonly property real headerHeight: Math.max(18 * textUnit, Math.min(30 * textUnit, height * 0.1))
-  readonly property real pad: Math.max(3, 8 * unit * depthScale)
-  readonly property real radius: appearance.cornerRadius * depthScale
+  readonly property real pad: Math.max(3, 8 * unit * animatedScale)
+  readonly property real radius: appearance.cornerRadius * animatedScale
   readonly property real fog: entry
     ? theme.fogStrength * Math.min(0.7, Math.max(0, Math.min(1, r)) * (0.12 + 0.75 * Math.min(1, entry.depth / 8)) + 0.05 * Math.max(0, r - 1))
     : 0
@@ -50,6 +56,15 @@ Item {
   height: Math.max(1, geometry.height)
   z: geometry.z
   opacity: geometry.opacity
+
+  // Moving the camera is an animation in Fathom: diving one window slides the
+  // whole stack, it does not cut. z stays instant -- interpolating depth order
+  // would let a card cross another mid-flight.
+  Behavior on x { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+  Behavior on y { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+  Behavior on width { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+  Behavior on height { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+  Behavior on opacity { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
 
   // The painted card. FieldView reaches it through `surfaceItem` so the
   // overlay can ask niri to frost exactly these rectangles.
@@ -104,7 +119,7 @@ Item {
         anchors.fill: parent
         visible: parent.status !== Image.Ready
         color: card.theme.bed
-        radius: 2 * card.unit * card.depthScale
+        radius: 2 * card.unit * card.animatedScale
       }
     }
 
@@ -116,7 +131,7 @@ Item {
       text: card.entry ? String(card.entry.appName || card.entry.appId || "") : ""
       color: card.theme.textSoft
       font.family: Style.font.family
-      font.pixelSize: Math.max(7, Math.min(height * 0.5, 14 * card.textUnit * card.depthScale))
+      font.pixelSize: Math.max(7, Math.min(height * 0.5, 14 * card.textUnit * card.animatedScale))
       elide: Text.ElideRight
       horizontalAlignment: Text.AlignHCenter
     }
@@ -157,7 +172,7 @@ Item {
         text: card.titleText
         color: card.selected ? card.theme.text : card.theme.textSoft
         font.family: Style.font.family
-        font.pixelSize: Math.max(7, Math.min(card.headerHeight * 0.52, 13 * card.textUnit * card.depthScale))
+        font.pixelSize: Math.max(7, Math.min(card.headerHeight * 0.52, 13 * card.textUnit * card.animatedScale))
         font.bold: card.selected
         elide: Text.ElideRight
         textFormat: Text.PlainText
@@ -177,7 +192,7 @@ Item {
         }
         color: card.theme.textFaint
         font.family: Style.font.family
-        font.pixelSize: Math.max(6, Math.min(card.headerHeight * 0.44, 11 * card.textUnit * card.depthScale))
+        font.pixelSize: Math.max(6, Math.min(card.headerHeight * 0.44, 11 * card.textUnit * card.animatedScale))
         textFormat: Text.PlainText
       }
     }

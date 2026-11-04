@@ -55,7 +55,25 @@ Item {
   // two in step.
   property int fieldCount: 0
   readonly property int count: fieldCount
-  readonly property var selection: selectedIndex >= 0 && selectedIndex < count ? field[selectedIndex] : null
+  // A function, not a binding. `field[selectedIndex]` inside a `property var`
+  // binding is not re-evaluated when the array's contents change -- QML tracks
+  // the `field` reference, not what is inside it -- so `selection` stayed at
+  // whatever it evaluated to before the window list arrived (null, measured:
+  // selected=1 with windows=4 while the property read null).
+  // No `selection` property. Every attempt to expose `field[selectedIndex]`
+  // through a property or a helper returned null while the same expression
+  // written at the call site returned the entry (measured repeatedly). The
+  // callers index the array directly instead.
+  property int fieldVersion: 0
+
+  // Everything inside a function body must be reached through `root.`:
+  // an unqualified `field` in a method resolves to undefined here, so the
+  // index check failed and every caller got null while the same expression
+  // written at a call site returned the entry (measured against this shell).
+  function selectionAt() {
+    return root.selectedIndex >= 0 && root.selectedIndex < root.fieldCount
+      ? root.field[root.selectedIndex] : null
+  }
 
   // ------------------------------------------------------------ data
 
@@ -84,6 +102,7 @@ Item {
     // 0 while the original still has its items -- the field then draws nothing.
     root.field = built
     root.fieldCount = built.length
+    root.fieldVersion++
     root.groups = Recency.workspaceGroups(root.field)
 
     if (!root.opened) {
@@ -306,7 +325,7 @@ Item {
   }
 
   function commit() {
-    var target = root.selection
+    var target = root.selectionAt()
     root.close()
     if (!target) return
     Quickshell.execDetached(["niri", "msg", "action", "focus-window", "--id", String(target.id)])
@@ -351,7 +370,10 @@ Item {
     }
 
     function state(): string {
+      var sel = root.selectionAt()
       return JSON.stringify({
+        selName: sel ? String(sel.appName || "") : "null",
+        selIcon: sel ? String(sel.icon || "") : "null",
         opened: root.opened,
         windows: root.count,
         selected: root.selectedIndex,

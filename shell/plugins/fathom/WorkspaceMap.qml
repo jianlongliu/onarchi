@@ -48,7 +48,7 @@ Item {
         border.color: card.highlighted ? map.theme.accent : map.theme.panelBorder
 
         readonly property bool highlighted: {
-          const entry = map.controller ? map.controller.selection : null
+          const entry = map.controller ? map.controller.selectionAt() : null
           return entry !== null && modelData.entries.indexOf(map.controller.selectedIndex) !== -1
         }
 

@@ -13,11 +13,10 @@ Item {
   property real size: 24
 
   readonly property bool loaded: image.status === Image.Ready
-  // Decoded at a power of two, at least twice the drawn size: a card's icon
-  // grows and shrinks with every step of the camera, and decoding it again at
-  // each size would blank it for a frame each time.
-  readonly property int textureSize: Math.min(512, Math.pow(2, Math.ceil(Math.log(Math.max(16, size * 2)) / Math.LN2)))
   readonly property bool missing: source.length === 0 || image.status === Image.Error
+
+
+
 
   function hue(text) {
     let hash = 0
@@ -35,8 +34,10 @@ Item {
 
     anchors.fill: parent
     source: icon.visible ? icon.source : ""
-    sourceSize: Qt.size(icon.textureSize, icon.textureSize)
-    asynchronous: true
+    // No sourceSize and no asynchronous: with both set, an `image://icon/` URL
+    // never leaves the Loading state (measured against Quickshell 0.3.1), so
+    // every app fell through to its lettered tile. The icons here are small
+    // theme files; loading them synchronously costs nothing.
     mipmap: true
     fillMode: Image.PreserveAspectFit
     visible: icon.loaded
@@ -46,12 +47,15 @@ Item {
     anchors.fill: parent
     visible: icon.missing
     radius: width * 0.26
-    color: Qt.hsla(icon.hue(icon.name || "?"), 0.32, 0.42, 1)
+    // The tile's colour comes from the name; an unnamed app still needs a
+    // stable one, so the empty string hashes as itself.
+    color: Qt.hsla(icon.hue(icon.name || ""), 0.32, 0.42, 1)
 
     Text {
       anchors.centerIn: parent
       textFormat: Text.PlainText
-      text: (icon.name || "?").charAt(0).toUpperCase()
+      // A "?" here would read as a failure; an unnamed app shows a dot instead.
+      text: icon.name.length > 0 ? icon.name.charAt(0).toUpperCase() : "\u00b7"
       color: "#f4f4f4"
       font.pixelSize: Math.max(6, icon.size * 0.52)
       font.bold: true

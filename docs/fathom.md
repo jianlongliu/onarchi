@@ -117,7 +117,7 @@ QML 侧**不设置** `BackgroundEffect.blurRegion`。客户端区域方案实测
 
 | 层 | alpha | 说明 |
 |---|---|---|
-| veil | 0.58–0.70 | `Palette.js` 的 `DARK_VEIL`，渐变压暗 |
+| veil | 0.15–0.25 | `Palette.js` 的 `DARK_VEIL`，极轻的压暗；再高就与 bar / 菜单的观感不一致 |
 | 卡片填充 | 0.82 | `Card.qml` 的 `fillOpacity`，够实以保住标题可读 |
 
 壁纸层已移除。Fathom 原版在 veil 下画当前壁纸，那层会盖住 niri 的磨砂，使背景完全不可见。
