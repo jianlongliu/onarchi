@@ -190,23 +190,26 @@ cd onarchi
 
 ## 上游同步状态
 
-本移植当前跟到上游 `quattro` 的 **`bc220e70`**（2026-10-27）—— 2026-10-28 从 `60663faf` 快进，
-共 846 个提交。当前 `niri.patch` 为 **40 文件 / 131 hunk / 3412 行**，md5 `b7d3f453e99631823bd76b0d2f477f25`（未跟踪的覆盖层文件另计）。
+本移植当前跟到上游 `quattro` 的 **`6194f4606`**（2026-11-04）—— 2026-11-05 从 `bc220e70` 快进，
+共 257 个提交、1384 个文件、+50142/−28245。`bc220e70` 的内容与 `v4.5.0-rc2` 完全一致，
+所以那次合并吃进了 4.5 这条线；要注意 `v4.5.0` 正式 tag 打在发布分支 `v4-5-0` 上、**不在 `quattro`**，
+本移植只跟 `quattro`。当前 `niri.patch` 为 **45 文件 / 129 hunk / 3236 行**，md5
+`1dc2d9dac04d46ae85eed9e6f0cfac46`（未跟踪的覆盖层文件另计）。
 
-上游**仍然没有 niri 支持**：`bc220e70` 上 `grep -ri niri shell/ bin/` 零命中，而 Hyprland 耦合反而
-加重（19 文件 54 处 → 26 文件 118 处）。下面每一条都是这个前提的产物。
+上游**仍然没有 niri 支持**：`6194f4606` 上 `grep -ri niri shell/ bin/` 零命中，而 Hyprland 耦合
+仍在 11 个文件 36 处。下面每一条都是这个前提的产物。
 
 ### 合并后保留的东西
 
 | 领域 | 状态 |
 |---|---|
 | 浮动 bar（间隙、圆角、霜化） | 接进上游新的 `barStrip`；`exclusiveZone` 现在算上 `floatGap`，窗口与条带之间不再多出一圈死桌面 |
-| 显示器分辨率档位滑块 | 完全本地，上游没有对应物；合并零丢失（235 行） |
+| 显示器分辨率档位滑块 | **2026-11-05 已退役**（用户决定），在上游重写 `panels/monitor/Panel.qml`（+1044/−289）之前动手。235 行实现连同 14 hunk 差分、`omarchy-niri-monitor-modes` 垫片、模型测试与恢复步骤归档在 `~/.local/state/backups/omarchy-pre-ff-quattro-*/retired-monitor-panel/` |
 | 电池充电阈值（sysfs 优先） | 保留，并吸收上游改进：电池路径由 UPower 解析，不再用 `BAT*` 通配 |
-| `Niri.qml` 合成器垫片 | 当前 364 行：`monitors`、`monitorFor`、`toplevels`、`refresh*`、`dispatch` |
+| `Niri.qml` 合成器垫片 | 当前 453 行：`monitors`、`monitorFor`、`toplevels`、`refresh*`、`dispatch`，以及 `fullscreenOn` —— 后者因为 `niri msg windows` 不报告全屏标志，改为拿窗口的 `tile_size` 与输出的逻辑尺寸比对（全屏时两者恰好相等） |
 | `OverlayWindow.qml` | 上游新增文件，所有 overlay 面板（菜单、OSD、剪贴板、图片选择器）都经过它。它读 `Hyprland.monitors`，在 niri 上恒为空 ⇒ `contentReady` 永远为假 ⇒ **每个面板都以 opacity 0 渲染**。已改指 `Niri` |
 | 通知霜化 | 上游把通知表面改窄并丢了客户端区域，layer 规则只剩 `xray` ⇒ 完全无霜化。恢复为客户端 `Region` + 规则里 `blur true` |
-| Apps 网格霜化 | 上游新增的 `omarchy.dock` 网格铺满屏幕、在 Hyprland 上靠 `ignore_alpha`。补了客户端区域 + `omarchy-dock-apps` 的 layer 规则 |
+| Apps 网格霜化 | 上游新增的 `omarchy.dock` 网格铺满屏幕、在 Hyprland 上靠 `ignore_alpha`。补了客户端区域 + `omarchy-dock-apps` 的 layer 规则。**dock 本体已禁用**（`disabledPlugins`）：上游画的 dock 完全没有背景板（`color: "transparent"`，图标后面没有任何 `Rectangle`），默认 pinned 的应用本机又基本没装 |
 | bar 图标居中 | `OpticalGlyph` 报的是**旋转前**的墨迹中心，pocket 的标记展开时转 90° ⇒ 按没转的位置摆。另外 `BarIconButton` 新增 `contentOffsetY`，给墨迹远矮于行盒的字形用 |
 | 截图 | 退回合并前的 satty 版 —— 见下节 |
 | 系统动作（`omarchy-system`） | 上游统一入口的 logout 走 `uwsm stop`，niri 上没有 uwsm：所有窗口先关掉，再报「Logout failed」。现在 logout 改为请求合成器退出（`niri msg action quit --skip-confirmation`），并把 `NIRI_SOCKET`、`XDG_CURRENT_DESKTOP` 传进 detach 出去的 worker —— 缺任何一个，worker 里都选不到 niri 分支 |
@@ -288,7 +291,7 @@ IgnorePkg = qt6-5compat qt6-base qt6-declarative qt6-imageformats qt6-multimedia
 |---|---|
 | `bar-startup-budget`、`lock-appear-budget`、`menu-open-budget`、`panel-open-budgets` | 它们靠 `hyprctl -j layers` 判断图层，而 niri 只报 namespace / level / output，不报 pid 和尺寸。`require_hyprland_layers` 在 niri 上跳过，Hyprland 上照跑 |
 | `nvidia-kms-migration` | 模拟移植不涉及的 NVIDIA 硬件。其夹具从不写 `00-omarchy-hooks.conf`，条件判断读到空 `HOOKS`，于是在混合显卡机器上误判要重建 |
-| `hardware-quirks` | 上游安装编排问题：`install/hardware/input-group.sh` 在 `bc220e70` 上没有任何脚本调用 |
+| `hardware-quirks` | 上游安装编排问题：`install/hardware/input-group.sh` 在 `6194f4606` 上没有任何脚本调用 |
 | `background-intro-lifecycle` | `BackgroundIntro.qml` 与上游逐字节一致，是夹具自己的 retint 断言不过 |
 | `agents-default-migration` | 期望的 bar 布局早于上游新增 `omarchy.keyboard-layout` |
 | `fontconfig-cjk` | 依赖本机装的字体 |

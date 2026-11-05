@@ -208,25 +208,27 @@ The overview backdrop needs no adjustment: niri draws that layer itself, so the 
 
 ## Upstream sync status
 
-The port currently tracks upstream `quattro` at **`bc220e70`** (2026-10-27), fast-forwarded from
-`60663faf` on 2026-10-28 — 846 commits. The current `niri.patch` has **40 files / 131 hunks / 3412
-lines**, md5 `b7d3f453e99631823bd76b0d2f477f25` (untracked overlay files are separate).
+The port currently tracks upstream `quattro` at **`6194f4606`** (2026-11-04), fast-forwarded from
+`bc220e70` on 2026-11-05 — 257 commits, 1384 files, +50142/−28245. `bc220e70` was content-identical
+to `v4.5.0-rc2`, so that merge brought the 4.5 release line in; note that the `v4.5.0` tag itself
+sits on the `v4-5-0` release branch, not on `quattro`, and this port follows `quattro` only.
+The current `niri.patch` has **45 files / 129 hunks / 3236 lines**, md5
+`1dc2d9dac04d46ae85eed9e6f0cfac46` (untracked overlay files are separate).
 
-Upstream still has **no niri support**: `grep -ri niri shell/ bin/` returns nothing at `bc220e70`,
-while Hyprland coupling grew (19 files / 54 sites → 26 files / 118 sites). Everything below exists
-because of that.
+Upstream still has **no niri support**: `grep -ri niri shell/ bin/` returns nothing at `6194f4606`,
+while Hyprland coupling stands at 11 files / 36 sites. Everything below exists because of that.
 
 ### Carried through the merge
 
 | Area | State |
 |---|---|
 | Floating bar (float gap, rounded corners, frosted blur) | Grafted onto upstream's new `barStrip`. `exclusiveZone` now includes `floatGap`, so windows no longer sit a band of dead desktop below the strip |
-| Monitor resolution tier slider | Entirely local; upstream has no equivalent. Merged without loss (235 lines) |
+| Monitor resolution tier slider | **Retired 2026-11-05** at the user's request, ahead of upstream's +1044/−289 rewrite of `panels/monitor/Panel.qml`. The 235-line implementation is archived under `~/.local/state/backups/omarchy-pre-ff-quattro-*/retired-monitor-panel/` with its 14-hunk diff, the `omarchy-niri-monitor-modes` shim, the model test and restore instructions |
 | Battery charge threshold (sysfs-first) | Kept, plus upstream's improvement: it resolves the battery through UPower instead of a `BAT*` glob |
-| `Niri.qml` compositor shim | Currently 364 lines: `monitors`, `monitorFor`, `toplevels`, `refresh*`, `dispatch` |
+| `Niri.qml` compositor shim | Currently 453 lines: `monitors`, `monitorFor`, `toplevels`, `refresh*`, `dispatch`, and `fullscreenOn` — the last one because `niri msg windows` carries no fullscreen flag, so it compares a window's `tile_size` against the output's logical size (fullscreen tiles to exactly that) |
 | `OverlayWindow.qml` | New upstream file, all overlay panels (menu, OSD, clipboard, image picker) go through it. It read `Hyprland.monitors`, which is always empty on niri, so `contentReady` never became true and every panel rendered at opacity 0 — patched to `Niri` |
 | Toast frost | Upstream narrowed the notification surface and dropped the client blur region; the layer rule carried only `xray`, so nothing was frosted. Restored as a client-side `Region` + `blur true` in the rule |
-| Apps grid frost | Upstream's new `omarchy.dock` grid spans the screen and relies on Hyprland's `ignore_alpha`. Given a client region plus an `omarchy-dock-apps` layer rule |
+| Apps grid frost | Upstream's new `omarchy.dock` grid spans the screen and relies on Hyprland's `ignore_alpha`. Given a client region plus an `omarchy-dock-apps` layer rule. **The dock itself is disabled** (`disabledPlugins`): upstream draws it with no backdrop at all (`color: "transparent"`, no `Rectangle` behind the icons), and its default pins are apps this machine does not have |
 | Bar icon centring | `OpticalGlyph` reported the ink centre before rotation, so the pocket's mark (which turns 90° when it opens) was placed as if it had not. `BarIconButton` also gained `contentOffsetY` for glyphs whose ink is far shorter than their line box |
 | Screenshot | Reverted to the pre-merge satty version — see "Dropped" |
 | System actions (`omarchy-system`) | Upstream's unified entry ran `uwsm stop` for logout, which does not exist on niri: every window closed and then the menu reported "Logout failed". `logout` now asks the compositor to quit (`niri msg action quit --skip-confirmation`), and the detached worker is given `NIRI_SOCKET` and `XDG_CURRENT_DESKTOP` — without both it cannot pick the niri branch |
@@ -250,7 +252,7 @@ open failures below are upstream's, and are left alone deliberately rather than 
 |---|---|
 | `bar-startup-budget`, `lock-appear-budget`, `menu-open-budget`, `panel-open-budgets` | They judge a layer surface through `hyprctl -j layers`, and niri reports a layer's namespace, level and output but not its pid or geometry. `require_hyprland_layers` skips them on niri; they still run under Hyprland |
 | `nvidia-kms-migration` | Simulates NVIDIA hardware the port does not touch. Its fixture never writes `00-omarchy-hooks.conf`, so the conditional reads an empty `HOOKS` and decides to rebuild on a hybrid machine |
-| `hardware-quirks` | Upstream's install orchestration: `install/hardware/input-group.sh` is dispatched by nothing, at `bc220e70` |
+| `hardware-quirks` | Upstream's install orchestration: `install/hardware/input-group.sh` is dispatched by nothing, at `6194f4606` |
 | `background-intro-lifecycle` | `BackgroundIntro.qml` is byte-identical to upstream and the fixture's own retint assertion fails |
 | `agents-default-migration` | The expected bar layout predates upstream shipping `omarchy.keyboard-layout` |
 | `fontconfig-cjk` | Depends on the fonts installed on the machine |
