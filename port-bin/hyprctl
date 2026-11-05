@@ -199,7 +199,16 @@ def cmd_monitors(json_out):
             "refreshRate": (cur.get("refresh_rate") or 60000) / 1000.0,
             "make": o.get("make") or "", "model": o.get("model") or "",
             "serial": o.get("serial"),
-            "availableModes": modes,
+            # Hyprland spells each mode as "WxH@R.RRHz" (e.g. "2560x1600@165.00Hz"),
+            # and every consumer parses that string: the Display panel's
+            # Model.js does `/^(\d+)x(\d+)@/`, and String({...}) is
+            # "[object Object]", which matches nothing. Passing niri's objects
+            # through unchanged is what emptied the panel's resolution row.
+            "availableModes": [
+                "%dx%d@%.2fHz" % (m.get("width", 0), m.get("height", 0),
+                                  (m.get("refresh_rate") or 0) / 1000.0)
+                for m in modes
+            ],
             "activeWorkspace": {"id": ws_by_output.get(name, 0)},
             "specialWorkspace": {"id": 0},
             "dpmsStatus": dpms,

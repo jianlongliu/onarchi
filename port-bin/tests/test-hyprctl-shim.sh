@@ -299,5 +299,16 @@ check "and it answers with JSON, never a bare dictionary" \
   "$(hyprctl activeworkspace -j | jq -r 'type')" object
 
 echo
+echo "== availableModes: Hyprland's string spelling, not niri's objects"
+# Every consumer parses "WxH@R.RRHz". The Display panel's Model.js runs
+# /^(\d+)x(\d+)@/ over each entry; String({...}) is "[object Object]" and
+# matches nothing, which emptied its resolution row.
+modes=$(hyprctl monitors -j | jq -r '[.[] | select(.disabled != true)][0].availableModes[0]')
+check "a mode reads as WxH@R.RRHz" \
+  "$(printf '%s' "$modes" | grep -cE '^[0-9]+x[0-9]+@[0-9]+\.[0-9]{2}Hz$')" 1
+check "no entry is an object" \
+  "$(hyprctl monitors -j | jq -r '[[.[] | select(.disabled != true)][0].availableModes[] | type] | unique | join(",")')" string
+
+echo
 echo "checks=$checks failures=$failures"
 [[ $failures -eq 0 ]] || exit 1
