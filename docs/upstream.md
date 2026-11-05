@@ -20,6 +20,8 @@
 - 8.21 上游 shell 层的取舍：只跟 `Color.qml` 的颜色环修复（2026-09-27）
 - 8.22 上游单条挑拣：壳层四条（2026-10-19）
 - 8.23 全量 FF 到 `bc220e70`（2026-10-28）：846 提交、32 冲突、补丁失效
+- 8.24 全量 FF 到 `6194f4606`（quattro tip，2026-11-05）：257 提交、10 冲突、上游拆 sudo 脚手架
+- 8.25 dock 在 niri 上接通（2026-11-05）：垫片 `o.workspace_mode`、`tiledLayout`、dock 两文件移植
 - 16. **GitHub 发布流程（2026-08-25 建立）**：移植差分推到 pub 仓库
 - 8. **A+C 落地 / 更新覆盖层（2026-08-24）**：本节最后两项。
 
@@ -433,6 +435,103 @@ git stash pop                                  # 冲突集中在这一步
 
 ---
 
+### 8.24 全量 FF 到 `6194f4606`（quattro tip，2026-11-05）
+
+**先纠正一处版本关系**：上游 `v4.5.0` 正式 tag **不在 `quattro` 上**。它是发布分支 `v4-5-0`
+（tip `ac2690cd7`）的提交，与 `quattro` 于 2026-10-27 在 `958254e92` 分叉；分叉后 `quattro`
+独有 262 提交、发布线独有 136 提交，内容差 764 文件 / +27909 −12264。`version` 文件在两条线上
+都仍是 `4.0.0.alpha`，版本号只存在于 tag 里。
+
+**上一次 FF 的基线 `bc220e70` 内容上等于 `v4.5.0-rc2`**（`git diff bc220e70 v4.5.0-rc2` → 0 文件）。
+所以「升级到 4.5 正式版」这个动作本身不带来新内容 —— rc2→正式版那 130 提交里，506 个是文档/翻译、
+104 个是测试、14 个是 Hyprland 专属 lua，真正新增的用户可见入口只有
+`omarchy-hw-wait-camera-access` 与 `omarchy-remove-ai-amp` 两个命令。
+**结论：只跟 `quattro`，不追 `v4-5-0` 发布分支。**
+
+**规模**（`bc220e70` → `6194f4606`，2026-10-27 → 2026-11-04）：257 提交、1384 文件、
++50142/−28245。撞 `niri.patch` 路径表的上游改动 **15 个文件**，套不上需人工的 8 处 hunk。
+
+**流程**（与 §8.23 同，但这次快照走 pkexec 而非 sudo）：
+
+```bash
+# snapper 描述必须 ASCII，且 -u 要 key=value 形式 —— 中文描述会让 polkit 报
+# "g_variant_new_string(): requires valid UTF-8"（本次踩到，先失败两次）。
+pkexec snapper -c home create -d "pre-ff-quattro-20261105" -c number -u "reason=pre-ff-quattro-20261105"
+pkexec snapper -c root create -d "pre-ff-quattro-20261105" -c number -u "reason=pre-ff-quattro-20261105"
+git stash push -m "pre-ff-quattro-tip-20261105"
+# 未跟踪文件与上游同路径的会挡 FF，先挪开再恢复
+git merge --ff-only origin/quattro
+git stash pop   # 冲突集中在这里
+```
+
+**冲突分布**：9 个 `UU` + 1 个 `DU` + 5 个 `UD`（主题删除）。
+
+| 文件 | 处置 |
+|---|---|
+| `shell/Ui/ScreenMoveRemap.qml`（DU） | **采用上游删除**。上游 `796e169ab` 说明 Hyprland 0.57 起已自行移动 layer surface，这个 remap 只会让 bar/dock 闪一下；且该文件已不在 `qmldir`、全树无引用 ⇒ 我们那 12 行 niri 守卫是死代码 |
+| `shell/plugins/panels/monitor/Panel.qml` | **退役**（用户 2026-11-05 决定）。上游 +1044/−289 重写，我们的 235 行分辨率滑块归档到 `~/.local/state/backups/omarchy-pre-ff-quattro-20261105-164054/retired-monitor-panel/`（含 `Panel.qml.before`、14 个 hunk 的差分、垫片、测试、README 与恢复步骤） |
+| `shell/plugins/bar/Bar.qml` | 两处：① 上游新增 `underFullscreen`（全屏时淡出 bar + 输入让位）依赖 `Hyprland.toplevels` 的 `lastIpcObject.fullscreen`，改接新增的 `Niri.fullscreenOn(screen)`；② `noInputRegion` 与我们的 `barBlurAnchor` 是两个不同对象，**都保留** |
+| `shell/Ui/OpticalGlyph.qml` | 合并：保留我们的旋转感知（pocket 标记开合转 90°）+ 吸收上游把 `glyphMetrics.tightBoundingRect.x` 归一化为 `root.ink.x` |
+| `shell/plugins/background/Background.qml` | 保留我们的 `paintedOnce`（主题封面等所有屏画完首帧）；上游已把过渡收尾抽成 `maybeFinishTransition()`，重复的四行删掉 |
+| `default/omarchy/omarchy-menu.jsonc` | 上游把 `setup.typing` 重组为 `setup.keyboard`；按新结构重写，niri 路径（`~/.config/niri/{binds,monitor,input}.kdl`）保留 |
+| `bin/omarchy-theme-set` | 合并 intro 条件：上游加了「重选当前主题也播 intro」与读 link 的比较，我们的 niri 守卫（快照文件会被 unlink ⇒ 黑桌面）并进同一条件 |
+| `bin/omarchy-update` | 保留 `~/bin/omarchy-update` 委派块；上游删掉的安全脚手架不再补回，见下 |
+| `default/i18n/en/{menu,shell}.json` | 保留我们的 Ante/Antex/Niri 标签，吸收上游新键 |
+
+**上游拆掉了整套 sudo 安全脚手架**（`56a910b0e`，2026-10-31，`Use ordinary sudo: one password for
+ten minutes, plain update scripts`）：删掉 `#!/bin/bash -p` 受保护启动、`omarchy_security_sanitize_bash_environment`
+环境清洗、`omarchy_security_require_source_root` 源根校验、`PATH` 钉死、sudo 时间戳入/出双向撤销。
+改法是 `timestamp_timeout=10` 一条密码管十分钟。上游理由（原文）：这些机制「只防了已经以用户身份
+运行的代码，同一个威胁模型下没必要」。**这推翻了 §8.20 的记录** —— 那套机制在 tip 上已不存在；
+`omarchy-update-stay-awake` 与 `omarchy-sudo-passwordless` 仍保留 security 库（OM-SEC-12 / OM-SEC-01
+防的是其他账户）。
+
+**新造的 niri 适配：`Niri.fullscreenOn(screen)`**
+
+`niri msg windows` 不报告全屏标志（niri 26.04 实测字段只有 `app_id/focus_timestamp/id/is_floating/
+is_focused/is_urgent/layout/pid/title/workspace_id`）。判据改为几何：**全屏窗口的 `tile_size` 恰好等于
+输出的逻辑尺寸**。实测：3200×2000@scale 2.0 的输出，全屏时 `tile_size` = 1600×1000（= 3200/2 × 2000/2），
+平铺 1584×936、最大化列 788×936 都不等。`applyWindows` 因此额外保留每窗的 `tileSize`。
+用 node 复刻逻辑验了 6 种情形（全屏/平铺/最大化列/别的工作区全屏/无窗口/高度同宽不同），全对。
+
+> 这与 `notifications/Service.qml` 里既有的「niri 无全屏标志，退化成 `visible: hasSomethingToShow`」不是
+> 矛盾：那是当时没找到判据时的保守做法。几何判据若在实机上不稳，bar 的淡出会误判，届时再退。
+
+**补丁已重导出**：`niri-port/niri.patch` 现在 **45 文件 / 129 hunk / 3236 行、md5
+`1dc2d9dac04d46ae85eed9e6f0cfac46`**，两项检查都过：
+
+- `git apply --reverse --check` → 通过（补丁精确等于当前工作区）
+- 在纯净 `HEAD`（`6194f4606`）的 `git archive` 副本上 `git apply --check` → 通过（更新后可重放）
+
+路径表变化（相对上一版 40 文件）：**移除** `shell/plugins/panels/monitor/Panel.qml`（退役）；
+**新增** `bin/omarchy-upgrade-to-quattro`、`default/i18n/en/{menu,shell}.json`、
+`test/shell.d/{system-power,overlay-window}-test.sh`、`test/shell.d/notifications/logic.cjs`
+（后三个是修测试夹具时一并纳入的）。`shell/Commons/Niri.qml` 仍是未跟踪文件，`omarchy-niri-repatch`
+单独 `cp`（`$OVL/Niri.qml` 已同步为 453 行，含 `fullscreenOn`）。
+
+**合并后修掉的三处测试夹具缺口**（都是移植层历史遗留，与上游无关）：
+
+1. `overlay-window-test.sh` 用 `new Function('Hyprland', ...)` 提取 QML 函数体做单测，而
+   `OverlayWindow.qml` 早已改读 `Niri.focusedMonitor` / `Niri.refreshMonitors()` ⇒ 提取出的体在 node 里
+   抛 `ReferenceError: Niri is not defined`，41 项断言只跑到一半。改成注入 `Niri`（`Hyprland` 保留为别名）。
+2. `notifications/logic.cjs` 同样只 stub 了 `Hyprland`，而 `Service.qml:1071` 走 `Niri.dispatch(...)`。
+   加了一个 `hydrate(scope)` 让 `runIn` 自动给 `Niri` 起别名。
+3. `~/bin/hyprctl` 的 `cmd_monitors` / `cmd_clients` 在 niri 不可用时 `return ([] if json_out else "")`
+   —— 返回的是 **list**，调用处 `sys.stdout.write(x + "\n")` 直接 `TypeError`。改成返回 `"[]"`。
+   这个 bug 只在 niri socket 读不到时触发，平时看不出来。
+
+**顺手补了一个既存缺口**：`docs/port-merge-status.md` 声称 `test/shell.d/system-power-test.sh`
+「补了 niri 路由契约，并把桌面与 `niri` 一起 mock/钉死——此前它继承真机环境，在 niri 会话里跑会真的
+把会话关掉」，但该测试文件里 **零 niri 引用、补丁里也没这个文件的改动**，契约从未落地。
+本次补上：mock 里加 `niri` 命令、导出 `XDG_CURRENT_DESKTOP=niri` 与 `NIRI_SOCKET=$test_tmp/niri.sock`，
+测试 19 项全绿。
+
+**回退**：`pkexec snapper -c root undochange 2625..0` / `pkexec snapper -c home undochange 1328..0`；
+或 `git reset --hard bc220e70` + 从 `~/.local/state/backups/omarchy-pre-ff-quattro-20261105-164054/`
+（1.2 G repo bundle + 19 M worktree tgz + 11 M `~/.config/omarchy`）恢复。
+
+---
+
 ### 8.22 上游单条挑拣：壳层四条（2026-10-19）
 
 上游 `quattro` 停在 2026-10-18（`e3eea45e`），本机基线还在 2026-09-19（`60663faf`），
@@ -556,3 +655,66 @@ shell/plugins/lock/LockView.qml shell/services/PluginRegistry.qml`，再删
 8. **A+C 落地 / 更新覆盖层（2026-08-24）**：本节最后两项。
    - **§8.6 A 层（菜单指向 niri 真配置 + Hyprland 层降级）**。
    - **§8.7 更新覆盖层（上游更新自动重放我们的移植改动）**。
+
+### 8.25 dock 在 niri 上接通（2026-11-05）
+
+上游的 dock 只在 **floating 工作区**显示，而这条链在 niri 上有三处断点，逐个补上的。
+
+**断点 1：`hyprctl` 垫片不认 `o.workspace_mode`。**
+
+`bin/omarchy-hyprland-workspace-layout-toggle` 靠 `hyprctl eval 'o.workspace_mode({ workspace = "N", mode = "..." })'`
+落模式，垫片的 `cmd_eval` 只处理 `hl.dispatch` / `hl.monitor`，其余一律 `return 0`（静默成功、
+什么也不做）。于是 `MODE_FILE` 永远写不出来 —— `~/.local/state/omarchy/workspace-layouts/` 从 10-30
+建目录起一直是空的。
+
+**断点 2：`omarchy-hyprland-workspace-layout-current` 在 niri 上永远回 `dwindle`。**
+
+`hyprctl activeworkspace -j` 的垫片版把 `tiledLayout` 写成 `"tile"`，而 toggle 的 case 只认
+`dwindle`/`scrolling`/`floating`；`tile` 落到 `*)` 分支 → `NEW_MODE=dwindle`，正好等于默认布局 →
+走 `rm -f "$MODE_FILE"` → 下次还是 `tile`。**死循环，永远停在默认值。** 改法：垫片返回 `dwindle`
+（niri 只有一种平铺布局，语义上等同 Hyprland 的默认 dwindle，`layout-default` 也正好是 `dwindle`）。
+
+**断点 3：`Dock.qml` / `DockWindow.qml` 从未移植。**
+
+这两个文件不在 `niri.patch` 里（补丁只含 `AppGrid.qml`），全文用 `Hyprland.toplevels` /
+`Hyprland.monitors` / `Hyprland.focusedMonitor` / `Hyprland.monitorFor()`，在 niri 上全是空 ⇒
+`workspaceId = -1` ⇒ `isFloating(-1)` 恒假 ⇒ **dock 表面存在但永不显示**。
+`Niri.qml` 的同名 API 形状一致，逐处替换即可。顺带删掉 `Dock.qml` 里那个
+`Connections { target: Hyprland; onRawEvent }` —— `Niri` 没有 `rawEvent` 信号，它本来就收不到任何事件；
+`Niri.qml` 自己跑 `niri msg event-stream` 维护 monitors/workspaces/toplevels。
+
+**顺带修的垫片同类 bug（3 处）**：`cmd_monitors`、`cmd_clients`、`cmd_activeworkspace`、
+`cmd_activewindow` 在拿不到数据时 `return ([] if json_out else "")` / `return ({} if json_out else "")`
+—— 返回的是 **list / dict**，而调用处是 `sys.stdout.write(x + "\n")`，直接 `TypeError`。
+平时看不出来（niri 正常时走不到），只有 socket 读不到时才炸。改成返回字符串 `"[]"` / `"{}"`。
+
+**踩到的环境坑（值得记住）**：niri 在 16:52 重启过一次（第一轮 `./test/shell` 里那个还没修的
+`system-power-test.sh` 真的把会话关了 —— 文档里 2026-10-29 记过这个坑，本次是第二次）。
+结果当前 zsh/ante/tmux 整条进程链都带着**旧的 `NIRI_SOCKET`（`niri.wayland-1.1828.sock`，socket 已不存在）**，
+而 systemd 会话环境里是正确的 `2061265`。所有 `niri msg` 调用因此全部失败，壳层也继承了这个死值
+⇒ `Niri.qml` 拿不到任何数据。**重启壳时要用 `env -i` 显式给出 `NIRI_SOCKET`**，
+或者先重开终端。判断方法：`tr '\0' '\n' < /proc/<壳pid>/environ | grep NIRI_SOCKET`。
+
+**验证**：`hyprctl` 垫片测试 **45/45 绿**（原有 40 + 新增 5：`o.workspace_mode` 成功/不产生 action/
+畸形载荷被拒、`tiledLayout` 为 `dwindle`、activeworkspace 输出 `object`）；
+dock 三角色循环 `dwindle → scrolling → floating` 实测文件正确写入与删除；
+`niri msg layers` 里 `omarchy-dock` 表面在位；全屏截图确认底部 dock 已画出来。
+
+**后续（同日）**：用户看过实物后决定**不用 dock** —— 上游这个 dock 本来就没有背景板
+（`DockWindow.qml` 是 `color: "transparent"`，`body` 里除图标外无任何 `Rectangle`/`BlurRegion`），
+图标裸浮在壁纸上；默认 pinned 的 7 个应用（`chromium`/`foot`/`omacalc`/`omawrite`/`X`/`YouTube` 等）
+本机基本没装，于是只剩应用网格按钮一个图标。已按用户要求关掉：
+
+- `~/.config/omarchy/shell.json` 的 `disabledPlugins` 加入 `omarchy.dock`（重启壳后
+  `niri msg layers` 里 `omarchy-dock` 为 0、IPC 目标也为 0）
+- `shell/plugins/dock/{Dock.qml,DockWindow.qml}` 的移植**已撤回**（插件禁用后是死代码）；
+  `AppGrid.qml` 的改动保留，它本来就在补丁里
+- 工作区模式回到 `dwindle`，`workspace-layouts/` 已空
+
+**垫片那两处修的是真 bug，与 dock 无关，保留**：`o.workspace_mode` 让布局模式能被记录
+（在此之前 `layout-toggle` 全程空转、模式文件从 10-30 起一直是空的），`tiledLayout` 由 `tile`
+改成 `dwindle` 打破了「切一次回默认、永远停在默认」的死循环。4 处 `return [] / {}` 的
+`TypeError` 同样保留 —— 它们在 socket 读不到时才会触发。
+
+**补丁最终指纹**：**45 文件 / 129 hunk / 3236 行、md5 `1dc2d9dac04d46ae85eed9e6f0cfac46`**，
+反向（等于工作区）与正向（干净 `6194f4606` 可重放）两项检查都过。

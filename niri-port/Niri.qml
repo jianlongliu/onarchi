@@ -50,7 +50,10 @@ QtObject {
     property var _monitorModes: ({})
 
     // Re-read both lists from scratch. Used on startup and by the event handlers.
+    // A call before the socket is resolved is dropped, not queued: `onReadyChanged`
+    // does one refresh of everything the moment the path is known.
     function refresh() {
+        if (!root.ready) return
         if (!wsProcess.running) wsProcess.running = true
         if (!winProcess.running) winProcess.running = true
         if (!outputProcess.running) outputProcess.running = true
@@ -58,12 +61,15 @@ QtObject {
 
     // Hyprland's own refresh hooks, so call sites port by renaming only.
     function refreshMonitors() {
+        if (!root.ready) return
         if (!outputProcess.running) outputProcess.running = true
     }
     function refreshWorkspaces() {
+        if (!root.ready) return
         if (!wsProcess.running) wsProcess.running = true
     }
     function refreshToplevels() {
+        if (!root.ready) return
         if (!winProcess.running) winProcess.running = true
     }
 
@@ -76,6 +82,33 @@ QtObject {
             if (list[i].name === name) return list[i]
         }
         return root.focusedMonitor
+    }
+
+    // Whether the active workspace on this screen holds a real fullscreen
+    // window. `niri msg windows` reports no fullscreen flag, so this compares
+    // each window's tile against the output's logical size: a fullscreen window
+    // tiles to exactly that, while a tiled or maximized one stays smaller
+    // (measured on niri 26.04 - 1600x1000 fullscreen against 1584x936 tiled on
+    // a 3200x2000 output at scale 2.0). Windows whose height matches but whose
+    // width does not are a scrolling column, not a fullscreen window.
+    function fullscreenOn(screen) {
+        var monitor = root.monitorFor(screen)
+        if (!monitor) return false
+        var workspace = monitor.activeWorkspace
+        if (!workspace) return false
+        var mode = monitor.lastIpcObject
+        var scale = mode && mode.scale > 0 ? mode.scale : 1
+        var width = mode && mode.width > 0 ? mode.width / scale : monitor.width
+        var height = mode && mode.height > 0 ? mode.height / scale : monitor.height
+        if (!(width > 0) || !(height > 0)) return false
+        var list = root.toplevels && root.toplevels.values ? root.toplevels.values : []
+        for (var i = 0; i < list.length; i++) {
+            var tile = list[i].tileSize
+            if (!tile) continue
+            if (!list[i].workspace || list[i].workspace.id !== workspace.niriId) continue
+            if (Math.abs(tile.width - width) < 1 && Math.abs(tile.height - height) < 1) return true
+        }
+        return false
     }
 
     // A dispatcher call, in whichever spelling the caller used. The Lua forms
@@ -168,12 +201,18 @@ QtObject {
                 byId[wid] = (byId[wid] || 0) + 1
                 if (!byWorkspace[wid]) byWorkspace[wid] = []
                 byWorkspace[wid].push(wins[i])
+                var layout = wins[i].layout || {}
+                var tile = layout.tile_size
                 list.push({
                     "address": String(wins[i].id),
                     "title": wins[i].title || "",
                     "class": (wins[i].app_id || ""),
                     "workspace": { "id": wins[i].workspace_id },
-                    "activated": !!wins[i].is_focused
+                    "activated": !!wins[i].is_focused,
+                    // niri has no fullscreen flag on its windows; a fullscreen
+                    // window's tile is exactly the output's logical size, so the
+                    // geometry is what fullscreenOn() compares.
+                    "tileSize": tile ? { "width": tile[0], "height": tile[1] } : null
                 })
             }
         } catch (e) {}
@@ -296,9 +335,46 @@ QtObject {
             winDebounce.restart()
     }
 
+    // `niri msg` finds the compositor through NIRI_SOCKET, and the value a shell
+    // inherits can outlive the compositor it named. Logging out and back in
+    // starts a new niri with a new socket path, but the user manager's already
+    // running children -- herdr, the terminal, this shell -- keep the old one in
+    // their environment, so every `niri msg` spawned here dies with "error
+    // connecting to the niri socket" and every list below stays empty. The
+    // failure is silent: monitors never arrives, an OverlayWindow gets no
+    // targetMonitor, never maps, and the menu stops opening while the bar draws
+    // against nothing.
+    //
+    // Quickshell.fileNameList cannot be used to look for the real one (measured:
+    // it returns no entries for /run/user/1000), so ask the shell. The socket is
+    // `niri.<wayland-display>.<pid>.sock` directly in the runtime dir, and the
+    // live compositor owns the highest pid.
+    property Process socketProbe: Process {
+        id: socketProbe
+        command: ["sh", "-c",
+            "ls -1 \"$0\"/niri.*.sock 2>/dev/null | sort -t. -k3 -n | tail -n 1",
+            Quickshell.env("XDG_RUNTIME_DIR") || ("/run/user/" + Quickshell.env("UID"))]
+        running: true
+        stdout: StdioCollector {
+            waitForEnd: true
+            onStreamFinished: {
+                var path = String(text || "").trim()
+                if (path.length > 0) root._socketPath = path
+            }
+        }
+        stderr: StdioCollector {}
+    }
+
+    // Empty until the probe answers. Each child is only spawned after that (see
+    // `ready`), so no `niri msg` ever runs against the stale path.
+    property string _socketPath: ""
+    readonly property bool ready: root._socketPath.length > 0
+    readonly property var _niriEnv: ({ "NIRI_SOCKET": root._socketPath })
+
     property Process wsProcess: Process {
         id: wsProcess
         command: ["niri", "msg", "-j", "workspaces"]
+        environment: root._niriEnv
         running: false
         stdout: StdioCollector {
             waitForEnd: true
@@ -310,6 +386,7 @@ QtObject {
     property Process winProcess: Process {
         id: winProcess
         command: ["niri", "msg", "-j", "windows"]
+        environment: root._niriEnv
         running: false
         stdout: StdioCollector {
             waitForEnd: true
@@ -323,6 +400,7 @@ QtObject {
     property Process outputProcess: Process {
         id: outputProcess
         command: ["niri", "msg", "-j", "outputs"]
+        environment: root._niriEnv
         running: false
         stdout: StdioCollector {
             waitForEnd: true
@@ -345,7 +423,10 @@ QtObject {
     property Process eventStream: Process {
         id: eventStream
         command: ["niri", "msg", "-j", "event-stream"]
-        running: true
+        environment: root._niriEnv
+        // Started only once the socket is resolved; `onReadyChanged` below kicks
+        // it off, and `streamRetry` reconnects after a compositor restart.
+        running: false
         stdout: SplitParser {
             onRead: line => root.handleEvent(line)
         }
@@ -357,7 +438,15 @@ QtObject {
 
     property Timer streamRetry: Timer {
         interval: 1000
-        onTriggered: if (!eventStream.running) eventStream.running = true
+        onTriggered: if (root.ready && !eventStream.running) eventStream.running = true
+    }
+
+    // The probe is the first thing to run; everything else waits for it so no
+    // child is ever spawned against the inherited (possibly dead) socket path.
+    onReadyChanged: {
+        if (!root.ready) return
+        root.refresh()
+        if (!eventStream.running) eventStream.running = true
     }
 
     Component.onCompleted: root.refresh()

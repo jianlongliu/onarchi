@@ -1,8 +1,8 @@
 diff --git a/bin/omarchy-agent b/bin/omarchy-agent
-index ec632b983..651bdb321 100755
+index 53160b426..5ca1db9ca 100755
 --- a/bin/omarchy-agent
 +++ b/bin/omarchy-agent
-@@ -197,6 +197,20 @@ commandcode)
+@@ -262,6 +262,20 @@ commandcode)
    command=(commandcode --yolo)
    [[ -n ${prompt:-} ]] && command+=(-- "$prompt")
    ;;
@@ -422,10 +422,10 @@ index 000000000..a0fe51853
 +if __name__ == "__main__":
 +  raise SystemExit(main())
 diff --git a/bin/omarchy-battery-status b/bin/omarchy-battery-status
-index 7f642e620..9776dec36 100755
+index 00a067346..b76be6d4c 100755
 --- a/bin/omarchy-battery-status
 +++ b/bin/omarchy-battery-status
-@@ -81,17 +81,18 @@ power_rate=$(awk -v rate="${power_rate_raw:-0}" 'BEGIN {
+@@ -89,17 +89,18 @@ power_rate=$(awk -v rate="${power_rate_raw:-0}" 'BEGIN {
    print rounded
  }')
  state=$(awk '/state/ { print $2; exit }' <<<"$battery_info")
@@ -564,7 +564,7 @@ index 745bee2d4..15e696852 100755
 +    ;;
 +esac
 diff --git a/bin/omarchy-default-agent b/bin/omarchy-default-agent
-index 69d4c2291..95123785c 100755
+index 022fa448e..ddab9da81 100755
 --- a/bin/omarchy-default-agent
 +++ b/bin/omarchy-default-agent
 @@ -1,7 +1,7 @@
@@ -854,10 +854,10 @@ index 02ab05c30..670bd0ada 100755
  else
    echo "$usage" >&2
 diff --git a/bin/omarchy-theme-set b/bin/omarchy-theme-set
-index 6fc1d9443..11c8f4396 100755
+index 059a117f3..ab8ed8090 100755
 --- a/bin/omarchy-theme-set
 +++ b/bin/omarchy-theme-set
-@@ -266,6 +266,13 @@ set_theme_background() {
+@@ -253,6 +253,13 @@ set_theme_background() {
      fi
    fi
  
@@ -871,7 +871,7 @@ index 6fc1d9443..11c8f4396 100755
    if [[ -f $OLD_BACKGROUND_SNAPSHOT && -f $new_background_snapshot ]]; then
      shell_ipc background themeTransition "$OLD_BACKGROUND_SNAPSHOT" "$new_background_snapshot" "$new_background" "$colors_payload" "$shell_payload" || \
        shell_ipc shell applyTheme "$colors_payload" "$shell_payload" || true
-@@ -275,7 +282,7 @@ set_theme_background() {
+@@ -262,7 +269,7 @@ set_theme_background() {
        shell_ipc shell applyTheme "$colors_payload" "$shell_payload" || true
      (sleep 3; rm -f "$new_background_snapshot") &
    else
@@ -880,55 +880,137 @@ index 6fc1d9443..11c8f4396 100755
        shell_ipc shell applyTheme "$colors_payload" "$shell_payload" || true
      if [[ -f $OLD_BACKGROUND_SNAPSHOT ]]; then
        (sleep 3; rm -f "$OLD_BACKGROUND_SNAPSHOT") &
-@@ -452,7 +459,11 @@ if [[ $THEME_HEADLESS != "1" && $OMARCHY_THEME_SKIP_BACKGROUND != "1" ]]; then
-   # Resolve the staged choice while the old theme still exists. Video changes
-   # switch directly to the durable path in QML, so neither side needs a copy.
+@@ -442,7 +449,14 @@ if [[ $THEME_HEADLESS != "1" && $OMARCHY_THEME_SKIP_BACKGROUND != "1" ]]; then
    if choose_staged_theme_background; then
--    if [[ $PREVIOUS_THEME_NAME != "$THEME_NAME" && ! -f $HOME/.local/state/omarchy/toggles/background-intros-off ]] &&
+     # Reselecting the current theme cycles its background, which plays that
+     # background's intro like any other background change.
+-    if [[ $PREVIOUS_THEME_NAME != "$THEME_NAME" || $(readlink "$CURRENT_BACKGROUND_LINK") != "$CHOSEN_THEME_BACKGROUND" ]] &&
++    #
 +    # niri port: snapshot files are unlinked a few seconds after the switch and
 +    # the shell reads the path asynchronously, so it can be left showing a path
 +    # that no longer exists (black desktop). Skip them entirely on niri and pass
-+    # the durable background files instead (see set_theme_background).
-+    if [[ ${XDG_CURRENT_DESKTOP:-} != niri && $PREVIOUS_THEME_NAME != "$THEME_NAME" && ! -f $HOME/.local/state/omarchy/toggles/background-intros-off ]] &&
++    # the durable background files instead - which means no intro either, so the
++    # niri guard joins the intro condition rather than replacing upstream's.
++    if [[ ${XDG_CURRENT_DESKTOP:-} != niri && $PREVIOUS_THEME_NAME != "$THEME_NAME" ]] &&
++      [[ $(readlink "$CURRENT_BACKGROUND_LINK") != "$CHOSEN_THEME_BACKGROUND" ]] &&
+       [[ ! -f $HOME/.local/state/omarchy/toggles/background-intros-off ]] &&
        [[ $(hyprctl -j getoption animations:enabled 2>/dev/null | jq -r '.bool') == "true" ]]; then
        THEME_BACKGROUND_INTRO=$(omarchy-theme-bg-boot-intro --resolve-only "$STAGED_THEME_BACKGROUND")
-     fi
 diff --git a/bin/omarchy-update b/bin/omarchy-update
-index 0a871493a..45261e141 100755
+index 8fdef4d65..5a34c532e 100755
 --- a/bin/omarchy-update
 +++ b/bin/omarchy-update
-@@ -6,6 +6,16 @@
+@@ -6,6 +6,20 @@
  # omarchy:examples=omarchy update | omarchy update -y
  # omarchy:requires-sudo=true
  
 +# 本机（手装/dev-link）委派：CLI `omarchy update` 也落到 ~/bin 垫片，因为它走的是
 +# 绝对路径 $OMARCHY_PATH/bin/omarchy-update，PATH-first 的垫片拦不到。
-+# 上游那套在本机跑不通（keyring 装不上，set -e 直接终止），故在安全脚手架之前就转走；
-+# 垫片自己是普通 sudo 流程、不需要这套脚手架。想跑真身：`omarchy-update --upstream`
++# 上游那套在本机跑不通（keyring 装不上，set -e 直接终止），故在其余逻辑之前就转走；
++# 垫片自己是普通 sudo 流程。想跑真身：`omarchy-update --upstream`
 +# （它设 OMARCHY_UPDATE_NO_DELEGATE=1，防递归）。
++#
++# 2026-11-05 合并上游 56a910b0e 后：上游拆掉了 #!/bin/bash -p 受保护启动、环境清洗、
++# 源根校验、PATH 钉死与 sudo 时间戳双向撤销，改用 timestamp_timeout=10。
++# 所以这里只剩上游的 `set -e`，我们的委派块在上面，其余照上游。
 +# 见 docs/local-overrides.md §8 第 19 项。
 +if [[ ${OMARCHY_UPDATE_NO_DELEGATE:-0} != 1 && -x $HOME/bin/omarchy-update ]]; then
 +  exec "$HOME/bin/omarchy-update" "$@"
 +fi
 +
- if [[ $- != *p* ]]; then
-   echo "Refusing an unsafe Bash startup." >&2
-   exit 126
-@@ -26,6 +36,9 @@ unset OMARCHY_UPDATE_USER_PATH
- # prompt below always belongs to this update, never to an earlier session.
- omarchy_security_install_sudo_cleanup_traps
- omarchy_security_revoke_sudo_timestamp || exit 1
-+# Validate the no-update wrapper up front: the AUR phase depends on it. Every
-+# other phase shares the one authorization, so it stays off PATH until then.
-+omarchy_security_enable_no_update_sudo
- PATH="$OMARCHY_PATH/bin:/usr/bin:/usr/sbin:/bin:/sbin"
- unset OMARCHY_SUDO_NO_UPDATE
- # Helpers that manage their own sudo boundary leave this authorization to us.
+ set -e
+ 
+ update_stay_awake_stopped=0
+diff --git a/bin/omarchy-upgrade-to-quattro b/bin/omarchy-upgrade-to-quattro
+index 0d875c4b1..ee4087c34 100755
+--- a/bin/omarchy-upgrade-to-quattro
++++ b/bin/omarchy-upgrade-to-quattro
+@@ -1295,7 +1295,6 @@ run_final_system_package_upgrade() {
+     --overwrite '/etc/modprobe.d/omarchy-usb-autosuspend.conf' \
+     --overwrite '/etc/sddm.conf.d/10-theme.conf' \
+     --overwrite '/etc/sddm.conf.d/10-wayland.conf' \
+-    --overwrite '/etc/sudoers.d/omarchy-asdcontrol' \
+     --overwrite '/etc/sudoers.d/omarchy-passwd-tries' \
+     --overwrite '/etc/sudoers.d/omarchy-tzupdate' \
+     --overwrite '/etc/sysctl.d/90-omarchy-file-watchers.conf' \
+diff --git a/default/i18n/en/menu.json b/default/i18n/en/menu.json
+index c8ddf63a1..4410abc74 100644
+--- a/default/i18n/en/menu.json
++++ b/default/i18n/en/menu.json
+@@ -447,6 +447,15 @@
+   "trigger.tests.disk-speedtest": {
+     "label": "Disk Speed Test"
+   },
++  "style.avatar": {
++    "label": "Avatar"
++  },
++  "style.avatar.image": {
++    "label": "Set From Image"
++  },
++  "style.avatar.default": {
++    "label": "Restore Default"
++  },
+   "setup.keyboard": {
+     "label": "Keyboard"
+   },
+@@ -456,6 +465,9 @@
+   "setup.keyboard.inputs": {
+     "label": "Keyboard Inputs"
+   },
++  "setup.monitors": {
++    "label": "Monitors"
++  },
+   "setup.keyboard.input-methods": {
+     "label": "Input Methods"
+   },
+@@ -508,6 +520,12 @@
+   "setup.default.agent.commandcode": {
+     "label": "Command Code"
+   },
++  "setup.default.agent.ante": {
++    "label": "Ante"
++  },
++  "setup.default.agent.antex": {
++    "label": "Antex"
++  },
+   "setup.default.agent.copilot": {
+     "label": "Copilot"
+   },
+@@ -693,7 +711,7 @@
+     "label": "Git"
+   },
+   "setup.config.hyprland": {
+-    "label": "Hyprland"
++    "label": "Niri"
+   },
+   "setup.config.hyprsunset": {
+     "label": "Hyprsunset"
+@@ -1269,7 +1287,7 @@
+     "label": "Shell"
+   },
+   "update.config.hyprland": {
+-    "label": "Hyprland"
++    "label": "Niri Theme"
+   },
+   "update.config.hyprsunset": {
+     "label": "Hyprsunset"
+diff --git a/default/i18n/en/shell.json b/default/i18n/en/shell.json
+index 8bdaa4772..315c5d855 100644
+--- a/default/i18n/en/shell.json
++++ b/default/i18n/en/shell.json
+@@ -446,6 +446,7 @@
+   "power.batteryState": "Battery state",
+   "power.chargeCycles": "Charge cycles",
+   "power.chargeLimit": "Charge limit",
++  "power.chargeLimitHeader": "CHARGE LIMIT",
+   "power.charging": "Charging",
+   "power.chargingPhrase1": "Pumping power",
+   "power.chargingPhrase2": "Injecting electrons",
 diff --git a/default/omarchy/omarchy-menu.jsonc b/default/omarchy/omarchy-menu.jsonc
-index da07a04ff..8f762b856 100644
+index 29f403801..55c4913ec 100644
 --- a/default/omarchy/omarchy-menu.jsonc
 +++ b/default/omarchy/omarchy-menu.jsonc
-@@ -178,10 +178,14 @@
+@@ -178,12 +178,19 @@
    "trigger.tests.network-speedtest": {"icon":"󰓅","label":"Network Speed Test","action":"omarchy-shell shell summon omarchy.speedtest"},
    "trigger.tests.disk-speedtest": {"icon":"󰋊","label":"Disk Speed Test","action":"omarchy-shell shell summon omarchy.disk-speedtest"},
  
@@ -937,16 +1019,20 @@ index da07a04ff..8f762b856 100644
 +  "style.avatar.default": {"icon":"","label":"Restore Default","action":"omarchy-avatar default"},
 +
    // Setup
--  "setup.monitors": {"icon":"󰍹","label":"Monitors","action":"omarchy-launch-config-editor \"$HOME/.config/hypr/monitors.lua\""},
--  "setup.keybindings": {"icon":"","label":"Keybindings","when":"[[ -f ~/.config/hypr/bindings.lua ]]","action":"omarchy-launch-config-editor \"$HOME/.config/hypr/bindings.lua\""},
++  // niri port: upstream regrouped setup.typing into setup.keyboard. Values kept
++  // from our side - the files to edit are niri's, not Hyprland's.
+   "setup.keyboard": {"icon":"","label":"Keyboard"},
+-  "setup.keyboard.keybindings": {"icon":"","label":"Keybindings","when":"[[ -f ~/.config/hypr/bindings.lua ]]","action":"omarchy-launch-config-editor \"$HOME/.config/hypr/bindings.lua\""},
++  "setup.keyboard.keybindings": {"icon":"","label":"Keybindings","when":"[[ -f ~/.config/niri/binds.kdl ]]","action":"omarchy-launch-config-editor \"$HOME/.config/niri/binds.kdl\""},
+   "setup.keyboard.inputs": {"icon":"","label":"Keyboard Inputs","action":"omarchy-setup-keyboard"},
+   "setup.keyboard.input-methods": {"icon":"","label":"Input Methods","action":"omarchy-setup-input"},
 -  "setup.input": {"icon":"","label":"Input","when":"[[ -f ~/.config/hypr/input.lua ]]","action":"omarchy-launch-config-editor \"$HOME/.config/hypr/input.lua\""},
-+  "setup.monitors": {"icon":"󰍹","label":"Monitors","action":"omarchy-launch-config-editor \"$HOME/.config/niri/monitor.kdl\""},
-+  "setup.keybindings": {"icon":"","label":"Keybindings","action":"omarchy-launch-config-editor \"$HOME/.config/niri/binds.kdl\""},
-+  "setup.input": {"icon":"","label":"Input","action":"omarchy-launch-config-editor \"$HOME/.config/niri/input.kdl\""},
-   "setup.typing": {"icon":"","label":"Typing"},
-   "setup.typing.keyboard": {"icon":"","label":"Keyboard Layouts","action":"omarchy-setup-keyboard"},
-   "setup.typing.input": {"icon":"","label":"Input Methods","action":"omarchy-setup-input"},
-@@ -197,6 +201,8 @@
++  "setup.monitors": {"icon":"󰍩","label":"Monitors","action":"omarchy-launch-config-editor \"$HOME/.config/niri/monitor.kdl\""},
++  "setup.input": {"icon":"","label":"Input","when":"[[ -f ~/.config/niri/input.kdl ]]","action":"omarchy-launch-config-editor \"$HOME/.config/niri/input.kdl\""},
+   "setup.language": {"icon":"","label":"Language","provider":"languages"},
+   "setup.network": {"icon":"󰛳","label":"Network","aliases":["network"]},
+   "setup.network.dns": {"icon":"󰇖","label":"DNS","aliases":["dns"]},
+@@ -196,6 +203,8 @@
    "setup.default.agent": {"icon":"󰚩","label":"Agent","title":"Default Agent"},
    "setup.default.agent.amp": {"icon":"","iconFont":"omarchy","label":"Amp","checked":"[[ \"$(omarchy-default-agent)\" == \"amp\" ]]","action":"omarchy-default-agent amp"},
    "setup.default.agent.agy": {"icon":"","iconFont":"omarchy","label":"Antigravity","checked":"[[ \"$(omarchy-default-agent)\" == \"agy\" ]]","action":"omarchy-default-agent agy"},
@@ -955,7 +1041,7 @@ index da07a04ff..8f762b856 100644
    "setup.default.agent.claude": {"icon":"","iconFont":"omarchy","label":"Claude","checked":"[[ \"$(omarchy-default-agent)\" == \"claude\" ]]","action":"omarchy-default-agent claude"},
    "setup.default.agent.codex": {"icon":"","iconFont":"omarchy","label":"Codex","checked":"[[ \"$(omarchy-default-agent)\" == \"codex\" ]]","action":"omarchy-default-agent codex"},
    "setup.default.agent.commandcode": {"icon":"","iconFont":"omarchy","label":"Command Code","checked":"[[ \"$(omarchy-default-agent)\" == \"commandcode\" ]]","action":"omarchy-default-agent commandcode"},
-@@ -259,14 +265,17 @@
+@@ -259,14 +268,17 @@
    "setup.security.sudoless-docker": {"icon":"󰡨","label":"Sudoless Docker","when":"omarchy-sudo-docker --configured","action":"omarchy-launch-floating-terminal-with-presentation omarchy-setup-security-sudoless-docker"},
    "setup.security.passwordless-sudo": {"icon":"󰟵","label":"Passwordless Sudo","action":"omarchy-launch-floating-terminal-with-presentation omarchy-sudo-passwordless"},
    "setup.config.git": {"icon":"","label":"Git","action":"omarchy-launch-floating-terminal-with-presentation omarchy-setup-git"},
@@ -976,7 +1062,7 @@ index da07a04ff..8f762b856 100644
    "install.ai": {"icon":"󱚤","label":"AI"},
    "install.service": {"icon":"","label":"Service"},
    "install.development": {"icon":"󰵮","label":"Development"},
-@@ -287,7 +296,7 @@
+@@ -287,7 +299,7 @@
    "install.terminal": {"icon":"","label":"Terminal"},
    "install.tui": {"icon":"","label":"TUI","action":"omarchy-launch-floating-terminal-with-presentation omarchy-tui-install"},
    "install.windows": {"icon":"󰍲","label":"Windows","when":"omarchy-hw-x86","disabled":"[[ -f $HOME/.local/share/applications/windows-vm.desktop ]]","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy-windows-vm install'"},
@@ -985,7 +1071,7 @@ index da07a04ff..8f762b856 100644
    "install.preinstalls": {"icon":"󰏓","label":"Preinstalls","disabled":"[[ ! -f $HOME/.local/state/omarchy/preinstalls-removed ]]","action":"omarchy-launch-floating-terminal-with-presentation omarchy-install-preinstalls"},
    "install.browser.chrome": {"icon":"","label":"Chrome","disabled":"omarchy-pkg-present google-chrome","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy-install-browser chrome'"},
    "install.browser.edge": {"icon":"󰇩","label":"Edge","when":"omarchy-hw-x86","disabled":"omarchy-pkg-present microsoft-edge-stable-bin","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy-install-browser edge'"},
-@@ -360,7 +369,8 @@
+@@ -363,7 +375,8 @@
    "install.development.elixir.phoenix": {"icon":"","label":"Phoenix","disabled":"compgen -G \"$HOME/.mix/archives/phx_new*\"","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy-install-dev-env phoenix'"},
  
    // Remove
@@ -993,9 +1079,9 @@ index da07a04ff..8f762b856 100644
 +  // Same xdg-terminal-exec fallback as install.package above.
 +  "remove.package": {"icon":"󰣇","label":"Package","action":"if command -v xdg-terminal-exec >/dev/null 2>&1; then xdg-terminal-exec --app-id=org.omarchy.terminal omarchy-pkg-remove; else omarchy-launch-floating-terminal-with-presentation omarchy-pkg-remove; fi"},
    "remove.ai": {"icon":"󱚤","label":"AI","title":"Remove"},
-   "remove.dictation": {"icon":"","label":"Dictation","when":"omarchy-pkg-present voxtype-bin || omarchy-pkg-present superwhisper-bin"},
+   "remove.dictation": {"icon":"","label":"Dictation","when":"omarchy-pkg-present voxtype-bin || omarchy-pkg-present superwhisper-bin || omarchy-pkg-present hex-bin"},
    "remove.service": {"icon":"","label":"Services","title":"Remove"},
-@@ -446,10 +456,10 @@
+@@ -451,10 +464,10 @@
    "update.channel.rc": {"icon":"🟡","label":"RC","checked":"[[ \"$(omarchy-channel-current)\" == \"rc\" ]]","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy-channel-set rc'"},
    "update.channel.edge": {"icon":"🟠","label":"Edge","checked":"[[ \"$(omarchy-channel-current)\" == \"edge\" ]]","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy-channel-set edge'"},
    "update.channel.dev": {"icon":"🔴","label":"Dev","checked":"[[ \"$(omarchy-channel-current)\" == \"dev\" ]]","action":"omarchy-launch-floating-terminal-with-presentation 'omarchy-channel-set dev'"},
@@ -1181,22 +1267,22 @@ index d2c03e91e..49094c203 100644
      id: card
      x: root.morphed(root.morphFrom.x, root.cardOrigin.x)
 diff --git a/shell/Ui/OpticalGlyph.qml b/shell/Ui/OpticalGlyph.qml
-index ea2fdeba3..f8288d3b2 100644
+index a38fe9093..0bd9a0a3f 100644
 --- a/shell/Ui/OpticalGlyph.qml
 +++ b/shell/Ui/OpticalGlyph.qml
-@@ -21,8 +21,30 @@ Item {
+@@ -29,8 +29,30 @@ Item {
    readonly property real paintedWidth: tightWidth * paintedScale
    readonly property real paintedHeight: tightHeight * paintedScale
-   readonly property real horizontalCorrection: glyph.implicitWidth / 2 - (glyphMetrics.tightBoundingRect.x + tightWidth / 2)
--  readonly property real paintedCenterX: glyph.x + (glyphMetrics.tightBoundingRect.x + tightWidth / 2) * paintedScale
--  readonly property real paintedCenterY: glyph.y + (glyph.baselineOffset + glyphMetrics.tightBoundingRect.y + tightHeight / 2) * paintedScale
+   readonly property real horizontalCorrection: glyph.implicitWidth / 2 - (root.ink.x + tightWidth / 2)
+-  readonly property real paintedCenterX: glyph.x + (root.ink.x + tightWidth / 2) * paintedScale
+-  readonly property real paintedCenterY: glyph.y + (glyph.baselineOffset + root.ink.y + tightHeight / 2) * paintedScale
 +  // The ink centre, in this item's coordinates, *after* the rotation above has
 +  // been applied. Callers (BarIconButton) use these to line the glyph up on the
 +  // bar; reporting the unrotated point made a rotated glyph (the pocket's mark
 +  // turns 90 degrees when it opens) read as off-centre by the offset between
 +  // the two.
-+  readonly property real _inkCenterX: glyph.x + (glyphMetrics.tightBoundingRect.x + tightWidth / 2) * paintedScale
-+  readonly property real _inkCenterY: glyph.y + (glyph.baselineOffset + glyphMetrics.tightBoundingRect.y + tightHeight / 2) * paintedScale
++  readonly property real _inkCenterX: glyph.x + (root.ink.x + tightWidth / 2) * paintedScale
++  readonly property real _inkCenterY: glyph.y + (glyph.baselineOffset + root.ink.y + tightHeight / 2) * paintedScale
 +  readonly property real _rotationRadians: root.rotation * Math.PI / 180
 +  readonly property real paintedCenterX: {
 +    if (root.rotation === 0) return _inkCenterX
@@ -1260,10 +1346,10 @@ index e0b3c322b..ded86cfa3 100644
    Connections {
      target: Quickshell
 diff --git a/shell/plugins/agents/Panel.qml b/shell/plugins/agents/Panel.qml
-index 33a0627ab..4c56df006 100644
+index 480408617..9b3f16cde 100644
 --- a/shell/plugins/agents/Panel.qml
 +++ b/shell/plugins/agents/Panel.qml
-@@ -1490,12 +1490,16 @@ Panel {
+@@ -1988,12 +1988,16 @@ Panel {
        }
      }
  
@@ -1283,7 +1369,7 @@ index 33a0627ab..4c56df006 100644
  
        Item {
          width: parent.width
-@@ -1509,36 +1513,51 @@ Panel {
+@@ -2007,36 +2011,51 @@ Panel {
            text: Commons.I18n.t("agents.balance")
            color: root.foreground
            font.family: root.fontFamily
@@ -1340,7 +1426,7 @@ index 33a0627ab..4c56df006 100644
          text: root.balanceDetailText(section.balance)
          color: root.dim
          font.family: root.fontFamily
-@@ -2037,17 +2056,18 @@ Panel {
+@@ -2535,17 +2554,18 @@ Panel {
        markers: compact.scoped
      }
  
@@ -1364,7 +1450,7 @@ index 33a0627ab..4c56df006 100644
      Text {
        id: compactValue
        width: Math.ceil(compactValueMetrics.advanceWidth)
-@@ -2055,8 +2075,12 @@ Panel {
+@@ -2553,8 +2573,12 @@ Panel {
        anchors.verticalCenter: parent.verticalCenter
        textFormat: Text.PlainText
        horizontalAlignment: Text.AlignRight
@@ -1435,7 +1521,7 @@ index 25b11cf54..0b844b7aa 100644
        "refreshIntervalSec": 900,
        "syncMode": "Off",
 diff --git a/shell/plugins/background/Background.qml b/shell/plugins/background/Background.qml
-index a05f110cf..88db8ec53 100644
+index 1b785e0c4..56bdf1428 100644
 --- a/shell/plugins/background/Background.qml
 +++ b/shell/plugins/background/Background.qml
 @@ -55,6 +55,27 @@ Item {
@@ -1466,7 +1552,7 @@ index a05f110cf..88db8ec53 100644
    function isVideo(path) {
      return Util.isVideoPath(path)
    }
-@@ -248,7 +269,15 @@ Item {
+@@ -291,7 +312,15 @@ Item {
      id: readlinkProc
      command: ["readlink", "-f", root.currentBackgroundLink]
      stdout: StdioCollector {
@@ -1483,16 +1569,23 @@ index a05f110cf..88db8ec53 100644
      }
    }
  
-@@ -415,6 +444,7 @@ Item {
+@@ -468,7 +497,13 @@ Item {
+         constrainDecode: true
+         decodeSize: panel.decodeSize(root.displayedBackground)
          onFailedChanged: if (failed) root.recoverBackground(path)
-         onReadyChanged: {
-           panel.readyFrames = 0
+-        onReadyChanged: panel.readyFrames = 0
++        onReadyChanged: {
++          panel.readyFrames = 0
++          // Ours: the theme cover holds until every screen has painted one frame.
 +          if (ready) root.paintedOnce = true
-           if (ready && root.finishingTransition) {
-             root.incomingBackground = ""
-             root.oldBackground = ""
++          // Upstream moved the transition teardown into maybeFinishTransition();
++          // the handler above already calls it, so only the flag stays here.
++        }
+       }
+ 
+       Image {
 diff --git a/shell/plugins/bar/Bar.qml b/shell/plugins/bar/Bar.qml
-index d89fe9752..eab5292af 100644
+index af39ddf27..d1aeee9e6 100644
 --- a/shell/plugins/bar/Bar.qml
 +++ b/shell/plugins/bar/Bar.qml
 @@ -2,6 +2,7 @@ import Quickshell
@@ -1579,8 +1672,8 @@ index d89fe9752..eab5292af 100644
      return monitor ? String(monitor.name || "") : ""
    }
  
-@@ -1714,8 +1759,16 @@ Item {
-     visible: !remapGuard.remapping && (cutoutWaitOver || !cutoutPending)
+@@ -1723,8 +1768,16 @@ Item {
+     visible: cutoutWaitOver || !cutoutPending
      // An explicit zone instead of Auto: the reserved area stays the strip's
      // thickness though the window spans its screen.
 +    //
@@ -1597,10 +1690,23 @@ index d89fe9752..eab5292af 100644
  
      // While this window's widget or bar-move drag is live, the whole surface
      // takes input (mask below), so the pointer never leaves the bar surface
-@@ -1789,6 +1842,21 @@ Item {
-     WlrLayershell.namespace: "omarchy-bar"
-     WlrLayershell.layer: WlrLayer.Top
+@@ -1795,10 +1848,28 @@ Item {
  
+     // Whether the active workspace on this screen holds a real fullscreen
+     // window, which fades the bar out.
+-    readonly property bool underFullscreen: {
+-      var monitor = Hyprland.monitorFor(screen)
+-      var workspace = monitor ? monitor.activeWorkspace : null
+-      return !!workspace && BarModel.fullscreenOn(Hyprland.toplevels.values, workspace.id)
++    //
++    // niri port: `niri msg windows` carries no fullscreen flag, so this reads
++    // the window's geometry instead. A fullscreen window's `tile_size` is
++    // exactly the output's logical size; a tiled or maximized one is smaller
++    // (measured on niri 26.04: 1600x1000 fullscreen vs 1584x936 tiled on a
++    // 3200x2000 output at scale 2.0). Niri.toplevels does not expose geometry,
++    // so ask the focused output once per screen rather than per bar.
++    readonly property bool underFullscreen: Niri.fullscreenOn(screen)
++
 +    // niri port: hand niri the strip's own rounded rect as the blur region. The
 +    // surface spans its screen (so the exclusive zone and the drag input region
 +    // keep working), which on Hyprland is harmless because `ignore_alpha` keeps
@@ -1614,13 +1720,17 @@ index d89fe9752..eab5292af 100644
 +      // own antialiased rounded silhouette rather than outlining it.
 +      item: barBlurAnchor
 +      radius: Math.max(0, root.effectiveCornerRadius - 2)
-+    }
-+
+     }
+ 
      // Idle, only the strip takes input, so the clear expanse passes clicks
-     // through to the windows and desktop below.
-     mask: dragActive ? null : stripInputRegion
-@@ -1798,17 +1866,42 @@ Item {
+@@ -1815,21 +1886,48 @@ Item {
        item: barStrip
+     }
+ 
++    // Upstream's empty region for the fullscreen case: it takes every click and
++    // lets none through, so the faded strip cannot swallow the pointer.
+     Region {
+       id: noInputRegion
      }
  
 +    // A stationary stand-in at the strip's resting geometry, declared before the
@@ -2043,7 +2153,7 @@ index b803e7f4b..02fc7a4f5 100644
        font.pixelSize: Style.font.body
        elide: Text.ElideRight
 diff --git a/shell/plugins/bar/widgets/Tray.qml b/shell/plugins/bar/widgets/Tray.qml
-index cb9115e53..55c337b5a 100644
+index ff00f8de6..a0b0bf0b7 100644
 --- a/shell/plugins/bar/widgets/Tray.qml
 +++ b/shell/plugins/bar/widgets/Tray.qml
 @@ -164,7 +164,26 @@ BarWidget {
@@ -2073,7 +2183,7 @@ index cb9115e53..55c337b5a 100644
 +    return value.indexOf("image://") === 0 ? value : ""
    }
  
-   // Symbolic icons ship a fixed fill (often near-white) that the host is meant
+   // Symbolic icons ship a fixed fill (light or dark) that the host is meant
 @@ -519,13 +538,17 @@ BarWidget {
            }
  
@@ -2158,7 +2268,7 @@ index cb9115e53..55c337b5a 100644
                  font.family: root.fontFamily
                  font.pixelSize: Style.font.bodySmall
 diff --git a/shell/plugins/bar/widgets/Workspaces.qml b/shell/plugins/bar/widgets/Workspaces.qml
-index d1892541b..cc0126364 100644
+index 0166c4292..10a3c64cd 100644
 --- a/shell/plugins/bar/widgets/Workspaces.qml
 +++ b/shell/plugins/bar/widgets/Workspaces.qml
 @@ -67,7 +67,7 @@ BarWidget {
@@ -2341,7 +2451,7 @@ index 7189cce03..3dba92fd4 100644
        id: card
        width: root.cardWidth
 diff --git a/shell/plugins/notifications/Service.qml b/shell/plugins/notifications/Service.qml
-index fb60ce254..a37e513e0 100644
+index cdeff1112..d778547ad 100644
 --- a/shell/plugins/notifications/Service.qml
 +++ b/shell/plugins/notifications/Service.qml
 @@ -8,6 +8,7 @@ import QtQuick
@@ -2392,7 +2502,7 @@ index fb60ce254..a37e513e0 100644
      var out = []
      for (var i = 0; i < list.length; i++) {
        var ipc = list[i].lastIpcObject
-@@ -1057,7 +1062,7 @@ Item {
+@@ -1063,7 +1068,7 @@ Item {
    function focusWindow(win) {
      if (!win) return
      if (!/^0x[0-9a-f]+$/i.test(String(win.address || ""))) return
@@ -2401,7 +2511,7 @@ index fb60ce254..a37e513e0 100644
    }
  
    // A click: Omarchy's own --exec command first, then the sender's default
-@@ -1495,11 +1500,26 @@ Item {
+@@ -1509,11 +1514,26 @@ Item {
        readonly property var margins: service.marginsFor(String(modelData.name))
        readonly property bool stepAside: service.fullscreenOn(String(modelData.name))
        readonly property bool hasSomethingToShow: showingNotifications && toasts.count > 0
@@ -2537,388 +2647,6 @@ index c80c2e5c4..bab163517 100644
            elide: Text.ElideRight
            maximumLineCount: 1
          }
-diff --git a/shell/plugins/panels/monitor/Panel.qml b/shell/plugins/panels/monitor/Panel.qml
-index a26fbd5b0..6c5a8f0ee 100644
---- a/shell/plugins/panels/monitor/Panel.qml
-+++ b/shell/plugins/panels/monitor/Panel.qml
-@@ -28,6 +28,24 @@ Panel {
-   property var displays: []
-   property int enabledDisplayCount: 0
- 
-+  // Resolution tiers for the internal panel, straight from
-+  // `omarchy-niri-monitor-modes list` -- the single source of truth for this
-+  // machine's modelines (see docs/local-overrides.md §4). Switching resolution on
-+  // niri means injecting a `modeline` plus the tier's scale, so the slider drives
-+  // that CLI instead of `hyprctl keyword monitor`, which the port's shim treats as a
-+  // no-op for modes. The tier you pick is also written to monitor.kdl, so what you
-+  // switch to is what you boot into; resolutionBoot is that persisted value, kept
-+  // here only to witness that the write landed.
-+  property var resolutionTiers: []
-+  property string resolutionBoot: ""
-+  property int resolutionPreviewIndex: -1
-+
-+  // Tier in effect, derived from the live mode rather than polled.
-+  readonly property string resolutionCurrentId: {
-+    var index = activeResolutionIndex()
-+    return index >= 0 ? String(resolutionTiers[index].id) : ""
-+  }
-+
-   // Carry sub-notch touchpad deltas between wheel events.
-   property real wheelAccumulator: 0
- 
-@@ -38,11 +56,19 @@ Panel {
-   //   "scale"      - 6 Button scale presets; treated as a single
-   //                  horizontal row from j/k's perspective. h/l moves
-   //                  between presets, identical to bluetooth's header.
-+  //   "resolution" - lone slider over this machine's panel tiers, h/l steps it;
-+  //                  same shape as text size, and it applies the tier's own scale.
-   //   "monitors"   - vertical display row list for enabling/disabling displays;
-   //                  j/k walks each row.
-   // Mouse hover on a target updates root state via the components' `hovered`
-   // signal so keyboard cursor and pointer share one highlight.
--  readonly property var scalePresets: ["1", "1.25", "1.6", "2", "3", "4"]
-+  // Resolution tiers are documented in pairs (docs/local-overrides.md §4), so the
-+  // presets carry those scales: 1.25 / 1.6 / 1.8 / 2 ride the four custom modelines
-+  // and 2.25 is the native tier's. `availableScales` snaps each one to a value that
-+  // divides the mode cleanly and the notch label prints that effective value, so what
-+  // the row shows is what niri gets -- e.g. 2.25 reads "2.4x" on the 4K mode (which
-+  // lands on the same 1600x1000 desktop as the others) and 1.8 stays exact at 2880.
-+  readonly property var scalePresets: ["1", "1.25", "1.6", "1.8", "2", "2.25", "3", "4"]
-   readonly property var scaleValues: {
-     for (var i = 0; i < displays.length; i++) {
-       var display = displays[i]
-@@ -77,6 +103,7 @@ Panel {
-     var list = []
-     if (brightnessAvailable) list.push("brightness")
-     list.push("textsize")
-+    if (resolutionTiers.length > 0) list.push("resolution")
-     list.push("scale")
-     if (displays.length > 1) list.push("monitors")
-     return list
-@@ -85,18 +112,21 @@ Panel {
-   function sectionCount(section) {
-     if (section === "brightness") return 0  // only the slider sentinel at -1
-     if (section === "textsize") return 0    // slider sentinel at -1, like brightness
-+    if (section === "resolution") return 0  // slider sentinel at -1, like text size
-     if (section === "scale") return scaleValues.length
-     if (section === "monitors") return displays.length
-     return 0
-   }
- 
-   function sectionIsSingleRow(section) {
--    // brightness and text size are lone sliders; scale presets sit horizontally.
--    return section === "brightness" || section === "textsize" || section === "scale"
-+    // brightness, text size and resolution are lone sliders; scale presets sit
-+    // horizontally.
-+    return section === "brightness" || section === "textsize"
-+      || section === "resolution" || section === "scale"
-   }
- 
-   function sectionFirstIndex(section) {
--    if (section === "brightness" || section === "textsize") return -1
-+    if (section === "brightness" || section === "textsize" || section === "resolution") return -1
-     return 0
-   }
- 
-@@ -169,9 +199,12 @@ Panel {
-     }
-     var count = sectionCount(focusSection)
-     if (sectionIsSingleRow(focusSection)) {
--      // brightness/text size use the -1 sentinel; scale clamps into the presets.
--      if (focusSection === "brightness" || focusSection === "textsize") selectedIndex = -1
--      else if (selectedIndex < 0 || selectedIndex >= count) selectedIndex = 0
-+      // brightness/text size/resolution use the -1 sentinel; scale clamps into the presets.
-+      if (focusSection === "scale") {
-+        if (selectedIndex < 0 || selectedIndex >= count) selectedIndex = 0
-+      } else {
-+        selectedIndex = -1
-+      }
-       return
-     }
-     if (count === 0) {
-@@ -215,6 +248,9 @@ Panel {
-       brightnessAvailable: root.brightnessAvailable,
-       focusedMonitor: root.focusedMonitor,
-       scale: root.monitorScale,
-+      resolution: root.resolutionCurrentId,
-+      resolutionBoot: root.resolutionBoot,
-+      resolutionTiers: root.resolutionTiers,
-       displays: root.displays
-     })
-   }
-@@ -224,6 +260,9 @@ Panel {
- 
-     function brightness(percent: string): string { return root.brightnessIpc(percent) }
-     function state(): string { return root.stateIpc() }
-+    // Same entry point the slider uses, for scripts and the menu: takes a tier id
-+    // from `omarchy-niri-monitor-modes list` and applies + persists it.
-+    function resolution(tier: string): string { return root.resolutionIpc(tier) }
-     function open() { root.open() }
-     function close() { root.close() }
-     function toggle() { root.toggle() }
-@@ -319,6 +358,91 @@ Panel {
-     if (!actionProc.running) actionProc.running = true
-   }
- 
-+  // ---- Resolution (this panel's modeline tiers, via one CLI) ----
-+
-+  function focusedDisplay() {
-+    for (var i = 0; i < displays.length; i++) {
-+      var display = displays[i]
-+      if (display && display.focused) return display
-+    }
-+    return null
-+  }
-+
-+  // Which tier is on screen right now, matched on the live mode's pixel geometry
-+  // (the shim reports Hyprland-shaped width/height, i.e. mode pixels, not logical).
-+  function activeResolutionIndex() {
-+    var display = focusedDisplay()
-+    if (!display || resolutionTiers.length === 0) return -1
-+    for (var i = 0; i < resolutionTiers.length; i++) {
-+      var tier = resolutionTiers[i]
-+      if (tier && tier.width === display.width && tier.height === display.height) return i
-+    }
-+    return -1
-+  }
-+
-+  // While a switch is in flight the pending tier owns the label and the knob, same
-+  // as the text-size slider's preview index.
-+  function resolutionIndexForPreview() {
-+    if (resolutionPreviewIndex >= 0 && resolutionPreviewIndex < resolutionTiers.length)
-+      return resolutionPreviewIndex
-+    var index = activeResolutionIndex()
-+    return index >= 0 ? index : 0
-+  }
-+
-+  // Just the tier's name. The scale a tier pairs with is applied on switch anyway, and the
-+  // live value is the SCALE row's job -- it stays right even when the scale is then tweaked
-+  // by hand, which a static pairing figure printed here could not.
-+  function resolutionLabel(index) {
-+    if (index < 0 || index >= resolutionTiers.length) return ""
-+    return String(resolutionTiers[index].label)
-+  }
-+
-+  // The CLI applies the tier now and writes it into monitor.kdl, so one click is
-+  // "this is my resolution" for good. Re-picking the tier only counts as a no-op
-+  // when it is also what boots, otherwise a runtime-only switch could never be
-+  // promoted.
-+  function setResolution(index) {
-+    if (index < 0 || index >= resolutionTiers.length) return
-+    var tier = resolutionTiers[index]
-+    if (!tier) return
-+    resolutionPreviewIndex = index
-+    var id = String(tier.id)
-+    if (id === resolutionCurrentId && id === resolutionBoot && !resolutionProc.running) {
-+      resolutionPreviewIndex = -1
-+      return
-+    }
-+    resolutionProc.command = ["omarchy-niri-monitor-modes", "set", id]
-+    if (!resolutionProc.running) resolutionProc.running = true
-+  }
-+
-+  function stepResolution(delta) {
-+    if (resolutionTiers.length === 0) return
-+    var index = resolutionIndexForPreview() + delta
-+    if (index < 0) index = 0
-+    if (index > resolutionTiers.length - 1) index = resolutionTiers.length - 1
-+    setResolution(index)
-+  }
-+
-+  function refreshResolution() {
-+    if (!resolutionStateProc.running) resolutionStateProc.running = true
-+  }
-+
-+  function resolutionIpc(tier) {
-+    for (var i = 0; i < resolutionTiers.length; i++) {
-+      if (String(resolutionTiers[i].id) !== String(tier)) continue
-+      setResolution(i)
-+      return "ok"
-+    }
-+    return "unknown tier: " + tier
-+  }
-+
-+  // Drop the preview once the mode list agrees with the tier we asked for.
-+  function clearResolutionPreviewIfSettled() {
-+    if (resolutionPreviewIndex < 0) return
-+    var index = activeResolutionIndex()
-+    if (index === resolutionPreviewIndex) resolutionPreviewIndex = -1
-+  }
-+
-   // ---- Text size (shell base font + GTK text-scaling, via one CLI) ----
-   function nearestTextStop(px) {
-     var best = 0
-@@ -359,7 +483,10 @@ Panel {
-   implicitWidth: button.implicitWidth
-   implicitHeight: button.implicitHeight
- 
--  Component.onCompleted: refresh()
-+  Component.onCompleted: {
-+    refresh()
-+    refreshResolution()
-+  }
- 
-   // KeyboardPanel primes focus at open-time, so SUPER-bound IPC summons land
-   // with j/k ready to navigate. Keep a default landing point, but don't paint
-@@ -367,6 +494,7 @@ Panel {
-   onOpenedChanged: {
-     if (opened) {
-       refresh()
-+      refreshResolution()
-       if (brightnessAvailable) {
-         focusSection = "brightness"
-         selectedIndex = -1
-@@ -379,7 +507,10 @@ Panel {
-   }
- 
-   onBrightnessAvailableChanged: clampCursor()
--  onDisplaysChanged: clampCursor()
-+  onDisplaysChanged: {
-+    clampCursor()
-+    clearResolutionPreviewIfSettled()
-+  }
-   onScaleValuesChanged: clampCursor()
-   onVisibleSectionsChanged: clampCursor()
- 
-@@ -445,6 +576,43 @@ Panel {
-     onRunningChanged: if (!running) root.refresh()
-   }
- 
-+  // The panel's own tier table, read once on open (and after a write). The tier in
-+  // effect is derived from the display geometry instead of polled: a mode change
-+  // lands in `displays` through the regular state refresh, so there is nothing here
-+  // to keep in sync.
-+  Process {
-+    id: resolutionStateProc
-+    command: ["omarchy-niri-monitor-modes", "list"]
-+    stdout: StdioCollector {
-+      waitForEnd: true
-+      onStreamFinished: {
-+        var parsed = null
-+        try {
-+          parsed = JSON.parse(String(text || ""))
-+        } catch (e) {
-+          parsed = null
-+        }
-+        if (!parsed || !parsed.tiers) return
-+        root.resolutionTiers = parsed.tiers
-+        root.resolutionBoot = String(parsed.boot || "")
-+        root.clearResolutionPreviewIfSettled()
-+        root.clampCursor()
-+      }
-+    }
-+  }
-+
-+  Process {
-+    id: resolutionProc
-+    stdout: StdioCollector { waitForEnd: true }
-+    onRunningChanged: {
-+      if (running) return
-+      root.clearResolutionPreviewIfSettled()
-+      root.refresh()
-+      // `set` also rewrites monitor.kdl, so re-read which tier is persisted.
-+      root.refreshResolution()
-+    }
-+  }
-+
-   // Applies text size via the CLI, which rewrites the shell override file;
-   // Style picks the new base-size up through its own file watch, so there's
-   // nothing to refresh here.
-@@ -512,6 +680,7 @@ Panel {
-         else if (dx !== 0) {
-           if (root.focusSection === "brightness") root.adjustBrightness(dx * 5)
-           else if (root.focusSection === "textsize") root.adjustTextSize(dx)
-+          else if (root.focusSection === "resolution") root.stepResolution(dx)
-           else if (root.focusSection === "scale") root.moveCursorH(dx)
-         }
-       }
-@@ -738,6 +907,86 @@ Panel {
-             }
-           }
- 
-+          // ---------- Resolution ----------
-+          // Same shape as TEXT SIZE: a notched slider over a fixed table, applying
-+          // on release (each notch is a full modeset, so dragging must not fire one
-+          // per pixel). The tier's own scale rides along -- 3200x2000@2.0,
-+          // 2880x1800@1.8 and 2560x1600@1.6 all land on a 1600x1000 logical desktop --
-+          // and the pick is written to monitor.kdl, so it is also the boot value.
-+          PanelSeparator {
-+            visible: root.resolutionTiers.length > 0
-+            foreground: root.bar.foreground
-+          }
-+
-+          Column {
-+            visible: root.resolutionTiers.length > 0
-+            width: parent.width
-+            spacing: Style.space(6)
-+
-+            Item {
-+              width: parent.width
-+              implicitHeight: Math.max(resolutionHeader.implicitHeight, resolutionValue.implicitHeight)
-+
-+              PanelSectionHeader {
-+                id: resolutionHeader
-+                text: Commons.I18n.t("monitor.resolution")
-+                foreground: root.bar.foreground
-+                fontFamily: root.bar.fontFamily
-+                anchors.left: parent.left
-+                anchors.verticalCenter: parent.verticalCenter
-+              }
-+
-+              Text {
-+                id: resolutionValue
-+                textFormat: Text.PlainText
-+                text: root.resolutionLabel(resolutionSlider.dragging
-+                                           ? Math.round(resolutionSlider.liveValue)
-+                                           : root.resolutionIndexForPreview())
-+                color: Qt.darker(root.bar.foreground, 1.4)
-+                font.family: root.bar.fontFamily
-+                font.pixelSize: Style.font.caption
-+                font.bold: true
-+                anchors.right: parent.right
-+                anchors.rightMargin: Style.space(6)
-+                anchors.verticalCenter: parent.verticalCenter
-+              }
-+            }
-+
-+            CursorSurface {
-+              id: resolutionRow
-+              width: parent.width
-+              height: resolutionSlider.implicitHeight + Style.spacing.controlGap
-+              hasCursor: root.cursorActive && root.focusSection === "resolution" && root.selectedIndex === -1
-+              onHasCursorChanged: if (hasCursor) root.ensureCursorVisible(resolutionRow)
-+              foreground: root.bar.foreground
-+              outline: true
-+
-+              PanelSlider {
-+                id: resolutionSlider
-+                bar: root.bar
-+                anchors.fill: parent
-+                anchors.leftMargin: Style.space(6)
-+                anchors.rightMargin: Style.space(6)
-+                minimum: 0
-+                maximum: Math.max(0, root.resolutionTiers.length - 1)
-+                step: 1
-+                integer: true
-+                tickCount: root.resolutionTiers.length
-+                value: root.resolutionIndexForPreview()
-+                onReleased: function(v) { root.setResolution(Math.round(v)) }
-+              }
-+
-+              HoverHandler {
-+                onHoveredChanged: if (hovered && !root.reflowingText) {
-+                  root.cursorActive = true
-+                  root.focusSection = "resolution"
-+                  root.selectedIndex = -1
-+                }
-+              }
-+            }
-+
-+          }
-+
-           // ---------- Scale ----------
-           PanelSeparator {
-             foreground: root.bar.foreground
 diff --git a/shell/plugins/panels/power/Panel.qml b/shell/plugins/panels/power/Panel.qml
 index 976bc8ee2..a5985df11 100644
 --- a/shell/plugins/panels/power/Panel.qml
@@ -3164,7 +2892,7 @@ index 66f399f52..8693980ed 100644
  
    // The command a terminal entry runs, without the field codes it leaves for a
 diff --git a/shell/shell.qml b/shell/shell.qml
-index 4de346dd5..3001cfc5a 100644
+index d87c72cd2..e2fa7020c 100644
 --- a/shell/shell.qml
 +++ b/shell/shell.qml
 @@ -4,6 +4,7 @@ import QtQml.Models
@@ -3175,7 +2903,7 @@ index 4de346dd5..3001cfc5a 100644
  
  import qs.Commons
  import qs.Commons as Commons
-@@ -237,6 +238,18 @@ ShellRoot {
+@@ -238,6 +239,18 @@ ShellRoot {
      if ("pluginRegistry" in target) target.pluginRegistry = shell.pluginRegistryFor(manifest)
      if ("barConfig" in target) target.barConfig = shell.barConfigFor(manifest)
      shell.bar = target
@@ -3194,7 +2922,7 @@ index 4de346dd5..3001cfc5a 100644
    }
  
    Component {
-@@ -276,6 +289,48 @@ ShellRoot {
+@@ -277,6 +290,48 @@ ShellRoot {
      }
    }
  
@@ -3410,3 +3138,99 @@ index bb2b1c1bf..3a09a9ebb 100755
 +
 +flock -u 8
 +exec 8>&-
+diff --git a/test/shell.d/notifications/logic.cjs b/test/shell.d/notifications/logic.cjs
+index 66a56312b..30307784e 100644
+--- a/test/shell.d/notifications/logic.cjs
++++ b/test/shell.d/notifications/logic.cjs
+@@ -313,7 +313,15 @@ function fn(name) {
+   }
+   return text.replace(/^( *function \w+\([^)]*\))\s*:\s*\w+/, '$1')
+ }
++// The niri port routes window focus through Niri.dispatch(). Every fixture that
++// stubs Hyprland gets the same stub under the Niri name, so a body written
++// either way resolves without each call site having to know which it is.
++function hydrate(scope) {
++  if (scope.Niri === undefined && scope.Hyprland !== undefined) scope.Niri = scope.Hyprland
++  return scope
++}
+ function runIn(scope, ...names) {
++  hydrate(scope)
+   vm.createContext(scope)
+   vm.runInContext(names.map(fn).join('\n'), scope)
+   return scope
+diff --git a/test/shell.d/overlay-window-test.sh b/test/shell.d/overlay-window-test.sh
+index 10ca2d48e..2a8420131 100644
+--- a/test/shell.d/overlay-window-test.sh
++++ b/test/shell.d/overlay-window-test.sh
+@@ -53,7 +53,9 @@ reveals.shift()()
+ assert(!content.contentRevealed, 'a close or screen loss cancels a pending reveal')
+ 
+ const focusedScreenBody = /function focusedScreen\(\) \{([\s\S]*?)\n  \}/.exec(overlay)[1]
+-const focusedScreen = new Function('Hyprland', 'Quickshell', focusedScreenBody)
++// The niri port reads Niri.focusedMonitor instead of Hyprland's; the extracted
++// body is evaluated with whatever name it actually references.
++const focusedScreen = new Function('Niri', 'Quickshell', focusedScreenBody)
+ const external = { name: 'DP-1', width: 1920, height: 1080 }
+ assertEqual(focusedScreen({ focusedMonitor: { name: 'DP-1' } }, { screens: [screen, external] }), external,
+   'overlay selects the focused output')
+@@ -64,15 +66,18 @@ assertEqual(focusedScreen({ focusedMonitor: null }, { screens: [] }), null,
+ 
+ const shownHandler = /onShownChanged: \{([\s\S]*?)\n  \}/.exec(overlay)[1]
+ let refreshed = 0
+-const Hyprland = { refreshMonitors() { refreshed++ } }
+-const changeShown = new Function('shown', 'focusedScreen', 'Hyprland', `let targetScreen = null; ${shownHandler}; return targetScreen`)
+-assertEqual(changeShown(false, () => external, Hyprland), null, 'closing drops the previous screen reference')
++// The niri port calls Niri.refreshMonitors(); Hyprland is kept as an alias so
++// the fixture reads either way without caring which singleton the shell uses.
++const Niri = { refreshMonitors() { refreshed++ } }
++const Hyprland = Niri
++const changeShown = new Function('shown', 'focusedScreen', 'Niri', `let targetScreen = null; ${shownHandler}; return targetScreen`)
++assertEqual(changeShown(false, () => external, Niri), null, 'closing drops the previous screen reference')
+ assertEqual(refreshed, 0, 'closing does not refresh monitor data')
+-assertEqual(changeShown(true, () => screen, Hyprland), screen, 'reopening selects a current screen')
++assertEqual(changeShown(true, () => screen, Niri), screen, 'reopening selects a current screen')
+ assertEqual(refreshed, 1, 'opening refreshes monitor scales after a live change while closed')
+ const scaleHandler = /onDevicePixelRatioChanged: ([^\n]+)/.exec(overlay)[1]
+-const changeScale = new Function('shown', 'Hyprland', scaleHandler)
+-changeScale(false, Hyprland)
++const changeScale = new Function('shown', 'Niri', scaleHandler)
++changeScale(false, Niri)
+ assertEqual(refreshed, 1, 'scale changes on hidden windows do not refresh monitor data')
+ const changedScreen = { name: 'eDP-1', width: 960, height: 600 }
+ assert(!ready(true, true, 960, 600, changedScreen, monitor, 2),
+diff --git a/test/shell.d/system-power-test.sh b/test/shell.d/system-power-test.sh
+index 5cd98ed8b..c0260206c 100755
+--- a/test/shell.d/system-power-test.sh
++++ b/test/shell.d/system-power-test.sh
+@@ -10,6 +10,11 @@ call_log="$test_tmp/calls.log"
+ mkdir -p "$mock_bin"
+ export PATH="$mock_bin:$PATH" CALL_LOG="$call_log" OMARCHY_PATH="$ROOT"
+ export HYPRLAND_INSTANCE_SIGNATURE="test-session"
++# The niri branch of `omarchy-system` keys on XDG_CURRENT_DESKTOP and connects
++# over NIRI_SOCKET. Both are pinned to mocks so a run on a real niri session
++# cannot log the user out (measured happening on 2026-10-29), and so the worker
++# reaches the mocked `niri`, not the live compositor.
++export XDG_CURRENT_DESKTOP="niri" NIRI_SOCKET="$test_tmp/niri.sock"
+ export EXPECTED_PATH="$PATH" EXPECTED_OMARCHY_PATH="$OMARCHY_PATH"
+ 
+ cat >"$mock_bin/systemd-run" <<'SH'
+@@ -40,7 +45,7 @@ trap 'rm -f "$CALL_LOG.inhibited"' EXIT
+ "$@"
+ SH
+ 
+-for command in uwsm omarchy-state omarchy-hyprland-window-close-all omarchy-osd omarchy-notification-send sleep timeout systemctl; do
++for command in uwsm niri omarchy-state omarchy-hyprland-window-close-all omarchy-osd omarchy-notification-send sleep timeout systemctl; do
+   cat >"$mock_bin/$command" <<'SH'
+ #!/bin/bash
+ 
+@@ -67,6 +72,10 @@ case $command in
+     touch "$CALL_LOG.grace"
+     exit "$status"
+     ;;
++  niri)
++    [[ -f $CALL_LOG.grace ]] || exit 2
++    [[ ${FAIL_EXIT:-false} != "true" ]]
++    ;;
+   uwsm | systemctl)
+     [[ -f $CALL_LOG.grace ]] || exit 2
+     if [[ $1 == "poweroff" ]]; then
