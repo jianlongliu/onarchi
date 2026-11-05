@@ -22,6 +22,7 @@
 - 8.23 全量 FF 到 `bc220e70`（2026-10-28）：846 提交、32 冲突、补丁失效
 - 8.24 全量 FF 到 `6194f4606`（quattro tip，2026-11-05）：257 提交、10 冲突、上游拆 sudo 脚手架
 - 8.25 dock 在 niri 上接通（2026-11-05）：垫片 `o.workspace_mode`、`tiledLayout`、dock 两文件移植
+- 8.26 Display 面板分辨率为空（2026-11-05）：垫片格式 + 子进程 socket
 - 16. **GitHub 发布流程（2026-08-25 建立）**：移植差分推到 pub 仓库
 - 8. **A+C 落地 / 更新覆盖层（2026-08-24）**：本节最后两项。
 
@@ -716,5 +717,44 @@ dock 三角色循环 `dwindle → scrolling → floating` 实测文件正确写�
 改成 `dwindle` 打破了「切一次回默认、永远停在默认」的死循环。4 处 `return [] / {}` 的
 `TypeError` 同样保留 —— 它们在 socket 读不到时才会触发。
 
-**补丁最终指纹**：**45 文件 / 129 hunk / 3236 行、md5 `1dc2d9dac04d46ae85eed9e6f0cfac46`**，
+**补丁最终指纹**：**47 文件 / 131 hunk / 3269 行、md5 `10c291270151df9ac898472dcc5106eb`**，
 反向（等于工作区）与正向（干净 `6194f4606` 可重放）两项检查都过。
+
+### 8.26 Display 面板的分辨率行为什么是空的（2026-11-05）
+
+上游新面板（`shell/plugins/panels/monitor/`，不是我们退役的那份自写面板）里，
+BRIGHTNESS / SCALE / RESOLUTION 三行全都不显示，只剩 TEXT SIZE。两个独立原因叠在一起：
+
+**原因一：垫片把 niri 的模式原样透传，而所有消费方只认字符串。**
+
+`omarchy-monitor-state` 读 `hyprctl monitors` 的 `availableModes`。Hyprland 的拼法是
+`"3200x2000@59.97Hz"`；垫片给的是 niri 的 `[{width,height,refresh_rate}, …]`。
+上游 `Model.resolutionOptions()` 用 `/^(\d+)x(\d+)@/` 逐条解析，`String({...})` 是
+`"[object Object]"`，一条都匹配不上 ⇒ `sizes` 为空 ⇒ 返回 `[]` ⇒ 面板把整段
+`resolution` 隐藏（`resolutions.length > 1 ? resolutions : []`）。**垫片输出自己的格式自洽，
+所以单看 `omarchy-monitor-state` 完全正常，很难想到是格式契约不一致。**
+改：垫片输出 Hyprland 的字符串拼法。
+
+**原因二：壳的子进程拿着失效的 `NIRI_SOCKET`。**
+
+niri 每重启一次 socket 名就变（`niri.wayland-1.<pid>.sock`）。登录后一直活着的 shell
+继承的是旧值，于是它 spawn 的 `niri msg` 全部连不上、静默失败。`Niri.qml` 早就为此写了
+探测（取 runtime 目录里 pid 最大的那个 socket），但只给自己内部的进程用；
+面板的 `stateProc` 没接，所以读不到数据。
+改：`Niri.qml` 把探测结果暴露成 `socketEnvironment`，`panels/monitor/Panel.qml` 与
+`bar/widgets/KeyboardLayout.qml`（`hyprctl -j devices`，同样查 compositor）都接上。
+
+**不是所有 `hyprctl` 调用方都需要改**：`Style.qml` / `Bar.qml` 的 `getoption`、
+`nightlight` 的 `hyprsunset` 都由垫片返回写死的默认值，根本不问 niri。
+
+**排查用的判据**（以后怀疑同一问题时）：
+```bash
+NIRI_SOCKET=<壳进程 environ 里那个> hyprctl -j monitors   # 空数组 = socket 是死的
+ls /run/user/1000/niri.*.sock                            # 真实的是哪个
+tr '\0' '\n' < /proc/$(pgrep -x quickshell)/environ | grep NIRI_SOCKET
+```
+
+**2K 档仍然不在**：`niri msg outputs` 只报 3200x2000（自有 modeline）与 3840x2400（EDID 原生）。
+2560×1600 / 2880×1800 / 1920×1200 原本由退役的 `omarchy-niri-monitor-modes` 垫片在**运行时注入
+modeline** 提供，不在 niri 的模式列表里，所以新面板看不到。要恢复得接回那套机制；
+用户 2026-11-05 决定「先这样」。

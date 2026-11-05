@@ -212,8 +212,8 @@ The port currently tracks upstream `quattro` at **`6194f4606`** (2026-11-04), fa
 `bc220e70` on 2026-11-05 — 257 commits, 1384 files, +50142/−28245. `bc220e70` was content-identical
 to `v4.5.0-rc2`, so that merge brought the 4.5 release line in; note that the `v4.5.0` tag itself
 sits on the `v4-5-0` release branch, not on `quattro`, and this port follows `quattro` only.
-The current `niri.patch` has **45 files / 129 hunks / 3236 lines**, md5
-`1dc2d9dac04d46ae85eed9e6f0cfac46` (untracked overlay files are separate).
+The current `niri.patch` has **47 files / 131 hunks / 3269 lines**, md5
+`10c291270151df9ac898472dcc5106eb` (untracked overlay files are separate).
 
 Upstream still has **no niri support**: `grep -ri niri shell/ bin/` returns nothing at `6194f4606`,
 while Hyprland coupling stands at 11 files / 36 sites. Everything below exists because of that.
