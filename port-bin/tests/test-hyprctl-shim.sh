@@ -283,5 +283,21 @@ check "and nothing was remembered behind the user's back" \
   "$([[ -e $XDG_STATE_HOME ]] && echo written || echo nothing)" nothing
 
 echo
+echo "== o.workspace_mode: recorded, not applied (niri has no per-workspace layout)"
+: >"$NIRI_ACTIONS"
+out=$(hyprctl eval 'o.workspace_mode({ workspace = "3", mode = "floating" })' 2>&1)
+check "the call succeeds so the caller records the mode" "$?" 0
+check "and no niri action is invented for it" "$(wc -l <"$NIRI_ACTIONS")" 0
+check "a malformed payload is refused" \
+  "$(hyprctl eval 'o.workspace_mode({ mode = "floating" })' >/dev/null 2>&1; echo $?)" 1
+
+echo
+echo "== tiledLayout: niri's only tiled layout is dwindle"
+check "activeworkspace reports dwindle, not tile" \
+  "$(hyprctl activeworkspace -j | jq -r '.tiledLayout')" dwindle
+check "and it answers with JSON, never a bare dictionary" \
+  "$(hyprctl activeworkspace -j | jq -r 'type')" object
+
+echo
 echo "checks=$checks failures=$failures"
 [[ $failures -eq 0 ]] || exit 1

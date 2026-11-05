@@ -164,7 +164,7 @@ def _active_workspace_by_output():
 def cmd_monitors(json_out):
     outputs = niri_json(["outputs"])
     if outputs is None:
-        return ([] if json_out else "")
+        return ("[]" if json_out else "")
     focused = _focused_output_name()
     ws_by_output = _active_workspace_by_output()
     locked = session_locked()
@@ -244,8 +244,11 @@ def _window_to_client(w):
 
 def cmd_clients(json_out):
     windows = niri_json(["windows"])
+    # Both branches must return a string: the caller does `sys.stdout.write(... + "\n")`.
+    # Returning a bare [] here raised TypeError whenever the window list was
+    # unavailable (niri socket down, output not parseable).
     if windows is None:
-        return ([] if json_out else "")
+        return ("[]" if json_out else "")
     res = [_window_to_client(w) for w in windows]
     if json_out:
         return json.dumps(res)
@@ -260,7 +263,7 @@ def cmd_clients(json_out):
 def cmd_activewindow(json_out):
     w = niri_json(["focused-window"])
     if w is None:
-        return ({} if json_out else "")
+        return ("{}" if json_out else "")
     c = _window_to_client(w)
     if json_out:
         return json.dumps(c)
@@ -282,12 +285,12 @@ def cmd_activeworkspace(json_out):
     if fw is None and ws:
         fw = ws[0]
     if fw is None:
-        return ({"id": 1, "name": "", "monitor": "", "tiledLayout": "tile", "windows": 0} if json_out else "")
+        return '{"id": 1, "name": "", "monitor": "", "tiledLayout": "dwindle", "windows": 0}' if json_out else ""
     res = {
         "id": fw.get("idx", fw.get("id", 1)),
         "name": fw.get("name") or "",
         "monitor": fw.get("output", ""),
-        "tiledLayout": "tile",
+        "tiledLayout": "dwindle",
         "windows": len([w for w in (niri_json(["windows"]) or []) if w.get("workspace_id") == fw.get("id")]),
     }
     return json.dumps(res) if json_out else f"workspace ID {res['id']} ({res['name']}) on {res['monitor']}"
@@ -658,7 +661,35 @@ def cmd_eval(payload):
         return do_dispatch(inner.group(1))
     if "hl.monitor(" in payload:
         return _eval_monitor(payload)
+    if "o.workspace_mode(" in payload:
+        return _eval_workspace_mode(payload)
     return 0  # hl.config / hl.device / hl.workspace_rule -> no-op
+
+
+def _eval_workspace_mode(payload):
+    """`o.workspace_mode({ workspace = "3", mode = "floating" })`.
+
+    Omarchy's layout cycle calls this to put one workspace into a layout. niri
+    has no per-workspace layout: a window is either tiled or floating, and
+    `switch-preset-column-width`-style modes do not exist. So there is no niri
+    action to run here, and pretending otherwise would be a lie.
+
+    What still has to happen is that the caller can tell whether the change
+    took. `bin/omarchy-hyprland-workspace-layout-toggle` fails with
+    "needs reload" when this returns non-zero, and it only records a mode when
+    the call succeeds -- so returning 0 keeps the mode file honest, and the file
+    is what `...-layout-current` reads back (Hyprland's tiledLayout cannot carry
+    "floating" at all, so that file is the only record either way).
+
+    Known gap: the mode is recorded but nothing on niri re-lays-out the windows.
+    The dock does read it, which is what makes a "floating" workspace show the
+    dock. See docs/behavior.md for the state of workspace layouts on niri.
+    """
+    m = re.search(r'workspace\s*=\s*"?([0-9]+)"?', payload)
+    mode = re.search(r'mode\s*=\s*"([a-z]+)"', payload)
+    if not m or not mode:
+        return 1
+    return 0
 
 
 def _niri_config_dir():
