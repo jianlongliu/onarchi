@@ -2152,6 +2152,22 @@ index b803e7f4b..02fc7a4f5 100644
        font.family: root.bar ? root.bar.fontFamily : Style.font.family
        font.pixelSize: Style.font.body
        elide: Text.ElideRight
+diff --git a/shell/plugins/bar/widgets/KeyboardLayout.qml b/shell/plugins/bar/widgets/KeyboardLayout.qml
+index 48f3c6511..95ca734ea 100644
+--- a/shell/plugins/bar/widgets/KeyboardLayout.qml
++++ b/shell/plugins/bar/widgets/KeyboardLayout.qml
+@@ -133,6 +133,11 @@ BarWidget {
+   Process {
+     id: queryProc
+     command: ["hyprctl", "-j", "devices"]
++    // niri port: the shim answers this from `niri msg`, so a stale
++    // NIRI_SOCKET inherited from before the compositor restarted yields an
++    // empty device list and the bar shows no layout. Niri.qml already probes
++    // for the live socket; use it.
++    environment: Niri.socketEnvironment
+     onRunningChanged: {
+       if (running) {
+         stallTimer.restart()
 diff --git a/shell/plugins/bar/widgets/Tray.qml b/shell/plugins/bar/widgets/Tray.qml
 index ff00f8de6..a0b0bf0b7 100644
 --- a/shell/plugins/bar/widgets/Tray.qml
@@ -2647,6 +2663,23 @@ index c80c2e5c4..bab163517 100644
            elide: Text.ElideRight
            maximumLineCount: 1
          }
+diff --git a/shell/plugins/panels/monitor/Panel.qml b/shell/plugins/panels/monitor/Panel.qml
+index 0e6354620..7accefc6d 100644
+--- a/shell/plugins/panels/monitor/Panel.qml
++++ b/shell/plugins/panels/monitor/Panel.qml
+@@ -686,6 +686,12 @@ Panel {
+   Process {
+     id: stateProc
+     command: ["omarchy-monitor-state"]
++    // niri port: `omarchy-monitor-state` runs `hyprctl monitors`, i.e. the PATH
++    // shim, i.e. `niri msg`. A shell that logged in before the compositor
++    // restarted still carries the dead NIRI_SOCKET it inherited, so this read
++    // failed silently and every row below the text size disappeared. Niri.qml
++    // already probes for the live socket; borrow its answer.
++    environment: Niri.socketEnvironment
+     onRunningChanged: {
+       if (running) {
+         root.readAfterActions = root.actionsDone
 diff --git a/shell/plugins/panels/power/Panel.qml b/shell/plugins/panels/power/Panel.qml
 index 976bc8ee2..a5985df11 100644
 --- a/shell/plugins/panels/power/Panel.qml

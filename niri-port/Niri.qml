@@ -370,6 +370,9 @@ QtObject {
     property string _socketPath: ""
     readonly property bool ready: root._socketPath.length > 0
     readonly property var _niriEnv: ({ "NIRI_SOCKET": root._socketPath })
+    // Same map, under a name other files may read: anything spawning `niri msg`
+    // or the hyprctl shim must override a stale NIRI_SOCKET it inherited.
+    readonly property var socketEnvironment: root._niriEnv
 
     property Process wsProcess: Process {
         id: wsProcess
