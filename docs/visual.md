@@ -611,7 +611,8 @@ tonal-spot 方案），**下放**到本机、不是照抄那台机器。全部�
 | 生成器 | `~/bin/materal-update` | 跑 matugen、映射调色板、重套主题 |
 | 钩子 | `~/.config/omarchy/hooks/theme-set.d/20-materal` | 换 theme 后重新取色 |
 | 单元 | `~/.config/systemd/user/materal-recolor.{path,service}` | 盯壁纸文件，换壁纸自动重取色 |
-| 仓库副本 | `port-bin/materal-update`、`hooks/theme-set.d/20-materal` | 随 INSTALL 第 2/5 步安装；那对 systemd 单元只在本机，未随仓库分发 |
+| 仓库副本 | `port-bin/materal-update`、`hooks/theme-set.d/20-materal` | 随 INSTALL 第 2/5 步安装 |
+| 仓库副本（2026-11-06 补齐） | `local-config/omarchy/themes/tonal-spot/`、`local-config/systemd/user/materal-recolor.{path,service}` | 主题本体此前**只在本文档里被描述、实体一直没进版本库**，2026-11-06 补收（`matugen.toml` + `colors.toml` 快照 + 三份模板 + 生成好的 `backgrounds/*.webp`，1.1M；源 PNG 不收）。那对 systemd 单元同批收进，实际部署仍由 INSTALL 手工 `cp` + `systemctl --user enable --now materal-recolor.path` |
 
 - 主题的 `backgrounds/` 是我们用 `magick … -quality 90` 从上游 `backgrounds.default/*.png` 生成的
   `.webp`（上游只发 `.default` 变体，不生成则主题没有可用壁纸）。

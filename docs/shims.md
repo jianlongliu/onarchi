@@ -468,3 +468,59 @@ ghostty 按一次 `reload_config` —— 实测够用：改配置后重载，新
 `~/.local/state/backups/.config/ghostty/config.bak-20260927`；或删掉三个 bind + 四个 ghostty keybind，
 并 `rm ~/bin/omarchy-universal-clipboard ~/bin/omarchy-sendkeys`。
 
+
+---
+
+### 屏幕取色垫片 `hyprpicker`（2026-11-06 加）
+
+**症状**：菜单 Capture → Color（`trigger.capture.color`，action 是 `pkill hyprpicker || hyprpicker -a`）
+点了就报错：
+
+```
+[CRITICAL] ext-image-copy-capture-v1 output capture is not supported, can't proceed
+```
+
+**根因**：`hyprpicker` 是 Hyprland 客户端，取色走合成器自己的截图 IPC。niri 不实现
+`ext-image-copy-capture-v1`，所以它连画面都拿不到。上游该条目**没有 `when` 保护**，所以在 niri 上
+必然失败。同一支二进制还被 `omarchy-capture-{qr,text,region}` 用 `-r -z` 调用（只为冻结画面，
+让 `grim` 截到静止内容）—— 那条链路没有 `set -e`，hyprpicker 失败不影响主流程，只是冻结失效。
+
+**修法**：PATH-first 垫片 `~/bin/hyprpicker`（仓库 `port-bin/hyprpicker`），检测到 niri 就改用
+`niri msg pick-color`，并把它的输出翻译成 hyprpicker 的口径。
+
+| hyprpicker 参数 | 垫片实现 |
+|---|---|
+| `-a/--autocopy` | 把打印出来的那行交给 `wl-copy` |
+| `-f/--format hex\|rgb\|hsl\|hsv\|cmyk` | hex 由 rgb 直接拼；hsl/hsv/cmyk 本地换算（**不是拒绝**，调用方要什么给什么） |
+| `-l/--lowercase-hex` | hex 大小写；默认大写，与 hyprpicker 一致 |
+| `-o/--output-format` | hyprpicker 的 `{0}`,`{1}`,`{2}` 替换 |
+| `-r -z -d -c -t -s -u` | **接受并忽略**（Hyprland 自己的冻结/放大镜，niri 的 picker 没有这种 UI） |
+| 取消取色 | exit 0、无输出，与 hyprpicker 一致 |
+
+**两个实现要点**
+
+- `niri msg pick-color` 的输出是 `Picked color: rgb(R, G, B)`（从 `/usr/bin/niri` 26.04 的字符串表
+  确认 —— 该包没装 IPC 文档）。正则只取三元组，多余空格兼容。
+- 壳层会带着**失效的 `NIRI_SOCKET`**（登录后 niri 重启过一次），所以垫片不信任继承来的值，
+  按 `Niri.qml` 同一判据（runtime 目录里 **pid 最大**的那个 `niri.*.sock`）自己找。
+
+**验证**：`port-bin/tests/test-hyprpicker-shim.sh` —— **18/18 绿**，假 `niri` 打印真实格式的行，
+覆盖 5 种格式、大小写、`-o` 模板、`-a` 写剪贴板、`-r -z` 容忍、取消取色、socket 探测。
+
+**回退**：`rm ~/bin/hyprpicker`（PATH 立刻回到 `/usr/bin/hyprpicker`，行为恢复成报错）。
+
+---
+
+### 顺带澄清：matugen 动态取色**不受影响**
+
+`hyprpicker` 是**屏幕取色**（点屏幕吸一个像素）；matugen 那条是**壁纸取色**（换壁纸 → 重新推导
+整套主题调色板），两条链路互不相干。后者由 `materal-update` + theme-set hook + `materal-recolor.path`
+驱动，见 `docs/visual.md` §8.10；2026-11-06 复查实测：
+
+```
+$ ~/bin/materal-update tonal-spot
+materal-update: tonal-spot already matches 【哲风壁纸】4K-4K壁纸.png; nothing to do
+```
+
+`~/.cache/materal/state.json` 记录了壁纸路径与 sha256，`colors.toml` 当天 15:13 刚重新生成过 ⇒
+工作正常。它的幂等（sha 不变就跳过）与递归保护（guard 文件）都在。

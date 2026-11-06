@@ -1,0 +1,251 @@
+#!/usr/bin/env python3
+"""hyprpicker -> niri shim.
+
+`hyprpicker` is a Hyprland client: it grabs a screenshot through the
+compositor's own IPC and, on niri, dies with
+
+    [CRITICAL] ext-image-copy-capture-v1 output capture is not supported
+
+So the menu's Capture > Color entry (and anything else reaching for the
+picker) broke the moment the port dropped Hyprland. niri has its own picker,
+`niri msg pick-color`, and this script makes it answer in hyprpicker's
+vocabulary.
+
+What `hyprpicker` gives its callers, which this has to match:
+
+  -a/--autocopy   copy the colour to the clipboard (needs wl-clipboard)
+  -f/--format     hex, rgb, hsl, hsv, cmyk
+  -l/--lowercase-hex
+  -n/--notify     desktop notification on pick
+  -q/--quiet      drop the chatter
+  -b/--no-fancy   plain output, no ANSI colouring
+
+`niri msg pick-color` prints a single line to stdout:
+
+    Picked color: rgb(R, G, B)
+
+That line is the whole contract -- confirmed from the string table of
+/usr/bin/niri 26.04, since the IPC docs are not installed with the package.
+
+Two gaps are deliberate rather than accidental:
+
+  - frozen preview (-r/--render-inactive, -z/--no-zoom, -d/--disable-preview)
+    is Hyprland's own magnifier; niri's picker has no such UI, so these flags
+    are accepted and ignored. `omarchy-capture-{qr,text,region}` pass `-r -z`
+    purely to freeze the screen under grim; they only need the freeze to be
+    *attempted* before their own capture, and grim works either way.
+  - hsl/hsv/cmyk are converted here rather than refused, so a caller that asks
+    for one still gets an answer.
+"""
+
+import os
+import re
+import shutil
+import subprocess
+import sys
+
+# niri prints this on stdout; the triple is the only part that matters.
+_PICKED = re.compile(r"rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)")
+
+
+def _env_for_niri():
+    """The socket niri is actually listening on.
+
+    A shell that logged in before the compositor restarted carries a dead
+    NIRI_SOCKET, and `niri msg` then fails against it. The live socket is the
+    one with the highest pid in the runtime dir, which is how Niri.qml picks it
+    too.
+    """
+    runtime = os.environ.get("XDG_RUNTIME_DIR") or "/run/user/%d" % os.getuid()
+    try:
+        socks = [f for f in os.listdir(runtime)
+                 if f.startswith("niri.") and f.endswith(".sock")]
+    except OSError:
+        socks = []
+    if not socks:
+        return dict(os.environ)
+
+    def pid(name):
+        # niri.<wayland-display>.<pid>.sock
+        try:
+            return int(name.split(".")[-2])
+        except (IndexError, ValueError):
+            return -1
+
+    best = max(socks, key=pid)
+    env = dict(os.environ)
+    env["NIRI_SOCKET"] = os.path.join(runtime, best)
+    return env
+
+
+def pick():
+    """Run niri's picker and return (r, g, b), or None if it was cancelled."""
+    niri = shutil.which("niri")
+    if not niri:
+        sys.stderr.write("hyprpicker: niri not found\n")
+        return None
+    try:
+        out = subprocess.run([niri, "msg", "pick-color"], capture_output=True,
+                             text=True, env=_env_for_niri()).stdout
+    except OSError as error:
+        sys.stderr.write("hyprpicker: %s\n" % error)
+        return None
+    match = _PICKED.search(out or "")
+    if not match:
+        return None
+    return int(match.group(1)), int(match.group(2)), int(match.group(3))
+
+
+def _hsl(r, g, b):
+    r, g, b = r / 255.0, g / 255.0, b / 255.0
+    high, low = max(r, g, b), min(r, g, b)
+    light = (high + low) / 2
+    if high == low:
+        return 0.0, 0.0, light * 100
+    delta = high - low
+    sat = delta / (2 - high - low) if light > 0.5 else delta / (high + low)
+    if high == r:
+        hue = ((g - b) / delta) % 6
+    elif high == g:
+        hue = (b - r) / delta + 2
+    else:
+        hue = (r - g) / delta + 4
+    return hue * 60, sat * 100, light * 100
+
+
+def _hsv(r, g, b):
+    r, g, b = r / 255.0, g / 255.0, b / 255.0
+    high, low = max(r, g, b), min(r, g, b)
+    delta = high - low
+    if delta == 0:
+        hue = 0.0
+    elif high == r:
+        hue = ((g - b) / delta) % 6
+    elif high == g:
+        hue = (b - r) / delta + 2
+    else:
+        hue = (r - g) / delta + 4
+    return hue * 60, (0 if high == 0 else delta / high) * 100, high * 100
+
+
+def _cmyk(r, g, b):
+    r, g, b = r / 255.0, g / 255.0, b / 255.0
+    key = 1 - max(r, g, b)
+    if key >= 1:
+        return 0.0, 0.0, 0.0, 100.0
+    return ((1 - r - key) / (1 - key) * 100,
+            (1 - g - key) / (1 - key) * 100,
+            (1 - b - key) / (1 - key) * 100,
+            key * 100)
+
+
+def render(rgb, fmt, lowercase_hex, output_format):
+    r, g, b = rgb
+    if fmt == "rgb":
+        values = (r, g, b)
+        default = "rgb(%d, %d, %d)" % values
+    elif fmt == "hsl":
+        values = tuple(round(v) for v in _hsl(r, g, b))
+        default = "hsl(%d, %d%%, %d%%)" % values
+    elif fmt == "hsv":
+        values = tuple(round(v) for v in _hsv(r, g, b))
+        default = "hsv(%d, %d%%, %d%%)" % values
+    elif fmt == "cmyk":
+        values = tuple(round(v) for v in _cmyk(r, g, b))
+        default = "cmyk(%d%%, %d%%, %d%%, %d%%)" % values
+    else:
+        text = "#%02x%02x%02x" % (r, g, b)
+        if not lowercase_hex:
+            text = text.upper()
+        values = (r, g, b)
+        default = text
+
+    # hyprpicker's -o substitutes {0}, {1}, ... with the format's own values.
+    if output_format:
+        out = output_format
+        for index, value in enumerate(values):
+            out = out.replace("{%d}" % index, str(value))
+        return out
+    return default
+
+
+def main(argv):
+    autocopy = False
+    fmt = "hex"
+    lowercase_hex = False
+    notify = False
+    quiet = False
+    output_format = ""
+
+    index = 0
+    while index < len(argv):
+        arg = argv[index]
+        if arg in ("-h", "--help"):
+            sys.stdout.write(__doc__)
+            return 0
+        elif arg in ("-a", "--autocopy"):
+            autocopy = True
+        elif arg in ("-l", "--lowercase-hex"):
+            lowercase_hex = True
+        elif arg in ("-n", "--notify"):
+            notify = True
+        elif arg in ("-q", "--quiet"):
+            quiet = True
+        elif arg in ("-b", "--no-fancy"):
+            pass
+        elif arg in ("-r", "--render-inactive", "-z", "--no-zoom",
+                     "-d", "--disable-preview", "-c", "--cursor", "-t",
+                     "--no-fractional"):
+            pass  # no equivalent on niri's picker; see the module docstring
+        elif arg in ("-v", "--verbose"):
+            quiet = False
+        elif arg.startswith("--format="):
+            fmt = arg.split("=", 1)[1]
+        elif arg in ("-f", "--format") and index + 1 < len(argv):
+            index += 1
+            fmt = argv[index]
+        elif arg.startswith("--format"):
+            fmt = arg.split("=", 1)[1] if "=" in arg else fmt
+        elif arg.startswith("--output-format="):
+            output_format = arg.split("=", 1)[1]
+        elif arg in ("-o", "--output-format") and index + 1 < len(argv):
+            index += 1
+            output_format = argv[index]
+        elif arg.startswith("--scale=") or arg.startswith("--radius="):
+            pass
+        elif arg in ("-s", "--scale", "-u", "--radius", "-N", "--name") \
+                and index + 1 < len(argv):
+            index += 1
+        elif arg.startswith("-"):
+            sys.stderr.write("hyprpicker: unknown option %s\n" % arg)
+            return 1
+        index += 1
+
+    rgb = pick()
+    if rgb is None:
+        # Cancelled is not an error worth a notification, and hyprpicker exits 0.
+        return 0
+
+    text = render(rgb, fmt, lowercase_hex, output_format)
+    sys.stdout.write(text + "\n")
+
+    if autocopy:
+        clip = shutil.which("wl-copy")
+        if clip:
+            try:
+                subprocess.run([clip], input=text, text=True, check=False)
+            except OSError:
+                pass
+        elif not quiet:
+            sys.stderr.write("hyprpicker: wl-copy absent, colour not copied\n")
+
+    if notify and not quiet:
+        sender = shutil.which("omarchy-notification-send")
+        if sender:
+            subprocess.run([sender, "--image", " ", "Picked %s" % text],
+                           check=False, capture_output=True)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
