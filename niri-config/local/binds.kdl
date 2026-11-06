@@ -55,8 +55,11 @@ Mod+Ctrl+Alt+D hotkey-overlay-title="Calendar" { spawn-sh "omarchy-shell shell t
 Mod+Ctrl+Shift+W hotkey-overlay-title="WeChat" { spawn "/home/<user>/bin/wechat"; }
 // Fix XWayland window-mapping wedge (NoMachine nxrunner poisons satellite).
 Ctrl+Alt+B hotkey-overlay-title="Fix XWayland" { spawn-sh "$HOME/.local/bin/fix-xwayland.sh"; }
-// Alt+Tab family lives in config.kdl's `recent-windows { binds { } }` block —
-// those actions (next-window / previous-window) are only valid there.
+// Alt+Tab is niri's own MRU switcher, bound in config.kdl's `recent-windows`
+// block. The Fathom field (shell/plugins/fathom) replaced it from 2026-11 until
+// 2026-11-06, when it was retired: it committed on Enter because niri sends no
+// key-release to a surface that grabs the keyboard after the press, which made
+// a plain Alt+Tab feel wrong.
 
 
 // Use spawn-sh to run a shell command. Do this if you need pipes, multiple commands, etc.

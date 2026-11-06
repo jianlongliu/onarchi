@@ -63,9 +63,10 @@ hotkey-overlay {
     skip-at-startup
 }
 
-// Alt+Tab family: cycle through recently used windows within the output / the same app.
-// These actions (next-window / previous-window) are only valid inside this block,
-// not in the top-level `binds` — carried over from the pre-migration config.
+// Alt+Tab family: niri's built-in MRU switcher, restored 2026-11-06 when the
+// Fathom field was retired. Alt+Tab cycles every window most-recently-used;
+// Alt+grave keeps the app-scoped variant, so two windows of the same app can be
+// reached without stepping through others.
 recent-windows {
     binds {
         Alt+Tab         { next-window scope="output"; }

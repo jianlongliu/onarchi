@@ -1017,6 +1017,16 @@ Omarchy 有两层配置，只有层1在 niri 上真正生效：
 
 ### B. 用户主动遗弃（别再提议）
 
+- **Fathom Alt-Tab（2026-11-06 退役，实验分支已归档）**：那个"窗口深度 = 新鲜度"的三维切换器
+  （`shell/plugins/fathom/`，7 个提交，分支 `experiment/fathom-alttab`）在 2026-11 试过，
+  卡在一个够不着的地方：**niri 不向"按下后抓键盘"的 surface 发送按键释放事件**，所以它只能在 Enter
+  上确认，而真正让切窗手感对的是**松开 Alt 即确认**。它还把 `hyprctl` 垫片没覆盖的截图能力用上了，
+  在 niri 上拿不到画面。退役后 Alt+Tab 回到 niri 内置 MRU（`config.kdl` 的 `recent-windows` 块，
+  `next-window scope="output"`），`Alt+grave` 保留 app 内切换。
+  归档：tag `archive/fathom-alttab-2026-11-06`（分支已删，7 个提交都在 tag 上），
+  恢复用 `git switch -c experiment/fathom-alttab archive/fathom-alttab-2026-11-06`；
+  配置插件与目录的备份在 `~/.local/state/backups/fathom-retired-20261106/`。
+  **别再提议**，除非 niri 支持把按键释放交给已抓键盘的 surface。
 - **镜像输出**：`niri msg output` 只有 `off/on/mode/scale/transform/position/vrr`，**没有 mirror** ⇒ 补不了。
 - **夜灯（日落自动那套）**：`omarchy-toggle-nightlight` / `omarchy-refresh-hyprsunset` /
   `omarchy-restart-hyprsunset` 都在，但走的是 hyprsunset（Hyprland 专有），本机也没装。
