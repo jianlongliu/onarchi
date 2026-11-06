@@ -80,9 +80,16 @@ onarchi/
 │                     + the materal-recolor units; colours come from the Omarchy theme
 │                     + materal-recolor.service/.path; copy over your own, see its README
 ├── config/       <- upstream Omarchy's default config tree, untouched (NOT this machine's)
+├── default/, etc/, applications/, themes/, manual/, migrations/
+│                     <- the rest of upstream Omarchy's tree, carried so the shell and its
+│                        migrations run against the same source the port was built from
+├── test/         <- upstream's suites (test/cli, test/shell, acceptance.d) + this port's fixes
+├── agents/       <- agent-facing guides (agents/skills/*.md)
 ├── plugins/      <- self-written plugin sources (jianlongliu.arch-logo, jianlongliu.workspaces;
 │                     split-lock has its own dir)
 ├── split-greeter/, split-lock/  <- self-written greeter and lock screen, each with install.sh + tests
+├── battery-care/ <- self-written charge-threshold keeper: daemon, two units, install.sh + tests
+├── plans/        <- upstream's design notes (backup, dots, remote, server), carried as-is
 ├── default/      <- upstream-shaped defaults this machine ships (systemd/user units, omarchy menu jsonc)
 ├── hooks/        <- post-update.d/10-niri-repatch, theme-set.d/{10-niri-border,20-materal}
 ├── install.sh    <- optional convenience wrapper (prefer the manual steps in docs/INSTALL.md)

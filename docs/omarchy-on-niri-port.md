@@ -38,6 +38,23 @@
 | 本机改动总账 | `docs/local-overrides.md` | 这台机器相对仓库**多出/改过**的一切与回退方式 |
 | 待办 | `docs/todo.md` | 还没做 / 等拍板的事（**不占全局编号**，做完即删行；已完成的不在这里留档）|
 
+以下各卷是**上游源码自带的参考文档**（随 `quattro` 合并进来，我们只在确有必要时才改），
+写的是这套系统的设计，不是本移植的改动记录：
+
+| 卷 | 文件（正本） | 管什么 |
+|---|---|---|
+| 进度报告 | `docs/port-merge-status.md` | 最近一次大合并的快照：已完成 / 已退役 / 待做，附验证证据 |
+| 文件布局 | `docs/file-layout.md` | 上游仓库各目录的职责 |
+| CLI 路由 | `docs/cli-router.md` | `omarchy <group>` 怎么解析到具体命令 |
+| 菜单 | `docs/menu.md` | `omarchy-menu.jsonc` 的 schema、`when`/`disabled` 守卫、provider |
+| 通知 | `docs/notifications.md` | 通知引擎的结构与策略 |
+| 壳层 | `docs/omarchy-shell.md` | `omarchy-shell` 的 IPC 面与插件生命周期 |
+| 主题 | `docs/theming.md` | 主题与模板（`colors.toml` → `*.tpl`）的渲染链路 |
+| 音频调音 | `docs/audio-tuning.md` | 扬声器/麦克风调音的落点 |
+| 更新流程 | `docs/update-process.md` | `omarchy update` 的管线、迁移、pacman 守卫 |
+| 测试 | `docs/testing.md` | 各套测试的形状与入口 |
+| 安装（手动） | `docs/INSTALL.md` + `docs/INSTALL.zh.md` | 本移植的手工安装步骤（双语，不是上游文档） |
+
 文档只有一份，就在仓库里（上表第三列），没有第二处副本；`~/Documents` 下曾有的那九个软链
 （2026-09-20 文档归一的产物）与守它们的 `scripts/check-doc-links.sh` 于 2026-09-21 一并删掉。
 

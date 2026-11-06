@@ -133,6 +133,16 @@ mkdir -p ~/.config/systemd/user
 cp "$REPO/local-config/systemd/user/materal-recolor."* ~/.config/systemd/user/
 systemctl --user enable --now materal-recolor.path                   # 需要 ~/bin/materal-update 在位
 ghostty +validate-config                                             # 无输出即通过
+
+mkdir -p ~/.config/omarchy
+cp "$REPO/local-config/omarchy/shell.toml" ~/.config/omarchy/        # 字号 + 磨砂透明度
+cp "$REPO/local-config/omarchy/shell.json" ~/.config/omarchy/        # bar 布局、disabledPlugins
+cp -r "$REPO/local-config/omarchy/extensions" ~/.config/omarchy/     # 菜单覆盖
+# 随壁纸动态取色的主题。materal-update 读它的 matugen.toml，每次换壁纸重写 colors.toml；
+# 仓库里那份 colors.toml 只是入库时的快照。backgrounds/*.webp 由上游 backgrounds.default/*.png 压出。
+mkdir -p ~/.config/omarchy/themes
+cp -r "$REPO/local-config/omarchy/themes/tonal-spot" ~/.config/omarchy/themes/
+~/bin/materal-update tonal-spot --force                              # 按当前壁纸重新推导
 ```
 
 `ghostty/config` 里三条是移植必需的（`window-decoration = false`、`background-opacity = 0.85`、

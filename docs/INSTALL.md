@@ -151,6 +151,15 @@ systemctl --user enable --now materal-recolor.path                   # needs ~/b
 ghostty +validate-config                                             # silent means it parsed
 mkdir -p ~/.config/omarchy
 cp "$REPO/local-config/omarchy/shell.toml" ~/.config/omarchy/        # font size + frosting alphas
+cp "$REPO/local-config/omarchy/shell.json" ~/.config/omarchy/        # bar layout, disabledPlugins
+cp -r "$REPO/local-config/omarchy/extensions" ~/.config/omarchy/     # menu overrides
+# The dynamically-recoloured theme. materal-update reads its matugen.toml and
+# rewrites colors.toml on every wallpaper change; the colors.toml here is only
+# the snapshot from when it was committed. backgrounds/*.webp are generated from
+# upstream's backgrounds.default/*.png -- see the theme's own note below.
+mkdir -p ~/.config/omarchy/themes
+cp -r "$REPO/local-config/omarchy/themes/tonal-spot" ~/.config/omarchy/themes/
+~/bin/materal-update tonal-spot --force                              # derive from the current wallpaper
 ```
 
 Three lines in `ghostty/config` are required by the port (`window-decoration = false`,

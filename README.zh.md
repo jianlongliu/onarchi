@@ -71,8 +71,14 @@ onarchi/
 │                     + materal-recolor 单元；配色走 Omarchy 主题
 │                     + materal-recolor.{path,service}；拷到 ~/.config/ 用，说明见该目录 README
 ├── config/       <- **上游 Omarchy 的默认配置树**（未改动，不是本机在用的那份）
+├── default/、etc/、applications/、themes/、manual/、migrations/
+│                     <- 上游 Omarchy 树里其余的部分，一并带着，好让壳层和迁移跑在与移植
+│                        同源的源码上
+├── test/         <- 上游的测试套件（test/cli、test/shell、acceptance.d）+ 本移植的修复
 ├── plugins/      <- 自研插件源码（jianlongliu.arch-logo、jianlongliu.workspaces；split-lock 自成一档）
 ├── split-greeter/、split-lock/  <- 自研登录器与锁屏，各带 install.sh + tests/
+├── battery-care/ <- 自研充电阈值保持器：守护进程 + 两个单元 + install.sh + tests
+├── plans/        <- 上游的设计稿（backup、dots、remote、server），原样带着
 ├── default/      <- 本机随仓库走的"上游形状"默认件（systemd 用户单元、omarchy 菜单 jsonc）
 ├── hooks/        <- post-update.d/10-niri-repatch, theme-set.d/{10-niri-border,20-materal}
 ├── install.sh    <- 可选便捷包装脚本（推荐按 docs/INSTALL.zh.md 手动来）
