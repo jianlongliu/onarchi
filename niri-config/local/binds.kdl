@@ -48,6 +48,17 @@ Mod+Ctrl+D hotkey-overlay-title="Display" { spawn-sh "omarchy-shell shell toggle
 Mod+Ctrl+W hotkey-overlay-title="Network" { spawn-sh "omarchy-shell shell toggle omarchy.network"; }
 Mod+Ctrl+P hotkey-overlay-title="Power" { spawn-sh "omarchy-shell shell toggle omarchy.power"; }
 Mod+Ctrl+Alt+D hotkey-overlay-title="Calendar" { spawn-sh "omarchy-shell shell toggle omarchy.clock"; }
+// --- Notifications ---
+// Upstream binds these to Super+comma; niri already uses Mod+Comma for
+// consume-window-into-column, so act moves to Mod+Alt+Comma and dismissOne to
+// Mod+Ctrl+Shift+Comma. The rest keep the upstream chords. All of them are
+// shell IPC, so they also show up in Mod+K and Mod+Shift+Slash.
+Mod+Alt+Comma hotkey-overlay-title="Act on newest notification" { spawn-sh "omarchy-shell -q notifications act"; }
+Mod+Shift+Comma hotkey-overlay-title="Dismiss all notifications" { spawn-sh "omarchy-shell -q notifications dismissAll"; }
+Mod+Ctrl+Comma hotkey-overlay-title="Control notifications with the keyboard" { spawn-sh "omarchy-shell -q notifications keyboard"; }
+Mod+Ctrl+Shift+Comma hotkey-overlay-title="Dismiss newest notification" { spawn-sh "omarchy-shell -q notifications dismissOne"; }
+Mod+Shift+Alt+Comma hotkey-overlay-title="Open notification history" { spawn-sh "omarchy-shell -q notifications showHistory"; }
+Mod+Ctrl+Alt+Comma hotkey-overlay-title="Toggle notification silencing" { spawn-sh "omarchy-toggle-notification-silencing"; }
 // dropped: Mod+Return 重复终端（已并入上面的 Core binds）
 
 // --- Personal binds carried over from the pre-migration (DMS-era) config ---

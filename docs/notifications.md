@@ -60,6 +60,19 @@ into history — "what did I miss while silenced" is what history is for.
 Ephemeral ones (the freedesktop `transient` hint, or an `app_name` of
 `notify-send`/`omarchy-action`) are dropped entirely.
 
+## niri keybindings
+
+The Hyprland defaults bind `Super+comma` to `act`, but niri already uses `Mod+Comma` for `consume-window-into-column`, so the port moves `act` to `Mod+Alt+Comma` and `dismissOne` to `Mod+Ctrl+Shift+Comma` and keeps the other upstream chords. They live in `niri-config/local/binds.kdl` and the live `~/.config/niri/binds.kdl`; each one calls the shell over IPC, which costs one `omarchy-shell` round-trip (measured at about 17ms) instead of Hyprland's direct global-shortcut dispatch. The `hotkey-overlay-title` on each bind puts them in niri's `Mod+Shift+Slash` overlay, and the `hyprctl binds` shim puts them in the `Mod+K` keybindings menu.
+
+| Chord | Action |
+|---|---|
+| `Mod+Alt+Comma` | `omarchy-shell notifications act` |
+| `Mod+Shift+Comma` | `omarchy-shell notifications dismissAll` |
+| `Mod+Ctrl+Comma` | `omarchy-shell notifications keyboard` |
+| `Mod+Ctrl+Shift+Comma` | `omarchy-shell notifications dismissOne` |
+| `Mod+Shift+Alt+Comma` | `omarchy-shell notifications showHistory` |
+| `Mod+Ctrl+Alt+Comma` | `omarchy-toggle-notification-silencing` |
+
 ## The sender contract
 
 `bin/omarchy-notification-send` is the one way Omarchy code sends
