@@ -1,0 +1,16 @@
+[Unit]
+Description=Copy the current Omarchy theme and wallpaper to the login screen
+# Only the account that owns /var/lib/greeter/users/<account> can run this;
+# the path unit is enabled for every account, so skip accounts that have no
+# Omarchy state yet.
+ConditionPathExists=%h/.local/state/omarchy/current
+
+[Service]
+Type=oneshot
+# A theme switch stages and rewrites several files. Let it settle so the
+# login screen never gets a half-written palette.
+ExecStartPre=-/bin/sleep 1
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/local/bin/split-greeter-sync --self
+Nice=19
+IOSchedulingClass=idle

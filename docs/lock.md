@@ -30,6 +30,7 @@
 - §11.28 合盖/挂起不锁屏：单元**从没装过** → 2026-09-21 修好并**合盖实测通过**（当晚重启又暴露 `WAYLAND_DISPLAY` 条件在开机那刻也不成立 ⇒ 两条条件都删了，改用 `omarchy-sleep-lock-start` 包装器等会话环境）
 - §11.29 头像改成"可选"：真源 = AccountsService（免 root 的 `SetIconFile`），换头像入口 `omarchy-avatar` + 菜单 Style › Avatar（2026-09-23，用户指定）
 - §11.30 红屏真链路：引擎 SEGV 后 **双引擎抢锁** → `duplicate_output` → 死壳孤儿锁；`omarchy-launch-shell` 补三条护栏（2026-09-30）
+- §11.31 登录页壁纸/配色自动同步：用户级 path unit + 账户自有目录，换主题/壁纸不再 sudo（2026-11-09）
 
 ## 另见（锁屏相关的东西分住哪几处）
 
@@ -645,6 +646,29 @@ Omarchy 的锁层从 `hyprctl -j monitors` 读两个字段，shim 之前都在�
 **回退**：备份 `~/.local/state/backups/.local/share/omarchy/bin/omarchy-launch-shell.bak-20260930`（测试件同理 `…/test/shell.d/launch-shell-test.sh.bak-20260930`）。当时补丁尚未入覆盖层；现仓库 `niri-port/niri.patch` 已包含 `bin/omarchy-launch-shell`，后续重放会恢复补丁。
 
 **未做（留给上游/待发话）**：给 stranded-lock 恢复加"这个 output 是否已有 lock surface"的防重守卫（本机 fork `~/.config/omarchy/plugins/jianlongliu.split-lock/Service.qml`，上游 `shell/plugins/lock/Service.qml`）—— 本轮从源头消掉了"两条引擎"，故只作为纵深防御记在此处。
+
+---
+
+### §11.31 登录页壁纸/配色自动同步：用户级 path unit + 账户自有目录（2026-11-09）
+
+**症状/根因**：登录页的壁纸一直停在 2026-09-21 那张。`split-greeter-sync` 本身没问题，是**从来没人触发它**：`omarchy-theme-set` 的 `theme-set.d` 钩子里只有 `10-niri-border` / `20-materal`，文档只写了"建议挂到更新钩子后面"（§11.11），没有落成实现。换主题/壁纸后 `users/<账户>/wallpaper` 不会变，直到手动 `sudo split-greeter-sync`。
+
+**为什么不能用 root 钩子**：主题钩子以普通用户身份运行，`split-greeter-sync` 却要写 root 的 `/var/lib/greeter`，于是每次换壁纸都得 `sudo`/polkit；让 root 服务去复制用户指定的路径又会把"用户可控软链"带进 root 上下文。这里改成**账户自有目录 + 用户级触发器**：
+
+- `install.sh` 一次性把 `/var/lib/greeter/users/<账户>` 的属主交给该账户（旧安装留下的 greeter/root 文件一并 `chown`），greeter 只需要读；
+- 同一次安装把 `split-greeter-sync.{path,service}` 装进 `/etc/systemd/user`，并在 `default.target.wants/` 里启用（对所有账户生效）。
+
+**触发与写入**：`split-greeter-sync.path` 盯两个目标，和 `materal-recolor.path` 同一对——`~/.local/state/omarchy/current/` 捕获壁纸软链被重指（换主题 / 选择器换图），`~/.local/state/omarchy/current/background` 捕获图片被原地重写（主题 staging）。变化后以当前账户身份跑 `split-greeter-sync --self`：只复制该账户的 `colors.toml` / `shell.toml` / 壁纸，不碰共享缺省；临时文件 + rename 保证登录界面读不到半截，内容没变就跳过。`--self` 会拒绝符号链接形式的账户目录，也不会以 root 运行（root 只走原来的多账户模式）。
+
+**顺带修的显示问题**：Split 的 `Wallpaper.qml` 原来按逻辑尺寸设 `sourceSize`，在 greeter 当时的 2560×1600@1.5 输出下等于先解码成约 1707×1067、再由合成器放大到 2560×1600，壁纸看着发虚；源图 5000×2812、同步逐字节一致也一样糊。登录页与锁屏两份都改成 `Math.ceil(width * Screen.devicePixelRatio)`（登录页的改动同时写进 `split-greeter/vendor.py` 的 `PATCHES`）。右半边面板的模糊是设计本身 `blur: 1.0`，不是这个问题。
+
+**分辨率对齐（2026-11-10）**：greetd 本身不管分辨率；之前 greeter 自己的 `niri.kdl` 固定 2560×1600@1.5，而桌面跑 3200×2000@2.0、面板 EDID 原生 3840×2400，登录页整屏被面板放大 1.5×，所以即使 QML 补丁装上也不如桌面清晰。现在 `split-greeter/niri.kdl` 的 output 改成与桌面相同的 3200×2000@2.0。改完必须重跑 `install.sh` 才会进 `/etc/greetd`；只重启 greetd 不会重新拷贝 QML。
+
+**首次与新增账户**：安装后仍要跑一次 `sudo split-greeter-sync` 给现有账户填内容；安装后才新建的账户需要 root 跑一次 `sudo split-greeter-sync <账户>` 建目录，之后自动。共享缺省 `/var/lib/greeter/wallpaper` 仍只由 root 模式更新，没自己主题的账户继续走它。
+
+**验证**：`./split-greeter/tests/sync.sh`（假目录，断言复制、幂等、软链替换、拒绝符号链接）；真机看 `systemctl --user status split-greeter-sync.path`，换一次壁纸后比对 `/var/lib/greeter/users/$USER/wallpaper` 与当前壁纸的 sha256。登录屏本身只在下次启动时读这些文件，所以验证要重新起一次 greeter（或走 `tests/smoke.sh` 的临时账户目录）。
+
+**回退**：`systemctl --user mask split-greeter-sync.path` 只停当前账户；系统级停用 `sudo rm /etc/systemd/user/default.target.wants/split-greeter-sync.path`。之后回到手动 `sudo split-greeter-sync`，旧文件仍在。
 
 ---
 

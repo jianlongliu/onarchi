@@ -66,6 +66,7 @@ tail -20 /var/lib/greeter/greeter.log
 ```sh
 python3 bridge/test-bridge.py     # 协议层（纯 python，不需要显示）
 ./tests/state.sh                  # 登录状态机（StateTest.qml + mock，offscreen，不需要合成器）
+./tests/sync.sh                   # 账户级壁纸/配色同步（纯文件，不需要显示）
 ./tests/smoke.sh                  # 整屏渲染 + 真 Split 设计（需要图形会话）
 ```
 
@@ -81,9 +82,35 @@ python3 bridge/test-bridge.py     # 协议层（纯 python，不需要显示）
 
 ```sh
 sudo ./install.sh        # 拷到 /etc/greetd/split-greeter + /usr/local/bin/split-greeter
-sudo split-greeter-sync                    # 每个真实账户的配色/壁纸都同步一遍
+sudo split-greeter-sync                    # 每个真实账户的配色/壁纸都同步一遍（首次）
 sudo split-greeter-sync "$USER" <dev-user> # 只同步这两个（第一个同时作为共享缺省）
 ```
+
+`install.sh` 还会把 `/var/lib/greeter/users/<账户>` 的属主交给该账户（旧安装留下的
+greeter/root 文件一并交还），并把 `split-greeter-sync.{path,service}` 装进
+`/etc/systemd/user`、挂到 `default.target.wants/` 对每个账户启用。**首次**仍要跑一次
+`sudo split-greeter-sync`；之后换主题/壁纸由用户级 path unit 自动跑
+`split-greeter-sync --self`，**不再需要 sudo**。安装后才新建的账户仍需 root 跑一次
+`sudo split-greeter-sync <账户>` 建目录，之后同样自动。
+
+### 壁纸/主题自动同步
+
+`split-greeter-sync.path` 盯两个目标（与 `materal-recolor.path` 同一对，原理见该单元注释）：
+
+- `~/.local/state/omarchy/current/`：壁纸软链被重指（换主题、选择器换图）；
+- `~/.local/state/omarchy/current/background`：图片被原地重写（主题 staging）。
+
+变化后拉起 `split-greeter-sync.service`，以当前账户身份跑 `split-greeter-sync --self`：
+只复制该账户的 `colors.toml` / `shell.toml` / 壁纸到 `users/<账户>/`，不动共享缺省，也不需要
+root。写入是临时文件 + rename，图片/配色不会被登录界面读到半截；内容没变时直接跳过。
+
+```sh
+systemctl --user status split-greeter-sync.path
+systemctl --user start split-greeter-sync.service   # 手动跑一次
+```
+
+不想让某个账户自动同步：`systemctl --user mask split-greeter-sync.path`；系统级关掉则
+`sudo rm /etc/systemd/user/default.target.wants/split-greeter-sync.path`。
 
 `install.sh` **不动** `/etc/greetd/config.toml`——切 greetd 到本 greeter 是唯一能把人锁在门外的
 一步，脚本只在最后把命令打印出来。切换时务必先开一个 TTY（Ctrl+Alt+F2）：
@@ -134,7 +161,8 @@ GREETER_SELFTEST_PASSWORD=x GREETER_SELFTEST_OPEN_PICKER=1 qs -n -p .
 
 ## 配置面
 
-分辨率固定 modeline 2560x1600@60、`scale 1.5`（和 dms-greeter 的 greeter 合成器一致），
+分辨率固定 modeline 3200x2000@60、`scale 2.0`（与桌面 `~/.config/niri/monitor.kdl` 一致；
+面板 EDID 原生是 3840x2400，但桌面故意跑 3200x2000，登录页跟桌面同档才一样清晰），
 **没有** `mode` 行；圆角走 `GREETER_CORNER_RADIUS`。
 
 登录用户 / 会话命令在 `niri.kdl` 的 `environment` 段（`GREETER_USER` / `GREETER_SESSION`）；
@@ -155,7 +183,8 @@ greeter 用户不可读，所以是拷贝而非软链。布局：
 ```
 
 从没跑过 Omarchy 的账户，`users/<账户>/theme` 与 `wallpaper` 会是指向共享缺省的软链。
-改完主题重跑一次 `sudo split-greeter-sync` 即可。
+安装后由上面的 path unit 自动更新；只有安装后才新建的账户需要 root 跑一次
+`sudo split-greeter-sync <账户>` 建目录，之后自动。
 
 ## 复用的锁屏组件与补丁
 
@@ -166,7 +195,7 @@ greeter 用户不可读，所以是拷贝而非软链。布局：
 python3 vendor.py     # 插件升级或 omarchy update 之后重跑
 ```
 
-只有四处改动 vendored 代码，都写在 `vendor.py` 的 `PATCHES` 里：
+只有五处改动 vendored 代码，都写在 `vendor.py` 的 `PATCHES` 里：
 
 1. `Commons/Color.qml`：配色目录可以从外面指定（`themeOverride`）。greeter 用户的 HOME 只有
    一份主题，而登录界面要按选中的账户换色，所以 `shell.qml` 把 `Color.themeOverride` 指到
@@ -175,6 +204,9 @@ python3 vendor.py     # 插件升级或 omarchy update 之后重跑
    另加 `hintOverride` 让宿主接管提示行（显示"看摄像头"等状态）。
 3. `Split.qml`：提示行 "Press Enter to unlock" → "Press Enter to log in"，并优先用 `hintOverride`。
 4. `Style.qml`：`cornerRadius` 缺省从 `GREETER_CORNER_RADIUS` 取——greeter 里没有 hyprctl 可问。
+5. `Wallpaper.qml`：`sourceSize` 乘 `Screen.devicePixelRatio`。greeter 的 niri 输出是 `scale 2.0`，
+   按逻辑尺寸（约 1600×1000）解码会让合成器放大到 3200×2000，壁纸看着发虚；即使源图是
+   5000×2812、同步也逐字节一致。这个补丁只改解码尺寸，不改源图。
 
 `Commons/qmldir`、`Ui/qmldir` 由 `vendor.py` 生成，**必须**保留 `singleton` 关键字
 （丢了会让 `Color.lock.*` 全变 undefined）。

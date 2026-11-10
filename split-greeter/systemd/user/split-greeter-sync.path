@@ -1,0 +1,15 @@
+[Unit]
+Description=Sync the Omarchy wallpaper and theme to the login screen
+
+[Path]
+# Two targets on purpose, the same pair materal-recolor.path uses: the
+# directory entry catches the current background symlink being retargeted
+# (theme switch / wallpaper picker), while the symlink path resolves to the
+# image and catches that image being rewritten in place.
+PathChanged=%h/.local/state/omarchy/current/
+PathChanged=%h/.local/state/omarchy/current/background
+
+Unit=split-greeter-sync.service
+
+[Install]
+WantedBy=default.target

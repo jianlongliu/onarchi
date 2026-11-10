@@ -179,6 +179,17 @@ PATCHES = [
   property int cornerRadius: Number(Quickshell.env("GREETER_CORNER_RADIUS")) || 0''',
         ),
     ]),
+    ("designs/Wallpaper.qml", [
+        (
+            '''    sourceSize.width: width
+    sourceSize.height: height''',
+            '''    // greeter patch: niri runs this output at scale 1.5 (niri.kdl). Decode at
+    // physical pixels; decoding at logical width makes the compositor upscale
+    // a 1707px bitmap to 2560px, which reads as soft even from a 5000px source.
+    sourceSize.width: Math.ceil(width * Screen.devicePixelRatio)
+    sourceSize.height: Math.ceil(height * Screen.devicePixelRatio)''',
+        ),
+    ]),
 ]
 
 

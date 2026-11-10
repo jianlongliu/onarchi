@@ -64,10 +64,14 @@ cursor {
 }
 
 output "eDP-1" {
-    // 2560x1600@60, the panel's native mode. Never a `mode` line: Omarchy's
-    // monitor panel sends WxH@Hz which niri rejects.
-    modeline 268.5 2560 2608 2640 2720 1600 1603 1609 1646 "+hsync" "-vsync"
-    scale 1.5
+    // Match the desktop's tuned mode (~/.config/niri/monitor.kdl): 3200x2000@60
+    // at scale 2.0. The panel's EDID native mode is 3840x2400, but the desktop
+    // deliberately runs 3200x2000; matching it keeps the login screen as sharp
+    // as the session instead of rendering at 2560x1600 and letting the panel
+    // upscale the whole screen. Never a `mode` line: the monitor panel sends
+    // WxH@Hz which niri rejects.
+    modeline 414.50 3200 3248 3280 3360 2000 2003 2009 2057 "+hsync" "-vsync"
+    scale 2.0
     position x=0 y=0
     variable-refresh-rate
 }
