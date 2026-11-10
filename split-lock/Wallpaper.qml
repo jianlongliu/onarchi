@@ -29,8 +29,12 @@ Item {
     // this cannot serve a stale one. Sharing it matters in the explorer, where
     // every preview would otherwise decode the same file on its own.
     cache: true
-    sourceSize.width: width
-    sourceSize.height: height
+    // lock patch: the session-lock surface is rendered at niri's scale (1.5).
+    // Decode at physical pixels; decoding at logical width makes the compositor
+    // upscale a 1707px bitmap to 2560px, which reads as soft even from a 5000px
+    // source.
+    sourceSize.width: Math.ceil(width * Screen.devicePixelRatio)
+    sourceSize.height: Math.ceil(height * Screen.devicePixelRatio)
     visible: wall.blur <= 0
   }
 
