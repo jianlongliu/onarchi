@@ -11,8 +11,11 @@
 #   -o/--output-format        hyprpicker's {0}, {1}, ... substitution
 #   -l/--lowercase-hex        hex case
 #   -a/--autocopy             paste the result into the clipboard
-#   -r -z                     Hyprland's frozen preview; accepted and ignored,
-#                             since capture-qr/text/region pass them
+#   -r alone                  a freeze request from capture-qr/text/region:
+#                             holds the PID without opening niri's picker,
+#                             which would otherwise eat slurp's first click
+#   -r -a                     asks for a colour, so it still picks
+#   -z -d -c -t -s -u         Hyprland-only flags; accepted and ignored
 #   cancelled pick            exit 0 with no output, as hyprpicker does
 #
 #   ./tests/test-hyprpicker-shim.sh
@@ -91,11 +94,27 @@ run -a -f rgb -q >/dev/null
 check "and it copies what it printed, not always hex" "$(cat "$WL_COPY_LOG")" "rgb(255, 128, 0)"
 
 echo
-echo "== the flags capture-qr/text/region pass are accepted and ignored"
-mk_niri 'echo "Picked color: rgb(1, 2, 3)"'
-check "-r -z do not fail" "$(run -r -z -q >/dev/null 2>&1; echo $?)" "0"
-check "and the pick still comes out" "$(run -r -z -q)" "#010203"
-check "a bare -z" "$(run -z -q)" "#010203"
+echo "== -r alone is a freeze request: no picker, no colour"
+cat >"$stub/niri" <<'SH'
+#!/bin/bash
+printf 'called\n' >"$PICK_LOG"
+echo "Picked color: rgb(1, 2, 3)"
+SH
+chmod +x "$stub/niri"
+export PICK_LOG="$work/pick"
+: >"$PICK_LOG"
+freeze_out="$work/freeze.out"
+PATH="$stub:$PATH" NIRI_SOCKET=/nonexistent "$SHIM" -r -z -q >"$freeze_out" 2>/dev/null &
+freeze_pid=$!
+sleep .2
+check "stays alive for the caller to kill" \
+  "$(kill -0 "$freeze_pid" 2>/dev/null && echo alive)" "alive"
+check "-r -z prints nothing" "$(<"$freeze_out")" ""
+check "and does not open niri's picker" "$(<"$PICK_LOG")" ""
+kill "$freeze_pid" 2>/dev/null
+wait "$freeze_pid" 2>/dev/null || true
+check "-z on its own still picks" "$(run -z -q)" "#010203"
+check "-r -a still picks, because -a asks for a colour" "$(run -r -a -q)" "#010203"
 
 echo
 echo "== a cancelled pick is silent and successful, like hyprpicker"

@@ -488,13 +488,22 @@ ghostty 按一次 `reload_config` —— 实测够用：改配置后重载，新
 **修法**：PATH-first 垫片 `~/bin/hyprpicker`（仓库 `port-bin/hyprpicker`），检测到 niri 就改用
 `niri msg pick-color`，并把它的输出翻译成 hyprpicker 的口径。
 
+**2026-11-08 追加修**：`niri msg pick-color` 是**交互式**取色器。`omarchy-capture-region/text/qr` 用
+`-r -z` 只为请求冻结，垫片却照样把它拉起来，于是 niri 的取色层压在 `slurp` 上面：第一下点击被取色器
+吃掉（选完色就退出），`slurp` 还在等 ⇒ 点一下没反应、要点第二下。现在**只有 `-r` 而没 `-a` 的调用
+只挂起、不打开 picker**（PID 留给调用方 kill，避免调用方拿到已退出 PID 后误杀复用进程）；niri 本来
+也没有可冻结的画面（这条链路此前只是"冻结失效"，不是真冻结）。`-a`（菜单取色）与不带 `-r` 的调用
+不受影响。
+
 | hyprpicker 参数 | 垫片实现 |
 |---|---|
 | `-a/--autocopy` | 把打印出来的那行交给 `wl-copy` |
 | `-f/--format hex\|rgb\|hsl\|hsv\|cmyk` | hex 由 rgb 直接拼；hsl/hsv/cmyk 本地换算（**不是拒绝**，调用方要什么给什么） |
 | `-l/--lowercase-hex` | hex 大小写；默认大写，与 hyprpicker 一致 |
 | `-o/--output-format` | hyprpicker 的 `{0}`,`{1}`,`{2}` 替换 |
-| `-r -z -d -c -t -s -u` | **接受并忽略**（Hyprland 自己的冻结/放大镜，niri 的 picker 没有这种 UI） |
+| `-r`（无 `-a`） | **freeze 请求**：只挂起、不打开 niri 的 picker（否则会抢掉 `slurp` 的第一次点击），等调用方 kill |
+| `-r -a` | 仍然取色（`-a` 表示调用方确实要颜色） |
+| `-z -d -c -t -s -u` | **接受并忽略**（Hyprland 自己的放大镜/光标/缩放开关） |
 | 取消取色 | exit 0、无输出，与 hyprpicker 一致 |
 
 **两个实现要点**
@@ -504,8 +513,9 @@ ghostty 按一次 `reload_config` —— 实测够用：改配置后重载，新
 - 壳层会带着**失效的 `NIRI_SOCKET`**（登录后 niri 重启过一次），所以垫片不信任继承来的值，
   按 `Niri.qml` 同一判据（runtime 目录里 **pid 最大**的那个 `niri.*.sock`）自己找。
 
-**验证**：`port-bin/tests/test-hyprpicker-shim.sh` —— **18/18 绿**，假 `niri` 打印真实格式的行，
-覆盖 5 种格式、大小写、`-o` 模板、`-a` 写剪贴板、`-r -z` 容忍、取消取色、socket 探测。
+**验证**：`port-bin/tests/test-hyprpicker-shim.sh` —— **20/20 绿**，假 `niri` 打印真实格式的行，
+覆盖 5 种格式、大小写、`-o` 模板、`-a` 写剪贴板、`-r` 单独调用不打开 picker、`-r -a` 仍取色、
+取消取色、socket 探测。
 
 **回退**：`rm ~/bin/hyprpicker`（PATH 立刻回到 `/usr/bin/hyprpicker`，行为恢复成报错）。
 

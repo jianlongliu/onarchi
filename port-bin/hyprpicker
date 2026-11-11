@@ -30,10 +30,13 @@ That line is the whole contract -- confirmed from the string table of
 Two gaps are deliberate rather than accidental:
 
   - frozen preview (-r/--render-inactive, -z/--no-zoom, -d/--disable-preview)
-    is Hyprland's own magnifier; niri's picker has no such UI, so these flags
-    are accepted and ignored. `omarchy-capture-{qr,text,region}` pass `-r -z`
-    purely to freeze the screen under grim; they only need the freeze to be
-    *attempted* before their own capture, and grim works either way.
+    is Hyprland's own magnifier; niri's picker has no such UI, so the extra
+    flags are accepted and ignored. `omarchy-capture-{qr,text,region}` pass
+    `-r -z` purely to freeze the screen under grim. A call with `-r` and no
+    `-a` is one of those freeze requests: niri has nothing to freeze, so the
+    shim stays alive (the caller owns its PID) without opening a picker.
+    Opening one would put the compositor's picker above slurp, which eats the
+    first click and makes the region selection need a second one.
   - hsl/hsv/cmyk are converted here rather than refused, so a caller that asks
     for one still gets an answer.
 """
@@ -41,6 +44,7 @@ Two gaps are deliberate rather than accidental:
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 
@@ -175,6 +179,7 @@ def main(argv):
     lowercase_hex = False
     notify = False
     quiet = False
+    render_inactive = False
     output_format = ""
 
     index = 0
@@ -193,9 +198,10 @@ def main(argv):
             quiet = True
         elif arg in ("-b", "--no-fancy"):
             pass
-        elif arg in ("-r", "--render-inactive", "-z", "--no-zoom",
-                     "-d", "--disable-preview", "-c", "--cursor", "-t",
-                     "--no-fractional"):
+        elif arg in ("-r", "--render-inactive"):
+            render_inactive = True
+        elif arg in ("-z", "--no-zoom", "-d", "--disable-preview",
+                     "-c", "--cursor", "-t", "--no-fractional"):
             pass  # no equivalent on niri's picker; see the module docstring
         elif arg in ("-v", "--verbose"):
             quiet = False
@@ -220,6 +226,13 @@ def main(argv):
             sys.stderr.write("hyprpicker: unknown option %s\n" % arg)
             return 1
         index += 1
+
+    # The capture commands ask for a frozen screen with -r and never read a
+    # colour. Opening niri's picker for that would steal the click aimed at
+    # slurp; hold the PID instead, because the caller kills it when done.
+    if render_inactive and not autocopy:
+        signal.pause()
+        return 0
 
     rgb = pick()
     if rgb is None:
