@@ -188,11 +188,9 @@ into `~/.config/omarchy/plugins/`. To change any of it, edit
 `none` for fully clear, `opaque`), the detach is `bar.floatGap`, and the round
 corners plus the blur itself ride in `niri.patch`'s `shell/plugins/bar/Bar.qml`.
 
-The frosted surface is `MultiEffect` blur, and it stops working under **Qt 6.12**
-— the bar and menu then render as opaque black cards. This machine pins 16 Qt
-packages at 6.11.2 for exactly that reason (see "Holding Qt at 6.11.2"
-below). If your distro ships 6.12, expect the layout above with a solid bar
-instead of frosted glass until `MultiEffect` is fixed upstream.
+The frosted surface is `MultiEffect` blur. An earlier version of this README warned that it stops
+working under **Qt 6.12**; that turned out to be unreproducible (see "Qt 6.12 and the frosted bar"
+below). This machine runs 6.12 with the frost intact — measured, not assumed.
 
 If you already have a `shell.json`, `install.sh` leaves it alone — it holds your
 theme and font choices. To adopt the new look by hand, set `background`,
@@ -286,54 +284,49 @@ contention rather than a distinct defect.
 `runtime-smoke` fails its transparent-bar wallpaper sample. It fails at `HEAD` with all working-tree
 changes stashed, so it is not caused by port work, and the root cause is not yet known.
 
-### Holding Qt at 6.11.2 — read this before you upgrade
+### Qt 6.12 and the frosted bar — the pin is gone
 
-**The frosted bar does not survive Qt 6.12.** `MultiEffect`'s blur becomes a no-op, and the bar,
-menu and panels paint as exactly `(0,0,0)` opaque black — the layout is intact, which makes it look
-like a theming bug rather than a library one. If you followed the look above and suddenly have a
-solid black bar, this is why.
+**This machine tracks Qt 6.12 as of 2026-11-11.** The `IgnorePkg` that held it at 6.11.2 is removed.
+Before that, this section warned that `MultiEffect`'s blur became a no-op on 6.12, painting the bar,
+menu and panels as exactly `(0,0,0)` opaque black. **That does not reproduce.**
 
-Verified, not assumed: a minimal `MultiEffect { blurEnabled: true; blur: 0.6 }` in a `qml6` sandbox
-gives a hard edge on 6.12 and a real gradient on 6.11.2. The porting machine's own baseline at
-6.11.2 measures a gradient (104 of 150 sampled points mid-tone). Upstream has no fix: its only
-6.12-touching commit (`b83d3df08`) is a QML palette-syntax change, and `git log --grep=MultiEffect`
-finds nothing.
+Measured on 6.12.0 (`qt6-base 6.12.0-4`, `qt6-declarative 6.12.0-4`), unpacked to a scratch tree and
+run with `qml6` so the live system stayed on 6.11.2 during the test:
 
-To hold Qt back, this machine pins **16** packages in `/etc/pacman.conf`'s `IgnorePkg`. They are not
-independent choices — they move as one set:
+| Probe | 6.11.2 | 6.12.0 |
+|---|---|---|
+| 8 px checkerboard under `blurMax: 32` (stddev, blur on / off) | 9.4 / 127.5 | 9.4 / 127.5 |
+| Hard edge under `blur: 0.6` (mid-tone samples, on / off) | 64 / 0 | 64 / 0 |
+| Same scene, 6.11.2 vs 6.12.0, pixel for pixel | — | **max diff 0** |
 
-```ini
-IgnorePkg = qt6-5compat qt6-base qt6-declarative qt6-imageformats qt6-multimedia
-            qt6-multimedia-ffmpeg qt6-shadertools qt6-svg qt6-translations qt6-wayland
-            qt6ct fcitx5-qt quickshell
-            opencv python-opencv vtk
-```
+Blur is a no-op in the `--no-blur` controls (stddev 127.5), so the probes do discriminate. Both
+`opengl` and `vulkan` RHI backends behave the same. `QML_IMPORT_TRACE` confirms `QtQuick.Effects`
+resolves to the 6.12 plugin, not the system one, and `Qt.application.version` reports `6.12.0`.
 
-- The ten `qt6-*` packages are the library itself.
-- **`qt6ct` and `fcitx5-qt` ship Qt plugins** (5 and 6 of them respectively). Qt refuses a plugin
-  built against a different minor version, so leaving them at 6.12 while the libraries go back to
-  6.11 breaks them at load time rather than failing cleanly. **`quickshell` links the Qt libraries
-  directly** and has to move with them for the same reason.
-- **`opencv`, `python-opencv` and `vtk` are collateral.** They are compiled against Qt 6.12, so
-  holding only the `qt6-*` set fails at dynamic link: `libopencv_highgui.so.500` wants
-  `QVariant(QString&&)`, `libopencv_viz.so.500` wants `vtkImplicitArray::SetValueEx`.
+Why the earlier conclusion was wrong is still unknown: the cached 6.12.0-2 / declarative-1 builds
+that were installed on 2026-10-10 render identically to the current ones. The 6.10 black-bar report
+was never reproduced under controlled conditions, so treat it as an unexplained one-off rather than a
+property of Qt 6.12.
 
-That last group has a nasty symptom worth knowing: a **disappearing face-unlock (howdy)**. PAM still
-runs `omarchy-lock-face`; its `compare.py` dies on `import cv2` and the lock screen reports
-`Error while authenticating: "System error" (code 4)`. Do not trust the UI — check
-`journalctl -t omarchy-shell | grep -A3 omarchy-lock-face` for the traceback, or just run
-`python3 -c "import cv2"`.
+Verified on the live session after upgrading: the bar is frosted (pixel samples across the strip show
+real gradients, no `(0,0,0)` block), the overview backdrop is blurred, and the menu panel shows the
+wallpaper through it. `omarchy-shell shell ping` answers `ok`.
 
-Check your own state with `pacman-conf IgnorePkg` (should list all 16) and `pacman -Qu` (those
-entries show `[ignored]`).
+**What the upgrade pulls in.** Lifting the pin was not a Qt-only transaction: 121 packages moved,
+including `linux` 7.2.14→7.2.15, `systemd` 262.1→262.2, `pacman` and `openssl` 3.6.5→4.1.0. The
+openssl soname bump is the risky part — 74 installed binaries linked `libcrypto.so.3`, which is now
+provided by the `openssl-3` compatibility package. Which binaries keep working is checked with
+`python3 -c "import cv2"` (opencv drives face unlock; a broken `cv2` shows up as a lock screen
+reporting `Error while authenticating: "System error" (code 4)`), plus smoke runs of `node`, `git`,
+`rsync`, `paru` and `cargo`.
 
-**To lift the pin**, delete the `IgnorePkg` line and run `pacman -Syu`; all 16 move together. If a
-package later declares `qt6-base>=6.12`, `-Syu` stops with a dependency error — that is the signal
-to re-evaluate, not a silent breakage. `krita` is left unpinned deliberately (not used here).
+`vtk` still fails to import: Arch builds it against 42 optional libraries it does not depend on
+(`libopenxr_loader`, `libgdal`, `libonnxruntime`, the OCCT and viskores sets). That count was 40 on
+the old 9.6.2-7 build, so it is a pre-existing packaging gap, not something this upgrade introduced.
+Nothing in Omarchy uses `vtk`; it is only there because `python-opencv` pulls it.
 
-What you gain by lifting it: `omasnap`, `monologue`, `hype` and `signed`, which need 6.12. Three of
-them are not needed on niri — `omasnap` hard-depends on `hyprland` — so the trade is a working
-frosted shell for four tools that all have substitutes.
+Rollback if needed: `pkexec snapper -c root undochange 2702..2708` restores the pre-upgrade snapshot,
+and the previous packages are still in `/var/cache/pacman/pkg`.
 
 ### Open items
 

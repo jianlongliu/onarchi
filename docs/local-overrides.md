@@ -78,7 +78,7 @@
 | `default/omarchy/omarchy-menu.jsonc` | `install.package`/`install.aur`/`remove.package` 的 `xdg-terminal-exec` 回退 | 随仓库/覆盖层 |
 | `docs/` | `INSTALL{,.zh}.md` + **主文档 `omarchy-on-niri-port.md`（当前事实 + 映射表）** + 模块卷 `visual/behavior/plugins/shims/upstream/migration/lock/local-overrides`（编号沿用原号），**正本就在 `docs/`** | 直接改 `docs/`，无第二副本 |
 
-- 覆盖层实际内容：**40 文件 / 131 hunk / 3412 行**（`--reverse --check` 通过、repatch 幂等）；**md5 `b7d3f453e99631823bd76b0d2f477f25`**（2026-11-04 重导出：补丁里通知霜化那行写的是 `service.cornerRadius`，而 `shell/plugins/notifications/Service.qml` 里既没有这个属性、根对象也只是裸 `Item`（全文件仅此一处提 `cornerRadius`）⇒ 重放会把圆角静默变成 0。工作树本来是对的（`Style.cornerRadius`），**陈旧的只有补丁**，所以这轮只重导出补丁、行数/hunk 不变（40 文件 / 131 hunk / 3412 行），md5 由 `a9f9e107…` 变为上面这个；`git apply` 上干净上游 + 对活体树 `--reverse --check` 双验通过。此前 2026-10-30：新增 `bin/omarchy-system` 的 niri logout 分流，并把 `omarchy-capture-screenshot`、`omarchy-launch-tui`、`omarchy-launch-floating-terminal-with-presentation`、两个 panel QML 的 i18n/helper/动效改动带进来；此前 2026-10-05 三轮：① `shell/plugins/menu/Menu.qml` 的卡片投影、同日再改实现并按 bar 的实测剖面标定 alpha（105→106 hunk、2956→3022 行），见 `docs/visual.md` §8 第 45 条；② **`shell/Ui/KeyboardPanel.qml` 的弹层卡片投影换成同款环带 + 裁到卡片外沿**（hunk 数不变、3022→3088 行），见 `docs/visual.md` §8 第 43 条；③ **`shell/plugins/bar/Bar.qml` 的 1px 顶边高光**（hunk 数不变、3088→3098 行），见 `docs/visual.md` §8 第 46 条；上一版 3088 行 / md5 `423813f5702a120214ea09da21af1fc4` = 上面那步 ②；再上一版 `bcb5aca36ace33d829c6773da7026801` = 上面那步 ①；再上一版 `2cea1e9517bd498df185e02414595bc8` = 2026-10-04 **合并浮空 bar**：插件那 28 个文件并进 `shell/plugins/bar/` 后新增 `Bar.qml` 的 16 hunk、`README.md`、`widgets/{ActiveWindow,KeyboardLayout,Tray}.qml` 与两个新文件 `LICENSE`/`UPSTREAM.md`（+6 文件、82→105 hunk），`widgets/Workspaces.qml` 的 niri 适配（`Hyprland.*`→`Niri.*`）随这版补丁走（合并时该文件一度被插件那份覆盖回上游写法、与基线逐字节相同，2026-10-04 当天恢复，见 `docs/omarchy-on-niri-port.md` §3.2）；上一版 27 文件 / 82 hunk、md5 `cdc361f9f534e16dd9043ac21c3ce352` = 2026-10-04 加 `shell/Ui/KeyboardPanel.qml` 的卡片投影：18 行 / 1 hunk，81→82 hunk，见 §8 第 43 条；再上一版 27 文件 / 81 hunk、md5 `3c672ab5…` = 2026-09-30 加 `bin/omarchy-update`：那份文件顶部委派给 `~/bin` 垫片，4 hunk，见 §8 第 19 项；再上一版 26 文件 / 77 hunk、md5 `22dd2334…` = 2026-09-27 加 `bin/omarchy-default-agent`、`bin/omarchy-agent` 两条 ante 分支，见 `behavior.md` §8 第 40 条）
+- 覆盖层实际内容：**47 文件 / 131 hunk / 3272 行**（`--reverse --check` 通过、repatch 幂等）；**md5 `91b1f11db89b451cc52578b93fd31bd1`**（2026-11-08 重导出：`bin/omarchy-capture-screenshot` 的默认保存目录补回 `~/Pictures/Screenshots`，`OMASNAP_SCREENSHOT_DIR` 优先、旧的 `OMARCHY_SCREENSHOT_DIR` 继续认；文件数/行数顺带按实际值更新。此前 2026-11-04 重导出：补丁里通知霜化那行写的是 `service.cornerRadius`，而 `shell/plugins/notifications/Service.qml` 里既没有这个属性、根对象也只是裸 `Item`（全文件仅此一处提 `cornerRadius`）⇒ 重放会把圆角静默变成 0。工作树本来是对的（`Style.cornerRadius`），**陈旧的只有补丁**，所以这轮只重导出补丁、行数/hunk 不变（40 文件 / 131 hunk / 3412 行），md5 由 `a9f9e107…` 变为上面这个；`git apply` 上干净上游 + 对活体树 `--reverse --check` 双验通过。此前 2026-10-30：新增 `bin/omarchy-system` 的 niri logout 分流，并把 `omarchy-capture-screenshot`、`omarchy-launch-tui`、`omarchy-launch-floating-terminal-with-presentation`、两个 panel QML 的 i18n/helper/动效改动带进来；此前 2026-10-05 三轮：① `shell/plugins/menu/Menu.qml` 的卡片投影、同日再改实现并按 bar 的实测剖面标定 alpha（105→106 hunk、2956→3022 行），见 `docs/visual.md` §8 第 45 条；② **`shell/Ui/KeyboardPanel.qml` 的弹层卡片投影换成同款环带 + 裁到卡片外沿**（hunk 数不变、3022→3088 行），见 `docs/visual.md` §8 第 43 条；③ **`shell/plugins/bar/Bar.qml` 的 1px 顶边高光**（hunk 数不变、3088→3098 行），见 `docs/visual.md` §8 第 46 条；上一版 3088 行 / md5 `423813f5702a120214ea09da21af1fc4` = 上面那步 ②；再上一版 `bcb5aca36ace33d829c6773da7026801` = 上面那步 ①；再上一版 `2cea1e9517bd498df185e02414595bc8` = 2026-10-04 **合并浮空 bar**：插件那 28 个文件并进 `shell/plugins/bar/` 后新增 `Bar.qml` 的 16 hunk、`README.md`、`widgets/{ActiveWindow,KeyboardLayout,Tray}.qml` 与两个新文件 `LICENSE`/`UPSTREAM.md`（+6 文件、82→105 hunk），`widgets/Workspaces.qml` 的 niri 适配（`Hyprland.*`→`Niri.*`）随这版补丁走（合并时该文件一度被插件那份覆盖回上游写法、与基线逐字节相同，2026-10-04 当天恢复，见 `docs/omarchy-on-niri-port.md` §3.2）；上一版 27 文件 / 82 hunk、md5 `cdc361f9f534e16dd9043ac21c3ce352` = 2026-10-04 加 `shell/Ui/KeyboardPanel.qml` 的卡片投影：18 行 / 1 hunk，81→82 hunk，见 §8 第 43 条；再上一版 27 文件 / 81 hunk、md5 `3c672ab5…` = 2026-09-30 加 `bin/omarchy-update`：那份文件顶部委派给 `~/bin` 垫片，4 hunk，见 §8 第 19 项；再上一版 26 文件 / 77 hunk、md5 `22dd2334…` = 2026-09-27 加 `bin/omarchy-default-agent`、`bin/omarchy-agent` 两条 ante 分支，见 `behavior.md` §8 第 40 条）
   （2026-09-26 重导出核，与 `~/.config/omarchy/niri-port/niri.patch` 逐字节一致；本次新增
   `shell/plugins/panels/monitor/Panel.qml` 的**分辨率滑块** —— 22→23 文件、48→62 hunk）。
   版本链（只留 md5，明细在各自卷）：`ef920a66ece784dfc207c7c87c479f5b`（2026-09-23，加菜单 `style.avatar.*` 三行，`docs/lock.md` §11.29）
@@ -273,16 +273,28 @@
 | `/usr/local/sbin/omarchy-battery-care`、`/etc/systemd/system/omarchy-battery-care{,-sleep}.service`、`/usr/local/share/omarchy-battery-care/README.md` | **把"停在充电阈值之上"的电自动放回 STOP**（2026-10-17 装，见 `behavior.md` §8 第 47 条；源件＝仓库 `battery-care/`，`install.sh` 装）：常驻循环**就是放电的刹车**——`force-discharge` **不会**在 `charge_control_end_threshold` 自己停（阈值只在 `auto` 模式生效；ThinkPad 走 ACPI `BDSS` 不传阈值），没刹住会插着电放到 0%。闸门＝阈值本身：只在 STOP 落在保护带 50–80 内才动，所以点 Full(95–100) 自动让路。**装的是 root 属主真副本**（`install -D -o root -g root`），不是软链 | `pkexec bash ~/Projects/omarchy-on-niri/battery-care/install.sh --remove`（**会先 disarm 再删**）。⚠ **改仓库后必须重跑 `install.sh`**，`omarchy update` 不会刷新它。暂停用 `touch /etc/omarchy-battery-care-off` + `systemctl restart omarchy-battery-care`（单元带同名 `ConditionPathExists=`） |
 | `/etc/polkit-1/rules.d/49-paru.rules` | **放行 `/usr/bin/omarchy-setup-security-paru` 的 pkexec**（2026-09-27 装，见 `behavior.md` §8 第 39 条；**源件已入档**：仓库 `etc/polkit-1/rules.d/49-paru.rules`，同日起 `49-tlp.rules` 也在那儿入档，`/tmp` 那份是易失的）：`org.freedesktop.policykit.exec` + `action.lookup("program") == "/usr/bin/omarchy-setup-security-paru"` + `subject.isInGroup("wheel")` → `polkit.Result.YES`。**刻意没放行 `/usr/bin/chmod`**：vantage 原实现是 `pkexec chmod ±x /usr/bin/paru`，那等于要求放行 chmod 本体（wheel 无密码改任意文件权限 ⇒ `chmod u+s` 就地提权），所以换成"root 属主 helper + 只放行该 helper 这一个 program" | `pkexec rm /etc/polkit-1/rules.d/49-paru.rules`（**改前本机没有这个文件**）。删掉后点菜单里的 Paru 开关会报 `Failed to change paru's permissions.`；脚本自己的 `--status`/`--enabled` 查询不受影响（菜单的勾选状态照旧显示）。⚠ **`/etc/polkit-1/rules.d` 是 `750 root:polkitd`** ⇒ 普通用户 `[ -e <某规则> ]` 永远为假，**别拿它当"文件不存在"的证据**（要确认装没装得用 `sudo ls -l`，或看目录 mtime 变没变） |
 | `/usr/lib/firmware/edid/CSO1411.bin`（+ `/etc/kernel/cmdline` 的 `drm.edid_firmware=eDP-1:edid/CSO1411.bin`、`/etc/mkinitcpio.conf` 的 `FILES=(… /lib/firmware/edid/CSO1411.bin …)`） | **面板 EDID 覆盖件**（256 B = base + CTA 扩展）。`pacman -Qo` 查过**无包拥有**（包升级不会覆盖）；靠 `FILES=` 打进 initramfs、靠 cmdline 在 i915 之前加载 ⇒ **改动后必须 `pkexec mkinitcpio -P` + 重启**才生效（本机 systemd-boot + UKI + Secure Boot，**没有**"启动菜单里临时删参数"这条路）。**2026-09-26 逐字节核过**：现行件（md5 `bd15a152…`）相对 `/data/App/firmware/CSO1411.bin.backup.20260722_235519`（`6ad0583a…`）**只差 19 字节**，全在 base 块描述符区 —— ① 加了一条 **DTD2 = 2560×1600@59.97**（`cvt -r` 268.5 MHz，"均衡档"那条模式）② 水平范围从 **149–149 kHz 放宽到 80–250 kHz**（旧件把行频钉死在 4K 那一条上；不放宽则任何自定义模式都判不合法）③ 描述符区重排 + 校验和。CTA 块（HDR 静态元数据 / AMD FreeSync 40–60）逐字节相同。⚠ **存疑**：用户记得注入件是"强制 8bit 色深"，但**两份 base 的"每通道位深"字段都写着 8bpc**（原厂原始值机器上已无副本可查）⇒ "注入 EDID = 钉 8bpc"在字节层面**没有证据**，别当结论用；"10bpc 花屏"本身是用户实测事实 | `pkexec cp ~/.local/state/backups/usr/lib/firmware/edid/CSO1411.bin.bak-20260926 /usr/lib/firmware/edid/CSO1411.bin && pkexec mkinitcpio -P`，重启生效（备份 2026-09-26 补的，与在用件同 md5；`/data/App/firmware/` 另有两份**旧件**副本，拿它回退会丢掉 DTD2 那条 1600p 模式）。屏幕万一黑：Ctrl+Alt+F3 进 TTY，走同一条 `cp` + `mkinitcpio -P` + 重启 |
-| `/etc/pacman.conf` | **`IgnorePkg` 钉住 Qt 6.12 相关的一批包（2026-10-10 起，临时项）**：`qt6-{base,declarative,shadertools,5compat,svg,wayland,translations,imageformats,multimedia,multimedia-ffmpeg}` + `qt6ct fcitx5-qt quickshell` + `opencv python-opencv vtk`。原因：**Qt 6.12 下 `MultiEffect` 的模糊整体失效**（验法：`qml6` 沙盒里一个 `MultiEffect{blurEnabled:true; blur:0.6}`，6.12 是硬边、6.11.2 有真模糊）⇒ 浮动 bar 与 omarchy menu 画成**精确 (0,0,0) 的不透明黑**。前 13 个必须一起降（`qt6ct`/`fcitx5-qt`/`quickshell` 是 **Qt 插件提供方**，Qt 会拒载版本不匹配的插件）；`opencv`/`python-opencv`/`vtk` 是**连带项**——`opencv 5.0.0-13`、`vtk 9.7.1-1` 都是按 6.12 编的，只降 qt6 不清它们会在**动态链接期**挂符号（`libopencv_highgui.so.500` 缺 `QVariant(QString&&)`、`libopencv_viz.so.500` 缺 `vtkImplicitArray::SetValueEx`）。外显症状长得很像「锁屏人脸（howdy）凭空消失」：其实 PAM 照样跑 `omarchy-lock-face`，只是 `compare.py` 的 `import cv2` 立刻死 ⇒ `Error while authenticating: "System error" (code 4)`。**别信界面**，判据是 `journalctl -t omarchy-shell \| grep -A3 omarchy-lock-face` 里的 traceback，或直接 `python3 -c "import cv2"`。**同类残留没处理**：`krita` 与 KDE 系 `-2` 重编包（用户 2026-10-10 拍板：不用 krita ⇒ 不降）。`/etc/pacman.conf` 是 `pacman` 包的文件，本机这份改过 ⇒ 将来 pacman 包升级会落 `.pacnew`、不会静默覆盖。核对现状：`pacman-conf IgnorePkg` 应列出这 16 个，`pacman -Qu` 里它们显示 `[ignored]` | **要恢复跟踪 Qt 6.12**：删掉那行 `IgnorePkg`（连同它上面那三行说明注释）+ `pacman -Syu`，并把 `opencv`/`python-opencv`/`vtk` 一起解开；若将来某个包声明 `qt6-base>=6.12`，`-Syu` 会直接报依赖错误（那是要重新评估的信号，不是静默出错）。降级前的原样备份：`~/.local/state/backups/etc/pacman.conf.bak-20261010`（**没有** `IgnorePkg` 那几行）；本次两步的中间态在 `/etc/pacman.conf.bak-20261010-180352`（只有 13 个 qt 项）与 `/etc/pacman.conf.bak-vtk-20261010-182853`（已含 opencv/python-opencv） |
-**Qt 6.12 是否已可解钉（2026-10-28 复查，结论：仍不建议）**：上游确实有一个 Qt 6.12 相关提交
-`b83d3df08 "Qualify shell palette references for Qt 6.12 (#14553)"`（已在本机 HEAD），但看 diff 它**只改 QML
-的 palette 限定名**（`Commons.Color.xxx` 一类语法兼容），**不是** `MultiEffect` 模糊渲染的修复。
-`git log 60663faf..HEAD --grep='blur\|MultiEffect'` 也没有针对性提交。基线实测：Qt 6.11.2 下
-`qml6` 跑 `MultiEffect{blurEnabled:true; blur:1.0; blurMax:48}`，水平剖面 150 个采样点里 **104 个是中间调**
-（有真实渐变），模糊正常。**要验证 6.12 只能真升**：16 个 `[ignored]` 包必须一起动
-（`qt6-*` 全家 + `quickshell` + `qt6ct` + `fcitx5-qt` + `opencv` + `vtk`，Qt 插件版本必须匹配，
-vtk/opencv 是按 6.12 编的、不一起升会在动态链接期挂符号）。可逆（`IgnorePkg` 那行有备份、pacman 缓存里有旧包），
-但过程中 bar/menu 可能黑屏。**建议单独立项，不要在其它改动收尾时顺带做。**
+| `/etc/pacman.conf` | **~~`IgnorePkg` 钉住 Qt 6.12~~ —— 2026-11-11 已解钉**（原本 2026-10-10 起钉 16 个包：`qt6-{base,declarative,shadertools,5compat,svg,wayland,translations,imageformats,multimedia,multimedia-ffmpeg}` + `qt6ct fcitx5-qt quickshell` + `opencv python-opencv vtk`，理由当时判为「Qt 6.12 下 `MultiEffect` 模糊整体失效 ⇒ bar/menu 画成精确 (0,0,0) 不透明黑」）。**解钉时那个理由被实测推翻**，详见本节末尾「Qt 6.12 解钉实测」。现在 `pacman-conf IgnorePkg` 无输出、`pacman -Qu` 为空。回退点：解钉前的配置备份 `~/.local/state/backups/etc/pacman.conf.bak-20261111-195945`（含 `IgnorePkg` 那 4 行），snapper 快照 `~/.local/state/backups/` 之外另有 `snapper -c root` 的 2702（pre）/ 2708（post） | **要重新钉回去**：把 `~/.local/state/backups/etc/pacman.conf.bak-20261111-195945` 里那 4 行抄回 `/etc/pacman.conf`，再降级——**但没理由这么做**，6.12 实测正常。真要整体回滚升级：`pkexec snapper -c root undochange 2702..2708`，旧包仍在 `/var/cache/pacman/pkg` |
+
+**Qt 6.12 解钉实测（2026-11-11，结论：可以解，已解）**：把 `qt6-base 6.12.0-4`、
+`qt6-declarative 6.12.0-4` 等包**解到临时树**、用其中的 `qml6` 跑探针（系统全程仍是 6.11.2，未受污染），
+再与系统 6.11.2 对照：
+
+- 8 px 棋盘 + `blurMax:32`：开模糊 stddev **9.4**（两版相同），关模糊对照 **127.5** ⇒ 探针有分辨力。
+- 硬边 + `blur:0.6`：开模糊 64 个中间调采样，关模糊 0 个；两版相同。
+- 同一场景 6.11.2 与 6.12.0 **逐像素最大差异 0**；`opengl` 与 `vulkan` 两种 RHI 一致。
+- `QML_IMPORT_TRACE=1` 确认 `QtQuick.Effects` 解析到 6.12 自己的 `libeffectsplugin.so`；
+  `Qt.application.version` 报 `6.12.0`（排除误用系统库）。
+
+**旧结论为何错：仍不确定**——缓存里 2026-10-10 当时装的 `6.12.0-2` / `declarative-1` 渲染结果与现版
+逐像素相同，当年那次黑 bar 从未受控复现，只能记作原因不明的偶发。
+
+> **已推翻的旧复查（2026-10-28，结论「仍不建议」，留作历史）**：上游确实有一个 Qt 6.12 相关提交
+> `b83d3df08 "Qualify shell palette references for Qt 6.12 (#14553)"`（已在本机 HEAD），但看 diff 它**只改 QML
+> 的 palette 限定名**（`Commons.Color.xxx` 一类语法兼容），**不是** `MultiEffect` 模糊渲染的修复。
+> `git log 60663faf..HEAD --grep='blur\|MultiEffect'` 也没有针对性提交。基线实测：Qt 6.11.2 下
+> `qml6` 跑 `MultiEffect{blurEnabled:true; blur:1.0; blurMax:48}`，水平剖面 150 个采样点里 **104 个是中间调**
+> （有真实渐变），模糊正常。当时判断「要验证 6.12 只能真升」——这个前提本身就是**错的**：包解到临时树、
+> `LD_LIBRARY_PATH` 指过去就能验，正是 2026-11-11 的做法。
 
 - 换主题/壁纸后同步到登录页：`sudo split-greeter-sync "$USER"`（还有实验账户时要一起列）。
 - 登录页切换是唯一会把自己锁在外面的步骤，所以 `split-greeter/install.sh` **故意不碰 `config.toml`**。
@@ -591,7 +603,8 @@ Omarchy 的构建**覆盖** Arch 的同名包。对本机的实际影响：
 
 - `omarchy-nvim` 会替代 `neovim`、`omarchy-power-profiles-daemon` 会替代 `power-profiles-daemon`。
   **本机目前都没装这两个**，所以暂时无影响；但将来 `pacman -Syu` 若有人装过官方版，会被换成 omarchy 版。
-- `IgnorePkg` 那 16 个 Qt 包仍然生效（源顺序不影响 IgnorePkg）。
+- ~~`IgnorePkg` 那 16 个 Qt 包仍然生效（源顺序不影响 IgnorePkg）。~~ **2026-11-11 已解钉**，整条
+  `IgnorePkg` 已从 `/etc/pacman.conf` 删除，现在没有任何包被按住。
 
 **Key**：`pacman-key --recv-keys 40DFB630FF42BCFFB047046CF0134EE680CAC571 --keyserver keyserver.ubuntu.com`
 （`keys.openpgp.org` 当时返回 `End of file`，换 ubuntu 那个才通；导入后 `pacman-key --list-keys` 显示 `[full]` 即可）。
@@ -599,8 +612,8 @@ Omarchy 的构建**覆盖** Arch 的同名包。对本机的实际影响：
 **仓库 URL 的坑**：`https://pkgs.omarchy.org/stable/$arch` 是对的，但数据库文件名是 **`omarchy.db`**
 （仓库名），不是 `stable.db`。用 `curl -sI .../stable/x86_64/omarchy.db` 验活，返回 200 就说明源正常。
 
-**装不了（2026-10-28 实测，已全部卸载）**：这 5 个里只有 **`disktree-bin` 能跑**，其余 4 个都死在
-**Qt 6.12** 上 —— 二进制硬要 `Qt_6.12` 符号，本机 `IgnorePkg` 钉着 6.11：
+**当时装不了（2026-10-28 实测，已全部卸载）**：这 5 个里只有 **`disktree-bin` 能跑**，其余 4 个都死在
+当时的 **Qt 6.11** 上 —— 二进制硬要 `Qt_6.12` 符号，而 `IgnorePkg` 钉着 6.11：
 
 ```
 hype / signed / monologue / omasnap:
@@ -618,8 +631,10 @@ hype / signed / monologue / omasnap:
 文件路径由 `--with` 追加到两个按钮的 argv；文案改走 `omarchy-i18n` 的 `capture.screenshot*`
 四个 key（此前是硬编码英文，导致目录里这四个 key 成为孤儿）。
 
-**结论：这四个工具要等 Qt 6.12 解钉**。解钉的代价是 bar/menu 可能黑屏（`MultiEffect` 失效，
-见上文 Qt 6.12 那段），**用户 2026-10-28 决定暂不解**，截图继续用 satty、录屏继续用 wf-recorder。
+**结论：这对工具的前提已经消失。** 原文写「要等 Qt 6.12 解钉」——**2026-11-11 已解钉**，本机现在跑
+Qt 6.12，所以 `hype`/`signed`/`monologue` 的 `Qt_6.12` 符号缺失不再成立（尚未重装验证；
+`omasnap` 仍然硬依赖 `hyprland`，在 niri 上不该装）。截图继续用 satty、录屏继续用 wf-recorder
+——那是**功能选择**，不再是 Qt 版本的被迫妥协。解钉的实测见上文「Qt 6.12 解钉实测」，bar/menu 没有黑屏。
 
 **没装**：AI agent 那几个（`1786967403` Kimi、`1790863209` Grok、`1792334754` OpenClaw、
 `1792345511` T3 Code、`1790017600` 退役 Hermes）—— 用户明确跳过。

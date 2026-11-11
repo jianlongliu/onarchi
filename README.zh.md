@@ -172,9 +172,9 @@ cd onarchi
 `bar.background`（`glassy`、`none` 全透明、`opaque` 不透明），脱开距离是 `bar.floatGap`，
 圆角与模糊本身由 `niri.patch` 里的 `shell/plugins/bar/Bar.qml` 提供。
 
-磨砂本身是 `MultiEffect` 模糊，在 **Qt 6.12** 下会失效——bar 和菜单会渲染成不透明的黑卡片。
-本机为此把 16 个 Qt 包钉在 6.11.2（见下文「把 Qt 按在 6.11.2」）。若你的发行版是 6.12，
-铺出来的会是同样的布局，但 bar 是实心而不是磨砂，直到上游修好 `MultiEffect`。
+磨砂本身是 `MultiEffect` 模糊。本 README 早先写过「在 **Qt 6.12** 下会失效、bar 和菜单渲染成不透明
+黑卡片」——那条后来复现不出来（见下文「Qt 6.12 与磨砂 bar」）。本机现在就跑 6.12，磨砂完好，
+而且是实测不是推测。
 
 若你已经有 `shell.json`，`install.sh` 不会碰它（里面存着你的主题与字体选择）。要手工套用新外观，
 就在它的 `bar` 块里设 `background`、`floatGap`、`id`，并把旧的 `centerAnchor` 迁到上游现在要求的
@@ -230,48 +230,46 @@ cd onarchi
 | 经 `popupColumn` 的通知霜化 | 该元素上游已不存在，表面现在是窄条带 |
 | `omasnap`、`monologue`、`hype`、`signed` | 四个都要 **Qt 6.12**，本机钉在 6.11（见下）。`omasnap` 还硬依赖 `hyprland`。同批只有 `disktree-bin` 能跑 |
 
-### 把 Qt 按在 6.11.2 —— 升级前先读这段
+### Qt 6.12 与磨砂 bar —— 已经解钉了
 
-**磨砂 bar 在 Qt 6.12 下活不下来。** `MultiEffect` 的模糊变成空操作，bar、菜单、面板会画成
-**精确 `(0,0,0)` 的不透明黑**——布局还是对的，所以看着像主题坏了，其实是库的问题。如果你照着上文
-配好了外观、突然得到一条实心黑 bar，原因就在这里。
+**本机自 2026-11-11 起跟 Qt 6.12 走。** 按住 6.11.2 的 `IgnorePkg` 已删除。删之前这一节写的是
+「`MultiEffect` 的模糊在 6.12 下变成空操作，bar、菜单、面板会画成精确 `(0,0,0)` 的不透明黑」——
+**这条复现不出来。**
 
-这是实测不是推测：`qml6` 沙盒里一个最小的 `MultiEffect { blurEnabled: true; blur: 0.6 }`，6.12 下是
-硬边、6.11.2 下有真渐变。本机 6.11.2 的基线量到渐变（150 个采样点里 104 个中间调）。上游没有修复：
-唯一碰到 6.12 的提交（`b83d3df08`）是 QML palette 语法改动，`git log --grep=MultiEffect` 什么都
-找不到。
+在 6.12.0（`qt6-base 6.12.0-4`、`qt6-declarative 6.12.0-4`）上实测。测试时包解到临时树里、用
+`qml6` 跑，系统本身仍是 6.11.2：
 
-要按住 Qt，本机在 `/etc/pacman.conf` 的 `IgnorePkg` 里钉了 **16** 个包。它们不是各自独立的选项——
-必须**整组**一起动：
+| 探针 | 6.11.2 | 6.12.0 |
+|---|---|---|
+| `blurMax: 32` 下的 8 px 棋盘（stddev，开 / 关模糊） | 9.4 / 127.5 | 9.4 / 127.5 |
+| `blur: 0.6` 下的硬边（中间调采样数，开 / 关） | 64 / 0 | 64 / 0 |
+| 同一场景，6.11.2 与 6.12.0 逐像素比 | — | **最大差异 0** |
 
-```ini
-IgnorePkg = qt6-5compat qt6-base qt6-declarative qt6-imageformats qt6-multimedia
-            qt6-multimedia-ffmpeg qt6-shadertools qt6-svg qt6-translations qt6-wayland
-            qt6ct fcitx5-qt quickshell
-            opencv python-opencv vtk
-```
+`--no-blur` 对照组里模糊确实是空操作（stddev 127.5），所以探针有分辨力。`opengl` 和 `vulkan`
+两种 RHI 后端结果一样。`QML_IMPORT_TRACE` 确认 `QtQuick.Effects` 解析到 6.12 自己的插件、不是系统
+那份，`Qt.application.version` 报 `6.12.0`。
 
-- 十个 `qt6-*` 就是库本身。
-- **`qt6ct`、`fcitx5-qt` 带 Qt 插件**（分别 5 个和 6 个）。Qt 拒绝加载按不同次版本编译的插件，
-  所以把它们留在 6.12、只把库退回去，它们会在加载期直接挂掉，而不是干净地报错。
-  **`quickshell` 直接链接 Qt 库**，同理必须跟着一起动。
-- **`opencv`、`python-opencv`、`vtk` 是连带项。** 它们按 Qt 6.12 编译，只按住 `qt6-*` 一组会在
-  动态链接期挂符号：`libopencv_highgui.so.500` 要 `QVariant(QString&&)`，
-  `libopencv_viz.so.500` 要 `vtkImplicitArray::SetValueEx`。
+旧结论错在哪，目前**不清楚**：缓存里 2026-10-10 当时装的 6.12.0-2 / declarative-1，渲染结果和现在
+这版逐像素相同。那次黑 bar 从来没在受控条件下复现过，所以应当当作一次原因不明的偶发，而不是
+Qt 6.12 的性质。
 
-最后一组有个坑值得记住：**人脸解锁（howdy）会凭空消失**。PAM 照样跑 `omarchy-lock-face`，但它的
-`compare.py` 在 `import cv2` 时就死了，锁屏报 `Error while authenticating: "System error" (code 4)`。
-**别信界面**，去 `journalctl -t omarchy-shell | grep -A3 omarchy-lock-face` 看 traceback，或者直接
-`python3 -c "import cv2"`。
+升级后在真实会话里复核过：bar 是磨砂的（沿 bar 采样有真实渐变，没有 `(0,0,0)` 色块）、总览背景
+有真模糊、菜单面板能透出背后的壁纸。`omarchy-shell shell ping` 返回 `ok`。
 
-查自己机器：`pacman-conf IgnorePkg`（应列出全部 16 个）、`pacman -Qu`（这些会标 `[ignored]`）。
+**这次升级顺带拉进来的东西。** 解钉不是一次只管 Qt 的事务：一共动了 121 个包，包括
+`linux` 7.2.14→7.2.15、`systemd` 262.1→262.2、`pacman` 和 `openssl` 3.6.5→4.1.0。风险大的是
+openssl 的 soname 跳变——本机原有 74 个二进制链接 `libcrypto.so.3`，现在这个库由兼容包
+`openssl-3` 提供。判据是 `python3 -c "import cv2"`（opencv 撑着人脸解锁；`cv2` 坏了的表现是锁屏报
+`Error while authenticating: "System error" (code 4)`），外加 `node`、`git`、`rsync`、`paru`、
+`cargo` 各跑一次。
 
-**要解钉**：删掉 `IgnorePkg` 那行，`pacman -Syu`，16 个一起走。若将来某个包声明
-`qt6-base>=6.12`，`-Syu` 会直接停在依赖错误——那是**重新评估的信号**，不是静默出错。`krita`
-故意没钉（本机不用）。
+`vtk` 仍然 import 不了：Arch 编译它时链了 42 个并未声明为依赖的可选库（`libopenxr_loader`、
+`libgdal`、`libonnxruntime`，以及 OCCT 和 viskores 那两套）。旧版 9.6.2-7 是 40 个，所以这是本来就
+存在的打包缺口，不是本次升级引入的。Omarchy 里没有任何东西用 `vtk`，它只是被 `python-opencv`
+连带装上的。
 
-解钉能换来什么：`omasnap`、`monologue`、`hype`、`signed` 四个要 6.12 的工具。其中三个在 niri 上
-用不上——`omasnap` 硬依赖 `hyprland`——所以这笔交易是「一个能用的磨砂 shell」换「四个都有替代品的工具」。
+需要回退：`pkexec snapper -c root undochange 2702..2708` 回到升级前快照，旧包也都还在
+`/var/cache/pacman/pkg` 里。
 
 ### 未完成项
 
