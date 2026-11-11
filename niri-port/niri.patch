@@ -453,10 +453,10 @@ index 00a067346..b76be6d4c 100755
  # Time left is the energy left over the draw shown beside it, so the two always
  # agree; charging counts up to the charge limit. UPower's own estimate averages
 diff --git a/bin/omarchy-capture-screenshot b/bin/omarchy-capture-screenshot
-index 745bee2d4..15e696852 100755
+index 745bee2d4..2cdecd365 100755
 --- a/bin/omarchy-capture-screenshot
 +++ b/bin/omarchy-capture-screenshot
-@@ -2,26 +2,91 @@
+@@ -2,26 +2,94 @@
  
  # omarchy:summary=Take a screenshot
  # omarchy:group=capture
@@ -468,7 +468,10 @@ index 745bee2d4..15e696852 100755
 -if [[ -n ${OMARCHY_SCREENSHOT_DIR:-} && -z ${OMASNAP_SCREENSHOT_DIR:-} ]]; then
 -  export OMASNAP_SCREENSHOT_DIR="$OMARCHY_SCREENSHOT_DIR"
 +[[ -f ~/.config/user-dirs.dirs ]] && source ~/.config/user-dirs.dirs
-+OUTPUT_DIR="${OMARCHY_SCREENSHOT_DIR:-${XDG_PICTURES_DIR:-$HOME/Pictures}}"
++# Saved shots land under the pictures directory, as the Omasnap-based upstream
++# command does. OMASNAP_SCREENSHOT_DIR wins; OMARCHY_SCREENSHOT_DIR is the
++# legacy name the command still honours.
++OUTPUT_DIR="${OMASNAP_SCREENSHOT_DIR:-${OMARCHY_SCREENSHOT_DIR:-${XDG_PICTURES_DIR:-$HOME/Pictures}/Screenshots}}"
 +
 +if [[ ! -d $OUTPUT_DIR ]]; then
 +  mkdir -p "$OUTPUT_DIR"

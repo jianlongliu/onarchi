@@ -7,7 +7,10 @@
 # omarchy:aliases=omarchy screenshot
 
 [[ -f ~/.config/user-dirs.dirs ]] && source ~/.config/user-dirs.dirs
-OUTPUT_DIR="${OMARCHY_SCREENSHOT_DIR:-${XDG_PICTURES_DIR:-$HOME/Pictures}}"
+# Saved shots land under the pictures directory, as the Omasnap-based upstream
+# command does. OMASNAP_SCREENSHOT_DIR wins; OMARCHY_SCREENSHOT_DIR is the
+# legacy name the command still honours.
+OUTPUT_DIR="${OMASNAP_SCREENSHOT_DIR:-${OMARCHY_SCREENSHOT_DIR:-${XDG_PICTURES_DIR:-$HOME/Pictures}/Screenshots}}"
 
 if [[ ! -d $OUTPUT_DIR ]]; then
   mkdir -p "$OUTPUT_DIR"
