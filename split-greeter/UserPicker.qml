@@ -1,5 +1,6 @@
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import "designs"
 
 // Account picker for the greeter. The Split design is a lock screen and has no
@@ -70,9 +71,9 @@ FocusScope {
     x: picker.width - picker.panelWidth
     width: picker.panelWidth
     height: picker.height
-    color: picker.host ? picker.host.withAlpha(Color.lock.background, 0.94) : Color.lock.background
+    color: picker.host ? picker.host.withAlpha(Commons.Color.lock.background, 0.94) : Commons.Color.lock.background
     border.width: 1
-    border.color: picker.host ? picker.host.withAlpha(Color.lock.text, 0.14) : Color.lock.border
+    border.color: picker.host ? picker.host.withAlpha(Commons.Color.lock.text, 0.14) : Commons.Color.lock.border
 
     Column {
       anchors.left: parent.left
@@ -83,7 +84,7 @@ FocusScope {
 
       Text {
         text: "Choose an account"
-        color: picker.host ? picker.host.withAlpha(Color.lock.text, 0.7) : Color.lock.text
+        color: picker.host ? picker.host.withAlpha(Commons.Color.lock.text, 0.7) : Commons.Color.lock.text
         font.family: Style.font.family
         font.pixelSize: Style.font.title
         font.letterSpacing: 2
@@ -102,10 +103,10 @@ FocusScope {
           height: 72
           radius: Style.cornerRadius
           color: index === picker.cursor
-            ? (picker.host ? picker.host.withAlpha(Color.lock.borderActive, 0.16) : "transparent")
+            ? (picker.host ? picker.host.withAlpha(Commons.Color.lock.borderActive, 0.16) : "transparent")
             : "transparent"
           border.width: index === picker.cursor ? 1 : 0
-          border.color: picker.host ? picker.host.withAlpha(Color.lock.borderActive, 0.6) : Color.lock.borderActive
+          border.color: picker.host ? picker.host.withAlpha(Commons.Color.lock.borderActive, 0.6) : Commons.Color.lock.borderActive
 
           // Follow the pointer only on real motion. A stationary mouse that
           // happens to sit over a row gets a hover-enter the moment the panel
@@ -139,14 +140,14 @@ FocusScope {
 
               Text {
                 text: row.modelData.full.length > 0 ? row.modelData.full : row.modelData.name
-                color: Color.lock.text
+                color: Commons.Color.lock.text
                 font.family: Style.font.family
                 font.pixelSize: Style.font.heading
               }
               Text {
                 visible: row.modelData.full.length > 0
                 text: row.modelData.name
-                color: picker.host ? picker.host.withAlpha(Color.lock.text, 0.55) : Color.lock.text
+                color: picker.host ? picker.host.withAlpha(Commons.Color.lock.text, 0.55) : Commons.Color.lock.text
                 font.family: Style.font.family
                 font.pixelSize: Style.font.bodySmall
               }
@@ -157,7 +158,7 @@ FocusScope {
 
       Text {
         text: "↑↓ choose · Enter confirm · Esc cancel"
-        color: picker.host ? picker.host.withAlpha(Color.lock.text, 0.45) : Color.lock.text
+        color: picker.host ? picker.host.withAlpha(Commons.Color.lock.text, 0.45) : Commons.Color.lock.text
         font.family: Style.font.family
         font.pixelSize: Style.font.bodySmall
         font.letterSpacing: 1

@@ -253,8 +253,58 @@ def apply_patches():
     return status
 
 
+# Qt 6.12 added a `QtQuick.Color` singleton (QQuickColor). An unqualified
+# `Color.foo` now resolves to that type instead of the qs.Commons singleton, so
+# every property read returns undefined -- the login panel painted white because
+# `Color.lock.background` fell through to Rectangle's default. The desktop shell
+# already imports `qs.Commons as Commons` and spells it `Commons.Color`; the
+# vendored copy here predates that. Qualify every bare reference and make sure
+# the alias is imported.
+COLOR_RE = re.compile(r"(?<![\w.])Color\.")
+
+# Files re-vendored from the lock plugin / Omarchy shell, plus the greeter's
+# own QML that reads the palette. The vendored ones get overwritten by
+# vendor(); listing them here means a re-vendor cannot reintroduce the bare
+# form.
+QUALIFIED_FILES = [
+    "designs/Avatar.qml", "designs/DesignBase.qml", "designs/LockInput.qml",
+    "designs/PasswordField.qml", "designs/Split.qml", "designs/Wallpaper.qml",
+    "Commons/Style.qml", "Commons/Border.qml",
+    "UserPicker.qml", "SelfTest.qml", "shell.qml",
+]
+
+
+def qualify_color():
+    """Rewrite bare `Color.` to `Commons.Color.` and import the alias."""
+    changed = []
+    for relative in QUALIFIED_FILES:
+        path = os.path.join(HERE, relative)
+        if not os.path.exists(path):
+            print("missing: %s" % relative, file=sys.stderr)
+            continue
+        text = open(path).read()
+        updated = COLOR_RE.sub("Commons.Color.", text)
+        if updated == text:
+            continue
+        if "import qs.Commons as Commons" not in updated:
+            # Files inside qs.Commons have no plain qs.Commons import to sit
+            # next to; anchor on QtQuick, which every one of them imports.
+            new, count = re.subn(r"^import QtQuick\n", "import QtQuick\nimport qs.Commons as Commons\n",
+                                 updated, count=1, flags=re.M)
+            if count:
+                updated = new
+            else:
+                print("no import anchor in %s" % relative, file=sys.stderr)
+                continue
+        open(path, "w").write(updated)
+        changed.append(relative)
+        print("qualified: %s" % relative)
+    return changed
+
+
 if __name__ == "__main__":
     for changed in vendor():
         print("vendored: %s" % changed)
     write_qmldirs()
+    qualify_color()
     sys.exit(apply_patches())

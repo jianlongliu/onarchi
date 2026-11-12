@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import qs.Commons
+import qs.Commons as Commons
 
 Item {
   id: base
@@ -130,7 +131,7 @@ Item {
     id: failFlash
     anchors.fill: parent
     z: 1000
-    color: Color.lock.textError
+    color: Commons.Color.lock.textError
     opacity: 0
     visible: opacity > 0
   }

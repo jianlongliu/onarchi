@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import qs.Commons
+import qs.Commons as Commons
 import "designs"
 
 // Omarchy greeter: the lock screen's Split design, standing in for a display
@@ -211,7 +212,7 @@ ShellRoot {
     // Point the palette at the selected account. Color is a singleton read by
     // every design component, so this is the one place that has to change.
     function applyAccountLook() {
-      Color.themeOverride = window.accountTheme(greetd.username)
+      Commons.Color.themeOverride = window.accountTheme(greetd.username)
     }
 
     Component.onCompleted: applyAccountLook()

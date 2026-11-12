@@ -1,5 +1,6 @@
 import QtQuick
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 
 BorderSurface {
@@ -41,12 +42,12 @@ BorderSurface {
 
   width: 400
   height: 60
-  color: Color.lock.background
+  color: Commons.Color.lock.background
   radius: Math.max(Style.cornerRadius, 12)
   clip: true
   borderSpec: errorState
-    ? Border.surfaceSpec("lock", "border-error", Color.lock.borderError, field.outlineThickness, "border-alpha")
-    : Border.surfaceSpec("lock", "border-active", Color.lock.borderActive, field.outlineThickness, "border-alpha")
+    ? Border.surfaceSpec("lock", "border-error", Commons.Color.lock.borderError, field.outlineThickness, "border-alpha")
+    : Border.surfaceSpec("lock", "border-active", Commons.Color.lock.borderActive, field.outlineThickness, "border-alpha")
 
   function focusInput() { input.forceActiveFocus() }
 
@@ -82,7 +83,7 @@ BorderSurface {
     anchors.verticalCenter: parent.verticalCenter
     visible: field.showLockGlyph
     text: field.authenticating ? "󰔟" : (field.errorState ? "󰍁" : "󰌾")
-    color: field.errorState ? Color.lock.textError : Color.lock.placeholder
+    color: field.errorState ? Commons.Color.lock.textError : Commons.Color.lock.placeholder
     font.family: Style.font.family
     font.pixelSize: Math.round(field.fieldFontSize * 1.1)
   }
@@ -106,7 +107,7 @@ BorderSurface {
     cursorVisible: activeFocus && text.length > 0 && !field.authenticating && !field.errorState
     cursorDelegate: Rectangle {
       width: 2
-      color: Color.lock.text
+      color: Commons.Color.lock.text
       visible: input.cursorVisible
     }
   }
@@ -118,7 +119,7 @@ BorderSurface {
       : (field.fido2Active ? (field.lock.fido2Status.length > 0 ? field.lock.fido2Status : "Waiting for your key…") : field.placeholder))
     textFormat: Text.PlainText
     visible: input.text.length === 0 && !field.snapshotBox
-    color: field.authenticating ? Color.lock.text : (field.errorState ? Color.lock.textError : Color.lock.placeholder)
+    color: field.authenticating ? Commons.Color.lock.text : (field.errorState ? Commons.Color.lock.textError : Commons.Color.lock.placeholder)
     font.family: Style.font.family
     font.pixelSize: field.fieldFontSize
     font.italic: !field.authenticating && field.errorState
@@ -140,7 +141,7 @@ BorderSurface {
     Text {
       anchors.centerIn: parent
       text: field.revealed ? "󰈉" : "󰈈"
-      color: field.revealed ? Color.lock.borderActive : Color.lock.placeholder
+      color: field.revealed ? Commons.Color.lock.borderActive : Commons.Color.lock.placeholder
       font.family: Style.font.family
       font.pixelSize: Math.round(field.fieldFontSize * 1.1)
     }
@@ -162,7 +163,7 @@ BorderSurface {
     anchors.verticalCenter: parent.verticalCenter
     visible: field.fingerprint
     text: "󰈷"
-    color: Color.lock.placeholder
+    color: Commons.Color.lock.placeholder
     font.family: Style.font.family
     font.pixelSize: Math.round(field.fieldFontSize * 1.1)
   }
@@ -175,7 +176,7 @@ BorderSurface {
     anchors.verticalCenter: parent.verticalCenter
     visible: field.face
     text: "󰱻"
-    color: Color.lock.placeholder
+    color: Commons.Color.lock.placeholder
     font.family: Style.font.family
     font.pixelSize: Math.round(field.fieldFontSize * 1.1)
   }
@@ -189,7 +190,7 @@ BorderSurface {
     anchors.verticalCenter: parent.verticalCenter
     visible: field.fido2
     text: ""
-    color: field.fido2Active ? Color.lock.text : Color.lock.placeholder
+    color: field.fido2Active ? Commons.Color.lock.text : Commons.Color.lock.placeholder
     font.family: Style.font.family
     font.pixelSize: Math.round(field.fieldFontSize * 1.1)
     MouseArea {

@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import qs.Commons
+import qs.Commons as Commons
 
 // Test hook, not part of the login path: loaded only when
 // GREETER_SELFTEST_PASSWORD is set (see shell.qml). Drives the design so the
@@ -47,8 +48,8 @@ Item {
   Timer {
     id: paletteTimer
     interval: 400
-    onTriggered: console.warn("selftest: palette is", Color.background, Color.lock.text,
-                              "from", Color.currentThemePath)
+    onTriggered: console.warn("selftest: palette is", Commons.Color.background, Commons.Color.lock.text,
+                              "from", Commons.Color.currentThemePath)
   }
 
   Timer {
