@@ -712,6 +712,19 @@ dock 三角色循环 `dwindle → scrolling → floating` 实测文件正确写�
   `AppGrid.qml` 的改动保留，它本来就在补丁里
 - 工作区模式回到 `dwindle`，`workspace-layouts/` 已空
 
+**后续（2026-11-13）：为菜单 Apps 重新启用 dock 服务**。上游从 dock 提交起给根菜单 `apps` 加了
+`action:"omarchy-shell omarchy.dock apps"`；dock 一禁用，Mod+D 与菜单首行 Apps 就只关菜单、不弹东西
+（`Target not found`）。用户要的正是新版**方形图标应用网格**，不是菜单内置列表，所以：
+
+- `~/.config/omarchy/shell.json` 从 `disabledPlugins` 移除 `omarchy.dock`（仓库
+  `local-config/omarchy/shell.json` 同步）—— 这是让 AppGrid 的 IPC 目标存在的唯一办法。
+- `DockWindow` 仍未移植：`niri msg layers` 有 `omarchy-dock` 空表面，但 `Hyprland.monitorFor()`
+  在 niri 上返回空 ⇒ `workspaceId = -1` ⇒ `shown = false`，所以**只看到网格，看不到 dock 本体**。
+- 验证：`omarchy menu toggle apps` 打开/关闭网格（`omarchy-dock-apps` 层出现/消失），网格内应用
+  可启动；根菜单 Apps 与搜索 apps 同样进入。
+- 回退：`omarchy plugin disable omarchy.dock`（或恢复
+  `~/.local/state/backups/.config/omarchy/shell.json.bak-20261113-dockgrid`）；菜单 Apps 会重新变成死动作。
+
 **垫片那两处修的是真 bug，与 dock 无关，保留**：`o.workspace_mode` 让布局模式能被记录
 （在此之前 `layout-toggle` 全程空转、模式文件从 10-30 起一直是空的），`tiledLayout` 由 `tile`
 改成 `dwindle` 打破了「切一次回默认、永远停在默认」的死循环。4 处 `return [] / {}` 的

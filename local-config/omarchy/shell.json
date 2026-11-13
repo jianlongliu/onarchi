@@ -77,7 +77,6 @@
     "jianlongliu.split-lock"
   ],
   "disabledPlugins": [
-    "omarchy.dock",
     "omarchy.fathom",
     "omarchy.lock"
   ],
