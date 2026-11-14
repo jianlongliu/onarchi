@@ -196,6 +196,10 @@ hyprctl dispatch 'hl.dsp.focus({ window = "address:0x10" })' >/dev/null 2>&1
 check "dispatch propagates niri's failure" "$?" 7
 hyprctl dispatch 'no-such-dispatcher-at-all' >/dev/null 2>&1
 check "unknown dispatcher is still a safe no-op" "$?" 0
+: >"$NIRI_ACTIONS"
+hyprctl dispatch 'o.universal_paste' >/dev/null 2>&1
+check "o.universal_paste -> universal-clipboard shim" \
+  "$(cat "$NIRI_ACTIONS")" "action spawn -- sh -c omarchy-universal-clipboard paste"
 export FAKE_NIRI_RC=0
 
 echo "== hl.monitor({disabled}) -> the output-toggle overlay (the clamshell verb)"

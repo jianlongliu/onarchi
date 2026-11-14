@@ -47,6 +47,7 @@ Mod+Ctrl+B hotkey-overlay-title="Bluetooth" { spawn-sh "omarchy-shell shell togg
 Mod+Ctrl+D hotkey-overlay-title="Display" { spawn-sh "omarchy-shell shell toggle omarchy.monitor"; }
 Mod+Ctrl+W hotkey-overlay-title="Network" { spawn-sh "omarchy-shell shell toggle omarchy.network"; }
 Mod+Ctrl+P hotkey-overlay-title="Power" { spawn-sh "omarchy-shell shell toggle omarchy.power"; }
+Mod+Ctrl+X hotkey-overlay-title="Agents" { spawn-sh "omarchy-shell shell toggle omarchy.agents"; }
 Mod+Ctrl+Alt+D hotkey-overlay-title="Calendar" { spawn-sh "omarchy-shell shell toggle omarchy.clock"; }
 // --- Notifications ---
 // Upstream binds these to Super+comma; niri already uses Mod+Comma for

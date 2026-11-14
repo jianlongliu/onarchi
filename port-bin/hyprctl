@@ -589,6 +589,12 @@ def do_dispatch(payload):
     if dispatcher.startswith("movewin") or dispatcher == "movetoworkspace":
         return _move_window_to_workspace(arg)
 
+    # Omarchy's named SUPER+V action, which scripts call as
+    # `hyprctl dispatch 'o.universal_paste'`. Hyprland runs the Lua binding; on
+    # niri the same work lives in the universal-clipboard shim.
+    if dispatcher == "o.universal_paste" or "o.universal_paste" in payload:
+        return do_exec("omarchy-universal-clipboard paste")
+
     return 0  # unknown -> safe no-op
 
 
