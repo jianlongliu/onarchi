@@ -213,15 +213,16 @@ The overview backdrop needs no adjustment: niri draws that layer itself, so the 
 
 ## Upstream sync status
 
-The port currently tracks upstream `quattro` at **`6194f4606`** (2026-11-04), fast-forwarded from
-`bc220e70` on 2026-11-05 — 257 commits, 1384 files, +50142/−28245. `bc220e70` was content-identical
-to `v4.5.0-rc2`, so that merge brought the 4.5 release line in; note that the `v4.5.0` tag itself
-sits on the `v4-5-0` release branch, not on `quattro`, and this port follows `quattro` only.
-The current `niri.patch` has **47 files / 131 hunks / 3269 lines**, md5
-`10c291270151df9ac898472dcc5106eb` (untracked overlay files are separate).
+The port currently tracks upstream `quattro` at **`723072a55`** (2026-11-14), fast-forwarded from
+`6194f4606` on 2026-11-14 — 248 commits, 1163 files, +48176/−28306. The `v4.5.0` tag itself sits
+on the `v4-5-0` release branch, not on `quattro`, and this port follows `quattro` only.
+The current `niri.patch` has **47 files / 131 hunks / 3241 lines**, md5
+`032f3f46f1f0f0454eb555356780ae8e` (untracked overlay files are separate). This sync
+updated the running tree and the overlay patch; the repository's vendored
+`bin/`/`shell/` source snapshot remains at `bc220e70` until the next full source sync.
 
-Upstream still has **no niri support**: `grep -ri niri shell/ bin/` returns nothing at `6194f4606`,
-while Hyprland coupling stands at 11 files / 36 sites. Everything below exists because of that.
+Upstream still has **no niri support** at `723072a55`; Hyprland coupling remains, and everything
+below exists because of that.
 
 ### Carried through the merge
 

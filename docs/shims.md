@@ -36,6 +36,9 @@
   （`hl.device` 这条 no-op **保持**——开关的实际实现不在 hyprctl 垫片里，而是**把上游那个脚本替掉**，
   见本节 §4「`hl.device` —— 触控板 / 触摸屏开关」；另两个 `hl.workspace_rule` / `setprop opaque`
   用户明确不要，别补。）
+- **`o.universal_paste`（2026-11-14）**：上游 `omarchy-clipboard-paste-text --universal` 用
+  `hyprctl dispatch 'o.universal_paste'` 触发 `SUPER+V` 的同款动作；垫片把它转成
+  `omarchy-universal-clipboard paste`，否则 niri 上这条新入口会静默 no-op（复制成功、粘贴不动）。
 - **`hl.monitor` 译三样（2026-09-23 首修，2026-09-24 补齐 `disabled`）**：垫片有 `_eval_monitor()`
   分支，把 **`scale` / `position` / `disabled`** 翻译成 niri 侧动作；`mode` 故意跳过（niri 不认
   Omarchy 回传的 `WxH@Hz` 形式，且输出本来就在该模式上）。
