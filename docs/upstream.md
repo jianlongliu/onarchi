@@ -47,7 +47,7 @@
   与两个新文件 `LICENSE`、`UPSTREAM.md`，共 +6 文件；`shell/plugins/bar/widgets/Workspaces.qml` 的 niri 适配（`Hyprland.*`→`Niri.*`）
   仍在这份补丁里（合并时该文件一度被插件那份覆盖回上游写法、与基线逐字节相同，2026-10-04 当天恢复，见 `docs/omarchy-on-niri-port.md` §3.2）
   —— 上面起步名单里那两个 bar 文件同属 `shell/plugins/bar/`。
-  ——这 40 个文件正是 `niri.patch` 的起点；**当前（2026-11-14 全量 FF 后）为 47 文件 / 131 hunk / 3241 行、md5 `032f3f46f1f0f0454eb555356780ae8e`**，见 §8.27。2026-11-04 那版为 40 文件 / 131 hunk / 3412 行、md5 `b7d3f453e99631823bd76b0d2f477f25`（同日重导出：通知霜化那行在补丁里写成 `service.cornerRadius`，而该文件没有这个属性、根对象是裸 `Item`，重放会把圆角变成 0；工作树本来是对的 `Style.cornerRadius`，只补丁陈旧 ⇒ 行数/hunk 不变、md5 由 `a9f9e107…` 变为此值）；2026-10-05 那版为 33 文件 / 106 hunk / 3098 行、md5 `f6ef5a467795e2bd6f1ccf14161b185e`；同日前一版 3088 行 / md5 `423813f5…` = 弹层投影；3022 行 / md5 `bcb5aca36ace33d829c6773da7026801` 为当天早些的 menu 投影版；105 hunk / 2956 行那版为 md5 `2cea1e9517bd498df185e02414595bc8`（2026-10-04 合并浮空 bar）；
+  ——这 40 个文件正是 `niri.patch` 的起点；**当前（2026-11-15 追加截图通知缩略图修复后）为 48 文件 / 133 hunk / 3276 行、md5 `15f3e9533b92eb5be00c133af9d1e40f`**，见 §8.27。2026-11-04 那版为 40 文件 / 131 hunk / 3412 行、md5 `b7d3f453e99631823bd76b0d2f477f25`（同日重导出：通知霜化那行在补丁里写成 `service.cornerRadius`，而该文件没有这个属性、根对象是裸 `Item`，重放会把圆角变成 0；工作树本来是对的 `Style.cornerRadius`，只补丁陈旧 ⇒ 行数/hunk 不变、md5 由 `a9f9e107…` 变为此值）；2026-10-05 那版为 33 文件 / 106 hunk / 3098 行、md5 `f6ef5a467795e2bd6f1ccf14161b185e`；同日前一版 3088 行 / md5 `423813f5…` = 弹层投影；3022 行 / md5 `bcb5aca36ace33d829c6773da7026801` 为当天早些的 menu 投影版；105 hunk / 2956 行那版为 md5 `2cea1e9517bd498df185e02414595bc8`（2026-10-04 合并浮空 bar）；
   合并前为 27 个文件 / 82 hunk、md5 `cdc361f9f534e16dd9043ac21c3ce352`；
   2026-09-30 为 27 文件 / 81 hunk、md5 `3c672ab5…`；2026-09-27 为 26 文件 / 77 hunk；
   2026-09-26 为 24 文件 / 72 hunk；
@@ -796,7 +796,9 @@ modeline** 提供，不在 niri 的模式列表里，所以新面板看不到。
 - 上游新默认包 `folio` / `plain` / `qtengine` **没有装**。niri 保持 `nautilus` / `nvim` 回退 / `qt6ct`；`omarchy-launch-files` 暂不接 Mod+E。要跟上游默认应用再单独决定。
 - 36 个新 migration 不自动跑：本机 `omarchy-update` 垫片跳过 `omarchy-migrate`，本次只吸收源码，未执行任何迁移。
 
-**补丁**：**47 文件 / 131 hunk / 3241 行、md5 `032f3f46f1f0f0454eb555356780ae8e`**。`git apply --reverse --check` 与在干净 `723072a55` 上的 `git apply --check` 双过；`omarchy-niri-repatch` 幂等。
+**补丁**：**48 文件 / 133 hunk / 3276 行、md5 `15f3e9533b92eb5be00c133af9d1e40f`**。`git apply --reverse --check` 与在干净 `723072a55` 上的 `git apply --check` 双过；`omarchy-niri-repatch` 幂等。
+
+**2026-11-15 追加：niri 截图通知不显示缩略图**。niri 的 `screenshot-screen` / `screenshot-window` 把保存路径放在 `Notify` 的 app_icon（第三个参数）里，而不是发 `image-path` hint；壳层只把 app_icon 当图标名，路径被 `normalise()` 丢掉，卡片只剩首字母 `N`。`Store.snapshot()` 现在把 app_icon 里的本地文件（`file://` URL 或绝对路径）提升为图片，主题图标名仍按图标主题解析；回归用例加在 `test/shell.d/notifications/logic.cjs`。补丁因此新增 `shell/plugins/notifications/Store.js` 路径，上面的指纹已按重导出后的实测值更新。
 
 **验证**：`agents-panel`、`bar`、`notifications`、`menu`、`app-icon-scan`、`dock`、`keyboard-layout`、`monitor`、`shell-shortcuts`、`launch-shell` 与 `hyprctl` 垫片（48/48）通过。`theme-templates-test` 与 `test/cli` 的失败点是本机已删除 21 个自带主题（例如 `themes/tokyo-night/colors.toml` 不存在），不是补丁引入。完整 `test/shell` 在本机不适用：上游 `omasnap-test` 直接驱动 `omarchy-capture-screenshot`，而本机补丁把截图换成 grim/slurp，测试会真的打开交互选区并挂住；运行 6m37s 后手动停止（exit 143），不是测试失败。壳层视觉验收在合并后重启壳再做。
 

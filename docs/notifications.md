@@ -87,7 +87,7 @@ flags map onto that call:
 | `-g` / `--glyph` | hint `omarchy-glyph` | Nerd Font glyph for the icon slot when no image icon resolves |
 | `--exec <program> [args…]` | hint `omarchy-exec-argv` | the click command; consumes the rest of the line, so it comes last. Each word is a discrete argument the shell runs without re-parsing (see below) |
 | `--image` | hint `image-path` | the standard freedesktop image hint |
-| `-i` / `--icon` | `app_icon` | themed icon name for the toast |
+| `-i` / `--icon` | `app_icon` | themed icon name for the toast, or a local file that becomes its picture |
 | `--app-name` | `app_name` | defaults to `omarchy-action` |
 | `-u` / `--urgency` | hint `urgency` (byte) | `low`/`normal`/`critical`; defaults to `low` |
 | `-t` / `--expire-time` | `expire_timeout` | milliseconds on screen; server default otherwise |
@@ -98,6 +98,8 @@ flags map onto that call:
 | `--with <args…>` | appended action argv | Consumes the rest of the line and appends these arguments to every action |
 
 After the headline, an unrecognized token in the description position is treated as body text, even if it starts with a dash. Recognized flags in that position are parsed as options instead; unknown tokens in the subsequent option position are errors. Leading recognized options are also parsed before the headline, so a headline matching one of them is not reliably treated as text. Likewise a body matching a recognized flag cannot safely be passed as an ordinary description. `--exec` and `--with` consume all remaining arguments.
+
+niri's own screenshot actions do not send `--image`: they pass the saved file as the `Notify` app_icon (the third argument) instead of an `image-path` hint. The shell promotes a local file in that slot to the card's picture, so `Ctrl+Print` and `Alt+Print` show a thumbnail too; an icon-theme name in app_icon still resolves as an icon.
 
 The defaults are the point: an unadorned `omarchy-notification-send "Done"`
 is a low-urgency user-action toast that pops through DND and is treated as

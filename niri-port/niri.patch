@@ -2527,6 +2527,22 @@ index c7180b688..446d8b59e 100644
        readonly property bool takesKeyboard: service.keyboardMode && service.targetDisplayName === String(modelData.name)
        WlrLayershell.keyboardFocus: takesKeyboard ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
        exclusionMode: ExclusionMode.Ignore
+diff --git a/shell/plugins/notifications/Store.js b/shell/plugins/notifications/Store.js
+index 0800e4cc5..9a02680c7 100644
+--- a/shell/plugins/notifications/Store.js
++++ b/shell/plugins/notifications/Store.js
+@@ -25,6 +25,11 @@ function snapshot(n, key, urgencyEnum) {
+     // Read whole: a path cut short names another file.
+     img = Security.localImagePath(n.image)
+   }
++  // Some senders put the picture in app_icon instead of an image-path hint:
++  // niri hands its screenshot toast over that way, as a file URL. The field is
++  // normally a theme icon name, so only a local file becomes the picture; a
++  // name stays an icon. Read whole, for the same reason as above.
++  if (!img) img = Security.localImagePath(n.appIcon)
+   var hints = n.hints || {}
+   var raw = { app: Security.bounded(n.appName, Security.MAX_APP_NAME), summary: Security.bounded(n.summary, Security.MAX_SUMMARY),
+               body: Security.bounded(n.body, Security.MAX_BODY) }
 diff --git a/shell/plugins/osd/Osd.qml b/shell/plugins/osd/Osd.qml
 index c80c2e5c4..bab163517 100644
 --- a/shell/plugins/osd/Osd.qml
@@ -3144,10 +3160,29 @@ index bb2b1c1bf..3a09a9ebb 100755
 +flock -u 8
 +exec 8>&-
 diff --git a/test/shell.d/notifications/logic.cjs b/test/shell.d/notifications/logic.cjs
-index fe227bd60..8910008cf 100644
+index fe227bd60..6b13442b5 100644
 --- a/test/shell.d/notifications/logic.cjs
 +++ b/test/shell.d/notifications/logic.cjs
-@@ -316,7 +316,15 @@ function fn(name) {
+@@ -125,6 +125,18 @@ for (let i = 0; i < 1000; i++) {
+   assert.equal(snap({ body: 'x'.repeat(100000), summary: 'y'.repeat(3000) }).body.length, 32768)
+ }
+ 
++{ // Some senders (niri's screenshot toast) put the picture in app_icon, which
++  // is otherwise a theme icon name. A local file there becomes the image; a
++  // name stays an icon, and an explicit image hint wins.
++  const shot = snap({ appName: 'niri', summary: 'Screenshot captured', appIcon: 'file:///home/u/Pictures/Screenshot%20from%202026-11-15.png' })
++  assert.equal(shot.image, '/home/u/Pictures/Screenshot from 2026-11-15.png')
++  assert.equal(shot.appIcon, '')
++  assert.equal(snap({ appName: 'niri', appIcon: '/tmp/Screenshot.png' }).image, '/tmp/Screenshot.png')
++  assert.equal(snap({ appName: 'Slack', appIcon: 'slack-tray' }).image, '')
++  assert.equal(snap({ appName: 'niri', appIcon: 'file:///dev/zero' }).image, '')
++  assert.equal(snap({ appName: 'niri', appIcon: 'file:///tmp/icon.png', image: 'file:///tmp/picture.png' }).image, '/tmp/picture.png')
++}
++
+ // ---------------------------------------------------------- store transforms
+ for (const body of ['Your verification code is 938271', 'Your code is 938 271', 'Your code is 938-271', 'Your code is &#57;38271',
+                     'Your code is A9F3K2']) {
+@@ -316,7 +328,15 @@ function fn(name) {
    }
    return text.replace(/^( *function \w+\([^)]*\))\s*:\s*\w+/, '$1')
  }
