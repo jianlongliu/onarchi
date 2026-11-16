@@ -105,6 +105,15 @@ def theme_set_env(binary: str) -> dict:
     # would describe the previous wallpaper and a wallpaper watcher could never settle.
     # The palette still reaches the running shell (applyTheme).
     env["OMARCHY_THEME_SKIP_BACKGROUND"] = "1"
+    # This script runs from a systemd oneshot service, i.e. with no tty. In that case
+    # omarchy-theme-set backgrounds the slow theme commands *and the theme-set hooks*,
+    # then returns; systemd tears the service's cgroup down as soon as materal-update
+    # exits and SIGKILLs that detached batch. 10-niri-border lives in it, so layout.kdl
+    # stayed on the previous theme's border colours while colors.toml was already
+    # fresh. OMARCHY_THEME_WAIT=1 is upstream's hook for exactly this caller shape: it
+    # runs the batch -- hooks included -- in the foreground, so the border lands before
+    # the service is declared finished.
+    env["OMARCHY_THEME_WAIT"] = "1"
     return env
 
 
@@ -143,10 +152,17 @@ def rgb_to_hex(rgb) -> str:
 
 
 def matugen_palette(wallpaper: Path, scheme: str, mode: str) -> dict:
+    # Seed selection follows Android's WallpaperColors: matugen already runs the same
+    # pipeline internally -- QuantizerCelebi (128 colours, chroma >= 5) followed by
+    # Material's Score -- and keeps the candidates in that order (see its --debug
+    # "Ranked colors"). Index 0 is therefore the same "most dominant" seed Android
+    # themes from. The old --prefer=saturation threw that ranking away and picked the
+    # most saturated cluster instead, which on a blue-grey wallpaper whose only vivid
+    # spot is a pink detail produced a pink accent and a warm brown surface.
     cmd = [
         "matugen", "image", str(wallpaper),
         "-t", f"scheme-{scheme}", "-m", mode,
-        "-j", "hex", "--prefer=saturation", "--dry-run",
+        "-j", "hex", "--source-color-index", "0", "--dry-run",
     ]
     proc = subprocess.run(cmd, capture_output=True, text=True)
     if proc.returncode != 0:
