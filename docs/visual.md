@@ -403,6 +403,8 @@ quickshell：`pkill -x quickshell && niri msg action spawn -- quickshell -n -p $
     - 量法（复现用）：`grim` 全屏（物理 = 逻辑 × 1.6）→ PIL 裁 24×24 逻辑像素取**中位色**。**窗外叠着别的窗口会毁掉读数**
       —— 第一轮我把同位置叠着的 nautilus 当成"壁纸背景"，整组数全错（同会话 A/B 才能救回来）。
 
+**2026-11-16 增补**：窗口级磨砂再加四组（五个 app，`niri-config/local/window-rules.kdl`）——Xournal++ `0.92`、disktree `0.85`、RevPDF + Papers `0.92`、Flux（`app-id=org.quickshell` + `title="^Flux$"`）`0.85`。规则同 §8 第 27 条：不透明 app 必须带 `opacity` 才看得见 `background-effect`；文档/笔记页用 0.92 保可读，工具窗用 0.85。Flux 另加 `port-bin/omarchy-launch-shell` 去掉 Qt CSD 白标题栏（见 `docs/shims.md`）。
+
 ---
 
 ### 8.19 全桌面字号 / DPI 一致性：一切向 bar 的 Display 面板看齐（2026-09-20）

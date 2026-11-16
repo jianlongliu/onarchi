@@ -146,5 +146,20 @@
   // 新增 `ante) command=(ante --yolo)`（ante 的 `--prompt` 是 headless 语义，故不转发 prompt）。
   // 两条都进 niri.patch（24 → 26 文件）。图标 󱚤 借 install.ai 那枚（已确认能渲染，iconFont 留空；
   // Ante 不在 omarchy 品牌字体里）。
-  "setup.default.agent.ante": {"icon":"󱚤","label":"Ante","checked":"[[ \"$(omarchy-default-agent)\" == \"ante\" ]]","action":"omarchy-default-agent ante"}
+  "setup.default.agent.ante": {"icon":"󱚤","label":"Ante","checked":"[[ \"$(omarchy-default-agent)\" == \"ante\" ]]","action":"omarchy-default-agent ante"},
+
+  // 2026-11-16: Flux（手机联动）挂进 Share。LocalSend 已卸，Share 下原来的
+  // Clipboard/File/Folder/Receive 四条现在都是死链；先补一个能用的 Flux 入口。
+  // bar 上已有 flux 图标（shell.json 的 right 区），fluxd 由 graphical-session.target 自启，
+  // 所以这里只负责唤出面板，不碰 niri 的 spawn-sh-at-startup。
+  "trigger.share.flux": {"icon":"󰏲","label":"Flux","description":"Phone link — files, clipboard, notifications","action":"flux-cli open"},
+
+  // 2026-11-16: Share 四条从 LocalSend 改走 Flux（用户："默认走flux也行"）。
+  // 覆盖必须整条复述 icon/label/action，否则合并会把 action 冲空（见上文 setup.security.paru 的教训）。
+  // Clipboard 走 flux-cli clip；File/Folder 走 flux-share（omarchy-file-select + flux-cli send）；
+  // Receive 打开 Flux 的 Files 页。脚本在 ~/bin/flux-share（仓库 port-bin/flux-share，install.sh 负责铺），不碰 omarchy 上游。
+  "trigger.share.clipboard": {"icon":"","label":"Clipboard","action":"flux-share clipboard"},
+  "trigger.share.file": {"icon":"\uea7b","label":"File","action":"flux-share file"},
+  "trigger.share.folder": {"icon":"","label":"Folder","action":"flux-share folder"},
+  "trigger.share.receive": {"icon":"󰥦","label":"Receive","action":"flux-share receive"}
 }

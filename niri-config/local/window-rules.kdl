@@ -259,3 +259,56 @@ window-rule {
         blur true
     }
 }
+
+// Xournal++ (2026-11-16): frosted glass to match the Catppuccin Latte setup.
+// GTK3 paints an opaque surface, so `opacity` is what lets the live background
+// blur show through (same mechanism as WeChat/QQ above); without it the
+// background-effect is silently invisible. CSD titlebar -> draw-border-with-background false.
+window-rule {
+    match app-id=r#"^com\.github\.xournalpp\.xournalpp$"#
+    opacity 0.92
+    draw-border-with-background false
+    background-effect {
+        xray false
+        blur true
+    }
+}
+
+// disktree (2026-11-16): custom wgpu UI paints an opaque surface, so `opacity`
+// is what lets the live blur through (same mechanism as WeChat/QQ above).
+window-rule {
+    match app-id=r#"^disktree$"#
+    opacity 0.85
+    draw-border-with-background false
+    background-effect {
+        xray false
+        blur true
+    }
+}
+
+// RevPDF (Flutter app on a GTK3 shell) and Document Viewer (Papers, GTK4).
+// Kept at 0.92 like Xournal++, because these show document pages that must stay
+// readable through the frost.
+window-rule {
+    match app-id=r#"^com\.revpdf\.editor$"#
+    match app-id=r#"^org\.gnome\.Papers$"#
+    opacity 0.92
+    draw-border-with-background false
+    background-effect {
+        xray false
+        blur true
+    }
+}
+
+// Flux (omarchy-flux phone link, 2026-11-16). It is a Quickshell toplevel, so the
+// app-id is the generic "org.quickshell"; match the window title too. Same
+// frosted-glass recipe as the other opaque apps above.
+window-rule {
+    match app-id=r#"^org\.quickshell$"# title="^Flux$"
+    opacity 0.85
+    draw-border-with-background false
+    background-effect {
+        xray false
+        blur true
+    }
+}

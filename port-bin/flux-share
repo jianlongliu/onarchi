@@ -1,0 +1,46 @@
+#!/bin/bash
+# Share via Flux — replacement for the LocalSend-backed omarchy-menu-share.
+# Modes: clipboard, file, folder, receive. Paths may be passed directly.
+# Lives in ~/bin (repo: port-bin/flux-share); the Omarchy menu overrides in
+# ~/.config/omarchy/extensions/omarchy-menu.jsonc point the Share rows here.
+
+set -euo pipefail
+
+mode="${1:-}"
+[[ -n $mode ]] && shift || true
+
+case "$mode" in
+  clipboard)
+    exec flux-cli clip
+    ;;
+
+  file | folder)
+    if (($# > 0)); then
+      exec flux-cli send "$@"
+    fi
+
+    args=(--title "Share via Flux" --multiple)
+    if [[ $mode == "folder" ]]; then
+      args=(--title "Share folder via Flux" --directory)
+    fi
+
+    picked=$(omarchy-file-select "${args[@]}") || status=$?
+    if ((${status:-0} > 1)); then
+      omarchy-notification-send -g "" -u critical "Share failed" "The file chooser did not open"
+      exit 1
+    fi
+
+    [[ -n $picked ]] || exit 0
+    readarray -t files <<<"$picked"
+    exec flux-cli send "${files[@]}"
+    ;;
+
+  receive | open)
+    exec flux-cli open files
+    ;;
+
+  *)
+    echo "Usage: flux-share <clipboard|file|folder|receive> [path...]" >&2
+    exit 2
+    ;;
+esac

@@ -1,0 +1,10 @@
+#!/bin/bash
+# omarchy-launch-shell — PATH-first shim for the Omarchy-on-niri port.
+#
+# Flux's panel is the only toplevel the Quickshell engine opens. Qt draws a
+# client-side titlebar for it (niri has no server-side decorations) in the
+# light Qt palette, which reads as a white frame over Flux's dark UI.
+# QT_WAYLAND_DISABLE_WINDOWDECORATION removes that CSD titlebar; it is set
+# only for the shell process, so other Qt apps keep their decorations.
+export QT_WAYLAND_DISABLE_WINDOWDECORATION=1
+exec "${OMARCHY_PATH:-$HOME/.local/share/omarchy}/bin/omarchy-launch-shell" "$@"

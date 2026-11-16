@@ -537,3 +537,10 @@ materal-update: tonal-spot already matches 【哲风壁纸】4K-4K壁纸.png; no
 
 `~/.cache/materal/state.json` 记录了壁纸路径与 sha256，`colors.toml` 当天 15:13 刚重新生成过 ⇒
 工作正常。它的幂等（sha 不变就跳过）与递归保护（guard 文件）都在。
+
+---
+
+### 2026-11-16：`omarchy-launch-shell` 与 `flux-share`（两个 `port-bin` 垫片）
+
+- **`omarchy-launch-shell`**：PATH-first 包装器，只导出 `QT_WAYLAND_DISABLE_WINDOWDECORATION=1`，然后 exec `$OMARCHY_PATH/bin/omarchy-launch-shell`。Flux 面板是 Quickshell 唯一的 toplevel；niri 没有服务端装饰，Qt 会画一条浅色 CSD 标题栏压在 Flux 的深色 UI 上。变量只影响壳层进程，其它 Qt app 仍有标题栏。**验证**：`omarchy-restart-shell` 后 `/proc/<quickshell>/environ` 里有该变量，Flux 顶部像素从 `#F6F5F4` 变成内容色（无标题栏）。回退：删 `~/bin/omarchy-launch-shell`。
+- **`flux-share`**：菜单 Share 四条的落点 —— `clipboard` → `flux-cli clip`；`file` / `folder` → `omarchy-file-select` + `flux-cli send`；`receive` → `flux-cli open files`。它替代已卸载的 LocalSend；菜单 override 在 `local-config/omarchy/extensions/omarchy-menu.jsonc`。回退：删 `~/bin/flux-share`，把该 override 里四条 action 改回默认（或整段删掉）。
