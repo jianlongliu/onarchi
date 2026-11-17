@@ -8,7 +8,7 @@
 | Genre | Where | Rule |
 |---|---|---|
 | Current reference | README, `omarchy-on-niri-port.md` §1–§7 / §9 / §10, the English reference volumes, `plugins.md`, the `shims.md` mapping | Present tense: what it is, how to use it, what limits it. No attempt-by-attempt narration. |
-| Historical record | `behavior.md`, `visual.md`, `lock.md`, `migration.md`, `upstream.md`, `local-overrides.md` | Dated decisions, root causes and evidence. Label it at the top; it is not a current guide. |
+| Historical record | `behavior.md`, `visual.md`, `lock.md`, `upstream.md`, `local-overrides.md` | Dated decisions, root causes and evidence. Label it at the top; it is not a current guide. |
 | Postmortem | `postmortems/` (create when needed) | Claim, measurement, live verification, impact, rollback. |
 | Known issues | `known-issues.md` | Current limitations only; delete a row when fixed. |
 | Procedure | `INSTALL.md`, `INSTALL.zh.md`, `../agents/skills/` | Imperative steps, prerequisites, expected result, rollback. |

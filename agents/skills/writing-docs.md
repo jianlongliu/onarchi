@@ -10,7 +10,7 @@ Read this before adding or changing anything under `docs/`, the READMEs, or `man
 - **Current reference stays current.** README, `manual/`, and the current-reference volumes describe what exists now. Move superseded behavior to a historical volume; pure version history stays in git.
 - **Known issues are explicit.** User-visible limitations, compatibility gaps and workarounds go in `docs/known-issues.md`, with impact, status and a link to the authoritative record.
 - **Postmortems are separate when they earn it.** A resolved or unexplained failure with measurements worth keeping gets its own file under `docs/postmortems/`: claim, measurement, live verification, impact, rollback. A resolved non-issue can stay a one-line known-issues entry.
-- **Historical volumes are dated records.** `behavior.md`, `visual.md`, `lock.md`, `migration.md`, `upstream.md` and `local-overrides.md` keep their dates and root-cause narratives on purpose. Do not rewrite them into present tense; label them and link to the current reference instead.
+- **Historical volumes are dated records.** `behavior.md`, `visual.md`, `lock.md`, `upstream.md` and `local-overrides.md` keep their dates and root-cause narratives on purpose. Do not rewrite them into present tense; label them and link to the current reference instead.
 - **Procedures are imperative.** Prerequisites, steps, expected output, rollback. Sequential instructions are not "process narration".
 - **Verification status is part of the claim.** Say whether something is 实测 / 有证据未验证 / 推断 / 未验证; do not let a plan read like a verified result.
 

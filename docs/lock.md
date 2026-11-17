@@ -7,7 +7,7 @@
 > 覆盖范围：登录界面（Split Greeter）、锁屏（`split-lock`）、PAM 门禁、人脸（howdy）与头像、greetd 的
 > 单格 `configuring` 陷阱。
 
-> **体裁**：历史记录（dated 变更与根因日志，不是当前操作指南）。当前状态见 [移植与合并进度](port-merge-status.md) 与 [已知问题](known-issues.md)。
+> **体裁**：历史记录（dated 变更与根因日志，不是当前操作指南）。当前状态见 [已知问题](known-issues.md) 与 [README](../README.md)。
 
 ## 本卷目录
 
@@ -116,8 +116,8 @@ pkexec ~/.local/share/omarchy/bin/omarchy-apply-lock     # 或 sudo omarchy-appl
 - **认证能力**（与 DMS 对等，且**各自独立 PAM 服务**，本机目前只有 `omarchy-lock-password` 存在）：指纹（`omarchy-lock-fingerprint`，有指纹器就自动监听）、facelock（`omarchy-lock-face` + `pam_facelock.so`）、安全钥匙（`omarchy-lock-fido2` + `pam_u2f.so`，由 `extras/setup-fido2.sh` 写入，**唯一需要 root 的一步**）。刻意分开的原因写在它的 README 里：把 `pam_u2f.so` 塞进密码服务会把每次打错的密码都变成钥匙的 PIN 尝试，八次就把钥匙锁死。
 - **顺带功能**：DPMS 空白策略（默认锁后 5s 关屏，可选 Never；还有 `keepDisplaysOnWithHdmi` 这种 HDMI 唤醒绕行开关）、解锁动画（fade/zoom/rise + 时长）、多显示器 `setInputMonitor`（其它屏只显示时钟）、12/24 小时制、`extras/install.sh` 加启动器/菜单入口。
 - **登录界面（DM）：这个插件当不了** —— 它是会话内的 Quickshell 插件（`ext-session-lock-v1` 要先有会话），DM 在会话之前运行并负责**启动**会话。想要"输密码登录"不需要它，三条路：
-  - **零改动**：`dms-greeter`（现已装）本身就是输密码登录界面；卸 DMS **壳层**不必动它（§11.1）。
-  - **摆脱 DMS 包、成本最低**：`greetd-agreety` **已装**，把 `/etc/greetd/config.toml`（主账户 sudo，0600）的 `[default_session]` 改成 `command = "agreety --cmd niri-session"`（`user = "greeter"`）→ 纯文本"用户名 + 密码 → 进 niri"。注意顺序：先在 TTY（Ctrl+Alt+F2）留好救急通道 → 改配置 → **登出实测能进** → 再卸 `greetd-dms-greeter-bin`；卸它前先 `pacman -D --asexplicit quickshell`（否则 `-Rs` 会把 quickshell 一起删，§11.1）。
+  - **零改动**：`dms-greeter`（现已装）本身就是输密码登录界面；卸 DMS **壳层**不必动它（迁移方案）。
+  - **摆脱 DMS 包、成本最低**：`greetd-agreety` **已装**，把 `/etc/greetd/config.toml`（主账户 sudo，0600）的 `[default_session]` 改成 `command = "agreety --cmd niri-session"`（`user = "greeter"`）→ 纯文本"用户名 + 密码 → 进 niri"。注意顺序：先在 TTY（Ctrl+Alt+F2）留好救急通道 → 改配置 → **登出实测能进** → 再卸 `greetd-dms-greeter-bin`；卸它前先 `pacman -D --asexplicit quickshell`（否则 `-Rs` 会把 quickshell 一起删，迁移方案）。
   - **好看/图形化**：`greetd-tuigreet`（extra，带会话选择器）或 SDDM（上游 Omarchy 自带主题 `default/sddm/`）。
 - **开机换皮（README 唯一标 experimental 的部分，本机不做）**：官方快路是 systemd-stub 的 initrd addon（`foo.efi.extra.d/*.addon.efi`，不重建 initramfs），但本机走不到——插件把 UKI 名写死成 `omarchy_linux.efi`（`plymouth/apply.sh:24`，本机是 `arch-linux.efi`），且 Secure Boot 只加载签名过的 addon；现实路径是 `plymouth-set-default-theme` + `mkinitcpio -P` 重建 initramfs，等于动启动链，**不建议顺手开**。
 - **迁移**：插件本体在 `plugins/` 下（9.4M，随 `~/.config/omarchy` 一起走）；每账户状态 = `shell.json` 的插件条目（本机 `design: "split"`）+ `lock-videos/`（软链）+ `lock-designs/`；`omarchy-lock-fido2` / `omarchy-lock-face` 若要启用需在新账户（同一台机只需一次，`/etc` 全机共享）重跑对应脚本。
@@ -170,7 +170,7 @@ ThinkPad X1 Carbon Gen9 那块 Chicony 04f2:b6ea 的 IR 灯。没有它，`howdy
 1. `sudo ./install.sh`：拷到 `/etc/greetd/split-greeter`（世界可读，greeter 用户要读）+ `/usr/local/bin/split-greeter{,-sync}`；建 `/var/lib/greeter/{users,.config/omarchy,.local/state/split-greeter}`（属 `greeter`）。
 2. `sudo split-greeter-sync`：同步**全部真实账户**的配色与壁纸（给共享缺省，没自己主题的账户走软链）。建议挂到已有的更新钩子后面，主题一换登录界面就跟着换。
 3. 先开着 TTY（Ctrl+Alt+F2）→ 把 `[default_session]` 改成 `command = "/usr/local/bin/split-greeter"`、`user = "greeter"` → 登出实测 → 起不来就在 TTY 改回原值（dms-greeter 留的备份在 `/etc/greetd/config.toml.backup-*`）。
-4. **实测能进之后**，才谈 `sudo pacman -D --asexplicit quickshell` 与卸 `greetd-dms-greeter-bin`（§11.1：不先 asexplict，`-Rns` 会顺手带走 quickshell，本 greeter 和 Omarchy shell 一起瘫）。
+4. **实测能进之后**，才谈 `sudo pacman -D --asexplicit quickshell` 与卸 `greetd-dms-greeter-bin`（迁移方案：不先 asexplict，`-Rns` 会顺手带走 quickshell，本 greeter 和 Omarchy shell 一起瘫）。
 
 **2026-09-19 装机状态（`pkexec` 已执行）**：`/etc/greetd/split-greeter`（root:root，文件世界可读）+ `/usr/local/bin/split-greeter{,-sync}` 已就位；`split-greeter-sync` 已跑过一遍（实验账户 = `tonal-spot` 主题 + 当前壁纸；主账户因为**还没迁移**、`~/.local/state/omarchy/current` 根本不存在 → 该账户目前软链到共享缺省）。**`/etc/greetd/config.toml` 的改动是用户自己做的**：15:09 他把 `[default_session].command` 切成 `/usr/local/bin/split-greeter`（备份 `/etc/greetd/config.toml.split-greeter-backup`，168B = 旧的 dms 命令），15:15 登出后 tty1 起的就是本 greeter。装机校验实测：greeter 身份下 `/etc/greetd/split-greeter` 下**所有文件可读**、桥可执行、状态目录可写；`niri validate -c /etc/greetd/split-greeter/niri.kdl` 通过；壁纸 sha256 与源文件一致。
 

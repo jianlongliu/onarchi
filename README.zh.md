@@ -34,7 +34,6 @@ Arch + niri 登录会话、并且**已经装好 Omarchy**（或者你会先装 O
 - `docs/shims.md` — 垫片卷：`hyprctl`、`uwsm-app`、`omarchy-update`、`display-text-size`、
   `picker-warmup` 等 PATH-first 覆盖脚本。
 - `docs/upstream.md` — 上游跟进卷：覆盖层重放、合并基线、上游小更新、发布流程。
-- `docs/migration.md` — 账户迁移卷：实验账户 → 主账户的方案与执行清单（2026-09-19）。
 - `docs/local-overrides.md` — 本机改动总账：相对仓库多出/改过的一切与回退方式。
 - `docs/lock.md` — 锁屏与登录专卷：Split Greeter、`split-lock`、PAM 门禁、howdy 与头像，
   以及 greetd 只有一格 `configuring` 的陷阱。

@@ -1,6 +1,6 @@
 # 上游跟进 — Omarchy on niri 卷（upstream）
 
-> **2026-10-28 当前状态与勘误**：见 [移植与合并进度报告](port-merge-status.md)。本卷下方保留各阶段历史快照；通知霜化已补回、官方源已加入、统一 system 入口的 niri 守卫尚缺、迁移完成标记未收口，不应把旧记录当作当前验收结果。
+> **2026-10-28 当前状态与勘误**：见 [已知问题](known-issues.md)。本卷下方保留各阶段历史快照；通知霜化已补回、官方源已加入、统一 system 入口的 niri 守卫尚缺、迁移完成标记未收口，不应把旧记录当作当前验收结果。
 
 > 文档只有一份：本文件（`docs/upstream.md`）。
 > 本卷 2026-09-20 从 `docs/omarchy-on-niri-port.md` 抽出（模块化拆分），**编号一律沿用原号** ——
@@ -524,7 +524,7 @@ is_focused/is_urgent/layout/pid/title/workspace_id`）。判据改为几何：**
    —— 返回的是 **list**，调用处 `sys.stdout.write(x + "\n")` 直接 `TypeError`。改成返回 `"[]"`。
    这个 bug 只在 niri socket 读不到时触发，平时看不出来。
 
-**顺手补了一个既存缺口**：`docs/port-merge-status.md` 声称 `test/shell.d/system-power-test.sh`
+**顺手补了一个既存缺口**：原合并报告声称 `test/shell.d/system-power-test.sh`
 「补了 niri 路由契约，并把桌面与 `niri` 一起 mock/钉死——此前它继承真机环境，在 niri 会话里跑会真的
 把会话关掉」，但该测试文件里 **零 niri 引用、补丁里也没这个文件的改动**，契约从未落地。
 本次补上：mock 里加 `niri` 命令、导出 `XDG_CURRENT_DESKTOP=niri` 与 `NIRI_SOCKET=$test_tmp/niri.sock`，

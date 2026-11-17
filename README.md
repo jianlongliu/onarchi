@@ -43,7 +43,6 @@ standalone installer** — it assumes a working Arch + niri login session and an
 - `docs/shims.md` — the shim volume (`hyprctl`, `uwsm-app`, `omarchy-update`, `display-text-size`,
   `picker-warmup`, … the PATH-first overrides).
 - `docs/upstream.md` — keeping up with upstream (overlay replay, merge baselines, release flow).
-- `docs/migration.md` — the account migration volume (experiment account → main account, 2026-09-19).
 - `docs/local-overrides.md` — what this machine has beyond the repo, and how to roll it back.
 - `docs/lock.md` — the lock screen and login volume: the Split Greeter, `split-lock`, the PAM gate,
   howdy and avatars, and greetd's single `configuring` slot.

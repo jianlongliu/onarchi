@@ -30,13 +30,12 @@
 | 卷 | 文件（正本） | 管什么 |
 |---|---|---|
 | 主文档（本文） | `docs/omarchy-on-niri-port.md` | 当前事实：约束 / 架构 / 文件清单 / niri 配置 / 部署 / 验证 / 环境 |
-| 视觉调整 | `docs/visual.md` | 磨砂全栈、字号与 DPI、边框环、菜单底色、gaps、overview、主题取色、壁纸库、缩放、bar 内联排布 |
-| 功能调整 | `docs/behavior.md` | 按键与去重、system 动作、电源与背光、screensaver、输入源、菜单行为、选择器性能与预热、耗电专项 |
+| 视觉调整 | `docs/visual.md` | 历史记录：磨砂全栈、字号与 DPI、边框环、菜单底色、gaps、overview、主题取色、壁纸库、缩放、bar 内联排布 |
+| 功能调整 | `docs/behavior.md` | 历史记录：按键与去重、system 动作、电源与背光、screensaver、输入源、菜单行为、选择器性能与预热、耗电专项 |
 | 插件 | `docs/plugins.md` | bar 插件层、逐插件魔改与运维（含原 §8.11） |
 | 垫片 | `docs/shims.md` | `hyprctl`（原 §4）、`uwsm-app`、`omarchy-update`、`display-text-size`、`picker-warmup` 等 PATH-first 覆盖脚本 |
-| 上游跟进 | `docs/upstream.md` | 覆盖层重放、合并基线、上游小更新、发布流程 |
-| 账户迁移 | `docs/migration.md` | 实验账户 → 主账户的完整方案与执行清单（原 §11） |
-| 锁屏 / 登录 | `docs/lock.md` | 锁面、greeter、人脸、greetd wedge |
+| 上游跟进 | `docs/upstream.md` | 上游同步 runbook（§8.7）+ 各阶段历史快照 |
+| 锁屏 / 登录 | `docs/lock.md` | 历史记录：锁面、greeter、人脸、greetd wedge |
 | 本机改动总账 | `docs/local-overrides.md` | 这台机器相对仓库**多出/改过**的一切与回退方式 |
 | 待办 | `docs/todo.md` | 还没做 / 等拍板的事（**不占全局编号**，做完即删行；已完成的不在这里留档）|
 | 已知问题 | `docs/known-issues.md` | 当前仍成立 / 未验收的限制与缺口（汇总索引，细节指向各卷） |
@@ -47,7 +46,6 @@
 
 | 卷 | 文件（正本） | 管什么 |
 |---|---|---|
-| 进度报告 | `docs/port-merge-status.md` | 最近一次大合并的快照：已完成 / 已退役 / 待做，附验证证据 |
 | 文件布局 | `docs/file-layout.md` | 上游仓库各目录的职责 |
 | CLI 路由 | `docs/cli-router.md` | `omarchy <group>` 怎么解析到具体命令 |
 | 菜单 | `docs/menu.md` | `omarchy-menu.jsonc` 的 schema、`when`/`disabled` 守卫、provider |
@@ -622,7 +620,6 @@ false` 让 niri 把焦点环画在窗口**周围**而非背后，问题解决（
 | `§8 第 14 条` | 菜单 Apps 列表启动全部失灵 | `docs/behavior.md` |
 | `§8 第 15 条` | brightnessctl 授权安装 + 背光权限 | `docs/behavior.md` |
 | `§8 第 16 条` | GitHub 发布流程 | `docs/upstream.md` |
-| `§8 第 17 条` | 迁移到主账户系统级 vs 用户级 | `docs/migration.md` |
 | `§8 第 18 条` | 弹窗未给浮栏让位 | `docs/visual.md` |
 | `§8 第 19 条` | 耗电/续航专项 | `docs/behavior.md` |
 | `§8 第 20 条` | 换主题时 omarchy-theme-set-browser-pol… | `docs/behavior.md` |
@@ -646,7 +643,7 @@ false` 让 niri 把焦点环画在窗口**周围**而非背后，问题解决（
 | `§8 第 38 条` | 电池面板加 CHARGE LIMIT 档位切换（`pkexec tlp setcharge`，只写运行时） | `docs/behavior.md` |
 | `§8 第 39 条` | Paru Security 开关（root 属主 helper + 只放行该 program 的 pkexec 规则） | `docs/behavior.md` |
 | `§8 第 40 条` | ante 进菜单的"默认 agent"列表（`omarchy-default-agent` / `omarchy-agent` 两条分支） | `docs/behavior.md` |
-| `§8 第 41 条` | vantage 退休并公开归档（`github.com/jianlongliu/vantage`） | `docs/behavior.md`、`docs/migration.md` |
+| `§8 第 41 条` | vantage 退休并公开归档（`github.com/jianlongliu/vantage`） | `docs/behavior.md`（迁移卷已删除） |
 | `§8 第 42 条` | 通用剪贴板 `Super+C/V/X`（垫片注入）+ 终端复制/剪切的 OSD 卡片 | `docs/shims.md`（目录行在 `docs/behavior.md`） |
 | `§8 第 43 条` | 窗口与卡片的投影（niri `shadow` + `KeyboardPanel` 自画的卡片外环带投影）+ 圆角统一 12 | `docs/visual.md` |
 | `§8 第 45 条` | menu 卡片投影（**自己画**：`band 4` 的 12 条同心圆角带 alpha `0.40/0.27/0.21/0.18/0.12/0.09/0.05/0.03/0.02/0.012/0.008/0.005`（=48 逻辑像素，照 bar 的实测剖面标定）过 `MultiEffect` 模糊，宿主留 `pad 68`；`RectangularShadow` 垫底会把半透明卡片压黑 52→22，直角渐变带会留硬边灰方块 56）+ 关掉全屏 `menu.scrim` 压暗（`scrim-alpha = 0`；`[menu] background-alpha` 本就跟 `[bar]` 同值 0.45） | `docs/visual.md` |
@@ -674,7 +671,7 @@ false` 让 niri 把焦点环画在窗口**周围**而非背后，问题解决（
 > 注：`§8 第 34 条` 曾在 2026-09-23 被 `About 窗口` 与 `AUR 助手 yay → paru 垫片` 同时占用（两条都没登记本表）；
 > 2026-09-24 定案：About 让号改 **36**，34 归垫片。**加新条目先扫全库取号、再登记本表。**
 > 2026-09-27 补记：`§8 第 39 条`（Paru Security 开关）、`§8 第 40 条`（ante 进默认 agent 列表）、
-> `§8 第 41 条`（vantage 退休归档）当时只在 `docs/behavior.md` / `docs/migration.md` 的目录行里出现，
+> `§8 第 41 条`（vantage 退休归档）当时只在 `docs/behavior.md` 的目录行里出现（迁移卷已删除），
 > 本表没登记 —— **2026-10-19 已按各卷正文补登（未重新取号）**，同时补登了 `§8 第 46 条`、`§8 第 47 条`
 > 与 `§8.20`–`§8.22`。今后加条目仍须先扫全库取号、再登记本表。
 
@@ -802,6 +799,4 @@ false` 让 niri 把焦点环画在窗口**周围**而非背后，问题解决（
 
 ## 11. 账户迁移：实验账户 → 主账户（2026-09-19 方案）
 
-> **已拆入迁移卷**：正文（§11.0–§11.9 方案与小结、§11.15 执行清单，以及 §11.10–§11.14、
-> §11.16–§11.25 的指针）在 `docs/migration.md`。
-> 其中锁屏/登录相关的 §11.10–§11.14、§11.16–§11.25 正文在 `docs/lock.md`。
+> **迁移卷已删除**：原迁移卷的方案与清单已随迁移完成移除（git 历史可查）；锁屏/登录相关的 §11.10–§11.14、§11.16–§11.25 正文在 `docs/lock.md`。
