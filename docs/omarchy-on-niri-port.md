@@ -781,7 +781,7 @@ false` 让 niri 把焦点环画在窗口**周围**而非背后，问题解决（
 
 ## 10. 关键环境信息
 
-- 两个账户**同属用户本人**。**移植现在就跑在主账户（uid 1000）上** —— 2026-09-19/20 按 §11 从实验账户迁回，本文档里 `$DEV_HOME`、`/home/<dev-user>` 这类写法是迁移前的历史记号，迁移后一律等于 `~`。实验账户（uid 1001 `yvonne`）还在，但已不参与本移植（其户目录仍是 0700，读不到）。迁移后 `dms-shell` / `dms-shell-niri` / `dankcalendar` **已不在包列表**，`/etc/greetd/config.toml` 的 `default_session` 指向自研 `/usr/local/bin/split-greeter`（`greetd-dms-greeter-bin` 包仍在，只是不再当登录会话）。
+- 两个账户**同属用户本人**。**移植现在就跑在主账户（uid 1000）上** —— 2026-09-19/20 按 §11 从实验账户迁回，本文档里 `$DEV_HOME`、`/home/<dev-user>` 这类写法是迁移前的历史记号，迁移后一律等于 `~`。实验账户（已停用）还在，但已不参与本移植（其户目录仍是 0700，读不到）。迁移后 `dms-shell` / `dms-shell-niri` / `dankcalendar` **已不在包列表**，`/etc/greetd/config.toml` 的 `default_session` 指向自研 `/usr/local/bin/split-greeter`（`greetd-dms-greeter-bin` 包仍在，只是不再当登录会话）。
 - niri 26.04 (8ed0da4) 位于 `/usr/bin/niri`。
 - 显示管理器：greetd / dms-greeter（DMS 自家 greeter，`/etc/greetd/config.toml` / `niri/dms.kdl` 归主账户所有）。包管理器 paru。
 - 电源后端：**TLP**（`tlp` + `tlp-pd` 1.10.2，D-Bus `net.hadess.PowerProfiles`），**无** power-profiles-daemon（`powerprofilesctl` 缺失）。
