@@ -289,7 +289,7 @@ changes stashed, so it is not caused by port work, and the root cause is not yet
 
 ### Qt 6.12 and the frosted bar
 
-Qt 6.12 is un-pinned and verified on the live session; the earlier black-bar report did not reproduce under controlled tests. Measurements, upgrade impact and rollback: [docs/postmortems/qt-6.12-frosted-bar.md](docs/postmortems/qt-6.12-frosted-bar.md).
+Qt 6.12 is un-pinned and verified on the live session; the earlier black-bar report did not reproduce under controlled tests.
 
 ### Open items
 

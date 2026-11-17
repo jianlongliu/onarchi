@@ -41,8 +41,8 @@
 
 | 项 | 结论 | 记录 |
 |---|---|---|
-| Qt 6.12 磨砂变黑 | 受控测试未复现；按原因不明的偶发放置，不再当作 6.12 的属性 | [复盘](postmortems/qt-6.12-frosted-bar.zh.md) |
-| `vtk` 导入失败 | Arch 打包缺可选依赖，非本移植引入；Omarchy 不用 vtk | [复盘](postmortems/qt-6.12-frosted-bar.zh.md) |
+| Qt 6.12 磨砂变黑 | 受控测试未复现；按原因不明的偶发放置，不再当作 6.12 的属性 | [README](../README.md) |
+| `vtk` 导入失败 | Arch 打包缺可选依赖，非本移植引入；Omarchy 不用 vtk | — |
 | Fathom Alt-Tab | 已退役，别再提议恢复 | [behavior 覆盖账](behavior.md) |
 
 修好一项就从表里删掉，并把结论落到对应卷；已完成的事不留在这里。
