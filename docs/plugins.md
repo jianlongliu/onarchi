@@ -11,6 +11,8 @@
 > - **魔改与正本**：改插件源码产生的 patch 存档在 `~/.config/omarchy/niri-port/plugin-patches/`，
 >   自研插件（split-lock）的源码正本在 `~/Projects/omarchy-on-niri` 仓库。
 
+> **体裁**：现状参考（读者：维护者 / 使用者）。坑清单见 §7；已知问题汇总见 [known-issues](known-issues.md)。
+
 ## 1. 一页速查
 
 本机在 `~/.config/omarchy/plugins/` 下有 **7 个**插件（其余 **38 个第一方**在
@@ -272,7 +274,7 @@ journalctl -t omarchy-shell --since "-10min" | tail -50
 - **交付 = `niri.patch`**：bar 的改动全在覆盖层里，随 `~/bin/omarchy-niri-repatch` 重放 ——
   `Bar.qml`（16 hunk）、`README.md`、`widgets/{ActiveWindow,KeyboardLayout,Tray}.qml`，外加两个新文件
   `LICENSE`/`UPSTREAM.md`（这两个是活体树里的未跟踪 sidecar，不在补丁内）。整份补丁现在是 **48 文件 / 133 hunk / 3276 行**，md5
-  `15f3e9533b92eb5be00c133af9d1e40f`（2026-11-15 追加截图通知缩略图修复后重导出；此前 2026-11-14 全量 FF 后为 47 文件 / 131 hunk / 3241 行、md5 `032f3f46f1f0f0454eb555356780ae8e`；2026-11-04 版为 40 文件 / 131 hunk / 3412 行、md5 `b7d3f453e99631823bd76b0d2f477f25`，只改通知霜化那行的 `service.cornerRadius` → `Style.cornerRadius`，行数/hunk 不变；上一版 md5 `a9f9e107…`；再上一版 3088 行 / md5 `423813f5702a120214ea09da21af1fc4` = 弹层卡片投影那版；再上一版 3022 行 / md5 `bcb5aca36ace33d829c6773da7026801` = menu 卡片投影那版；再上一版 27 文件 / 82 hunk、md5 `cdc361f9…`）。
+  `15f3e9533b92eb5be00c133af9d1e40f`（2026-11-15 追加截图通知缩略图修复后重导出；历史版本链见 [niri.patch 版本史](history/niri-patch-versions.md)）。
   `Bar.qml` 那 16 个 hunk 就是浮空全套：`floatGap`/`cornerRadius` 读取、boot reveal（`PanelWindow.visible`
   开关，加载期整块不上屏，见 `docs/visual.md` 第 33 条）、霜化内缩 2px（`barBlurAnchor` 的
   `anchors.margins: 2` + `radius: effectiveCornerRadius - 2`，见 §8 第 44 条）、加载期底部 `Thinking…`

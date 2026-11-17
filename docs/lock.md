@@ -7,6 +7,8 @@
 > 覆盖范围：登录界面（Split Greeter）、锁屏（`split-lock`）、PAM 门禁、人脸（howdy）与头像、greetd 的
 > 单格 `configuring` 陷阱。
 
+> **体裁**：历史记录（dated 变更与根因日志，不是当前操作指南）。当前状态见 [移植与合并进度](port-merge-status.md) 与 [已知问题](known-issues.md)。
+
 ## 本卷目录
 
 - 8.18 锁屏"不能锁"：PAM 门禁（手工部署漏了安装器步骤）（2026-09-19）

@@ -11,17 +11,19 @@ matching guide before starting:
 - [`agents/skills/visual-verification.md`](agents/skills/visual-verification.md) - verifying any change with a visual effect in the running UI
 - [`agents/skills/migrations.md`](agents/skills/migrations.md) - creating or changing migrations under `migrations/`
 - [`agents/skills/sanitization.md`](agents/skills/sanitization.md) - before committing docs, configs, or anything that could carry a credential or this machine's identity; run `scripts/check-sanitized.py`
+- [`agents/skills/writing-docs.md`](agents/skills/writing-docs.md) - adding or restructuring documentation under `docs/`, the READMEs, or `manual/`; genre map and result-first rules
 
 # Documentation Layout
 
 Three documentation trees, split by genre and audience:
 
 - `agents/skills/` - task procedure ("do this when doing X"), for anyone working on the codebase
-- `docs/` - reference on how the system is shaped (file layout, update pipeline, theming, shell architecture), for anyone working on the codebase; skills link here for depth
+- `docs/` - reference on how the system is shaped (file layout, update pipeline, theming, shell architecture), for anyone working on the codebase; skills link here for depth. Genres (current reference / dated history / postmortems / known issues) are defined in `docs/README.md`
 - `manual/` - end-user documentation for using Omarchy, published; never codebase internals
 
 # Style
 
+- Documentation is result-first and reader-first: describe what exists, how to use it, and what limits it; do not narrate the author's attempts. Dated history, postmortems, and known issues belong in their own files (`docs/README.md`)
 - In markdown documents (`plans/`, `docs/`, `manual/`), write full lines — no hard wrapping at 80 columns; break only at structural boundaries like headings and list items
 - Two spaces for indentation, no tabs
 - Use bash 5 conditionals: use `[[ ]]` for string/file tests and `(( ))` for numeric tests

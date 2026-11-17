@@ -2,6 +2,8 @@
 
 > **English → [README.md](README.md)**
 
+> 当前限制：[docs/known-issues.md](docs/known-issues.md)。文档体裁：[docs/README.md](docs/README.md)。
+
 把 [basecamp/omarchy](https://github.com/basecamp/omarchy)（`quattro` / `4.0.0.alpha`）从 Hyprland 移植到
 [niri](https://github.com/YaLTeR/niri) Wayland 合成器上。
 
@@ -229,48 +231,13 @@ cd onarchi
 | 经 `popupColumn` 的通知霜化 | 该元素上游已不存在，表面现在是窄条带 |
 | `omasnap`、`monologue`、`hype`、`signed` | 四个都要 **Qt 6.12**，本机钉在 6.11（见下）。`omasnap` 还硬依赖 `hyprland`。同批只有 `disktree-bin` 能跑 |
 
-### Qt 6.12 与磨砂 bar —— 已经解钉了
+### Qt 6.12 与磨砂 bar
 
-**本机自 2026-11-11 起跟 Qt 6.12 走。** 按住 6.11.2 的 `IgnorePkg` 已删除。删之前这一节写的是
-「`MultiEffect` 的模糊在 6.12 下变成空操作，bar、菜单、面板会画成精确 `(0,0,0)` 的不透明黑」——
-**这条复现不出来。**
-
-在 6.12.0（`qt6-base 6.12.0-4`、`qt6-declarative 6.12.0-4`）上实测。测试时包解到临时树里、用
-`qml6` 跑，系统本身仍是 6.11.2：
-
-| 探针 | 6.11.2 | 6.12.0 |
-|---|---|---|
-| `blurMax: 32` 下的 8 px 棋盘（stddev，开 / 关模糊） | 9.4 / 127.5 | 9.4 / 127.5 |
-| `blur: 0.6` 下的硬边（中间调采样数，开 / 关） | 64 / 0 | 64 / 0 |
-| 同一场景，6.11.2 与 6.12.0 逐像素比 | — | **最大差异 0** |
-
-`--no-blur` 对照组里模糊确实是空操作（stddev 127.5），所以探针有分辨力。`opengl` 和 `vulkan`
-两种 RHI 后端结果一样。`QML_IMPORT_TRACE` 确认 `QtQuick.Effects` 解析到 6.12 自己的插件、不是系统
-那份，`Qt.application.version` 报 `6.12.0`。
-
-旧结论错在哪，目前**不清楚**：缓存里 2026-10-10 当时装的 6.12.0-2 / declarative-1，渲染结果和现在
-这版逐像素相同。那次黑 bar 从来没在受控条件下复现过，所以应当当作一次原因不明的偶发，而不是
-Qt 6.12 的性质。
-
-升级后在真实会话里复核过：bar 是磨砂的（沿 bar 采样有真实渐变，没有 `(0,0,0)` 色块）、总览背景
-有真模糊、菜单面板能透出背后的壁纸。`omarchy-shell shell ping` 返回 `ok`。
-
-**这次升级顺带拉进来的东西。** 解钉不是一次只管 Qt 的事务：一共动了 121 个包，包括
-`linux` 7.2.14→7.2.15、`systemd` 262.1→262.2、`pacman` 和 `openssl` 3.6.5→4.1.0。风险大的是
-openssl 的 soname 跳变——本机原有 74 个二进制链接 `libcrypto.so.3`，现在这个库由兼容包
-`openssl-3` 提供。判据是 `python3 -c "import cv2"`（opencv 撑着人脸解锁；`cv2` 坏了的表现是锁屏报
-`Error while authenticating: "System error" (code 4)`），外加 `node`、`git`、`rsync`、`paru`、
-`cargo` 各跑一次。
-
-`vtk` 仍然 import 不了：Arch 编译它时链了 42 个并未声明为依赖的可选库（`libopenxr_loader`、
-`libgdal`、`libonnxruntime`，以及 OCCT 和 viskores 那两套）。旧版 9.6.2-7 是 40 个，所以这是本来就
-存在的打包缺口，不是本次升级引入的。Omarchy 里没有任何东西用 `vtk`，它只是被 `python-opencv`
-连带装上的。
-
-需要回退：`pkexec snapper -c root undochange 2702..2708` 回到升级前快照，旧包也都还在
-`/var/cache/pacman/pkg` 里。
+Qt 6.12 已解钉并在真实会话验收；此前的黑 bar 报告在受控测试中未复现。测量、升级影响与回滚见 [复盘](docs/postmortems/qt-6.12-frosted-bar.zh.md)。
 
 ### 未完成项
+
+> 汇总索引：[docs/known-issues.md](docs/known-issues.md)。
 
 - **91 条迁移待跑**（共 211 条）。33 条要 root 且是机型专属（N1x / ASUS ProArt / aarch64 / Limine）；
   42 条动 Hyprland 或 uwsm。已跑 6 条面向用户的（bar 布局拆分、壁纸重编号、Fcitx 主题、Chromium

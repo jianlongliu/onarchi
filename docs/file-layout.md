@@ -1,5 +1,7 @@
 # File layout
 
+> **Genre**: current reference (audience: users and maintainers). **Last reviewed**: 2026-11-17 (genre and links only; content not re-verified).
+
 How `omarchy/` is organized and where everything ends up on an installed
 system.
 

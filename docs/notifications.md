@@ -1,5 +1,7 @@
 # Notifications
 
+> **Genre**: current reference (audience: users and maintainers). **Last reviewed**: 2026-11-17 (genre and links only; content not re-verified).
+
 The shell is the notification daemon: `shell/plugins/notifications/Service.qml`
 hosts a Quickshell `NotificationServer` that claims `org.freedesktop.Notifications`
 on the session bus. There is no dunst or mako — anything that speaks the

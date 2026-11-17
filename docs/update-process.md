@@ -1,5 +1,7 @@
 # Omarchy update process
 
+> **Genre**: current reference (audience: maintainers). **Last reviewed**: 2026-11-17 (genre and links only; content not re-verified).
+
 This document describes the intended update behavior now that Omarchy is
 package-backed. It covers the blessed update path plus what happens when a user attempts to
 bypass it:

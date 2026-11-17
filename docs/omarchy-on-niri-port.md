@@ -2,7 +2,7 @@
 
 > 目的：把 DHH 的 Omarchy v4（原本 Arch + Hyprland + QuickShell）移植到 niri
 > 滚动平铺 Wayland 合成器上，运行在主账户（原实验账户已回迁），并保持 niri 原生体验。
-> 本文档是"上下文丢失也能重建"的持久记录。最后更新：2026-09-19（文档合并：`~/Documents` 母本与
+> 本文档是"上下文丢失也能重建"的持久记录。最后更新：2026-11-17（§10 环境核对；此前 2026-09-19 文档合并：`~/Documents` 母本与
 > 仓库 `docs/omarchy-on-niri-port.md` 归并为一，两份逐字节一致；补回仓库版缺的 §5.7/§5.8、媒体键 OSD、
 > `binds` 递归展开、发布流程等块，并补入仓库版今天的 §8.9 上游合并基线与 §9/§10 新条目；新增
 > §8.10 主题动态取色、§8.11 bar 插件层；修正 §5.6 C 层回归（已修）、§8.8 浮栏模糊规则变更）。
@@ -16,6 +16,8 @@
 > 2026-09-20 深夜**文档归一**：取消「母本 + 仓库镜像」双写 —— `docs/` 就是唯一正本，
 > `~/Documents/omarchy-niri-*.md` 改成了指向它的软链（2026-09-21 那九个软链、连同守它们的
 > `scripts/check-doc-links.sh` 一并删掉：正本在 `docs/`，不需要入口层）。
+>
+> **体裁**：§1–§7、§9、§10 是现状参考；§8 是专题记录入口（正文分在各模块卷，按 dated 记录，不是当前操作指南）。当前仍成立的问题见 [已知问题](known-issues.md)。
 
 ---
 
@@ -37,6 +39,10 @@
 | 锁屏 / 登录 | `docs/lock.md` | 锁面、greeter、人脸、greetd wedge |
 | 本机改动总账 | `docs/local-overrides.md` | 这台机器相对仓库**多出/改过**的一切与回退方式 |
 | 待办 | `docs/todo.md` | 还没做 / 等拍板的事（**不占全局编号**，做完即删行；已完成的不在这里留档）|
+| 已知问题 | `docs/known-issues.md` | 当前仍成立 / 未验收的限制与缺口（汇总索引，细节指向各卷） |
+| 复盘 | `docs/postmortems/` | 故障与误报的完整测量、结论与回滚（如 Qt 6.12 磨砂） |
+| 文档约定 | `docs/README.md` | 体裁、读者、验证标签与写作规则 |
+| 历史 | `docs/history/` | 从现状卷移出的版本链等历史细节 |
 
 以下各卷是**上游源码自带的参考文档**（随 `quattro` 合并进来，我们只在确有必要时才改），
 写的是这套系统的设计，不是本移植的改动记录：
@@ -135,7 +141,7 @@ hyprctl 调用面有界、可直接映射。
 | `~/bin/omarchy-display-text-size` (+x) | bar 的 Display 面板 TEXT SIZE 滑块垫片：官方脚本只管 shell `[font]`/GTK factor/终端 pt，这个补 GTK dconf+settings.ini、Qt(qt6ct)、fcitx5、XSETTINGS 各层（§8.19）。仓库 `port-bin/omarchy-display-text-size` |
 | `~/.config/omarchy/hooks/theme-set.d/10-niri-border` | 换 style 时自动 `omarchy-niri-apply-theme`（只写不重载，保护 SCALE）|
 | `~/.config/omarchy/hooks/post-update.d/10-niri-repatch` | 上游真身的 post-update 阶段重放覆盖层；本机四段垫片不调用该钩子 |
-| `~/.config/omarchy/niri-port/`（`niri.patch` + `Niri.qml` + `plugins/` + `plugin-patches/`）| 移植覆盖层产物（仓库外，重放用）。**当前：`niri.patch` 48 文件 / 133 hunk / 3276 行**，`--reverse --check` 通过、repatch 幂等，md5 `15f3e9533b92eb5be00c133af9d1e40f`（2026-11-15 追加截图通知缩略图修复后重导出，见 `docs/upstream.md` §8.27：新增 `shell/plugins/notifications/Store.js`；此前 2026-11-14 全量 FF 到 `723072a55` 后为 47 文件 / 131 hunk / 3241 行、md5 `032f3f46f1f0f0454eb555356780ae8e`；此前 2026-11-04 版为 40 文件 / 131 hunk / 3412 行、md5 `b7d3f453…`：通知霜化那行在补丁里写成 `service.cornerRadius`，而该文件没有这个属性、根对象是裸 `Item` ⇒ 重放会把圆角变成 0；工作树本来就是对的 `Style.cornerRadius`，只补丁陈旧。行数/hunk 不变，md5 由 `a9f9e107…` 变为此值。2026-10-30 起核：加 `bin/omarchy-system` 的 niri logout 分流 + 5 个 i18n/helper/动效改动，131 hunk；此前 2026-10-05 三轮后核 —— menu 那轮 2956→3022 行、弹层那轮 3022→3088 行、bar 顶边高光那轮 3088→3098 行，hunk 数始终 106，见 `docs/visual.md` §8 第 43 条、§8 第 45 条、§8 第 46 条；3088 行 / md5 `423813f5…`、3022 行 / md5 `bcb5aca3…` 为其间的中间版本；再往前 2026-10-04 **合并浮空 bar** 后核，与仓库 `niri-port/niri.patch` 逐字节一致：`shell/plugins/bar/` 进 6 个路径 + 新文件 `LICENSE`/`UPSTREAM.md`，82→105 hunk，见 `docs/plugins.md` §5.4；上一版 27 文件 / 82 hunk、md5 `cdc361f9…` = 同日加 `shell/Ui/KeyboardPanel.qml` 的卡片投影，1 hunk / 18 行，见 `docs/visual.md` §8 第 43 条。上一版 27 文件 / 81 hunk、md5 `3c672ab5…` = 2026-09-30 加 `bin/omarchy-update`（把 CLI `omarchy update` 委派给 `~/bin` 垫片，4 hunk），见 `docs/upstream.md` §8.7；上一版 26 文件 / 77 hunk、md5 `22dd2334…` = 2026-09-27 加 `bin/omarchy-default-agent`、`bin/omarchy-agent` 两条 ante 分支（5 hunk），见 `docs/behavior.md` §8 第 40 条 —— 同轮还新增了两个**仓库外**的 root 动作（paru 开关的 `/usr/bin` 副本 + polkit 规则，见 §5），它们不进补丁；再上一版 24 文件 / 72 hunk、md5 `e6868080…` = 2026-09-26 加 `shell/plugins/panels/power/Panel.qml` 的 **CHARGE LIMIT 档位切换**共 8 个 hunk，同时把 `bin/omarchy-battery-status` 改成 **sysfs 优先**（阈值读数陈旧的真根因）；再上一版 `4ec279cf…` = 2026-09-26 加 `shell/plugins/panels/monitor/Panel.qml` 的**分辨率滑块**；上一版 `ef920a66…` = 2026-09-23 加菜单 `style.avatar.*` 三行，见 `docs/lock.md` §11.29）；上一版重导出是把活体先改、补丁没跟上的两处（`Background.qml` 的 `paintedOnce`、`shell.qml` 的 `pushBootReveal()` 增补）补进补丁 —— 补上之前 repatch 判 exit 2。**`backups/` 已不在这里**（2026-09-21 全部备份搬进 `~/.local/state/backups/`，见 `local-overrides.md` §0.1），安全网是断的。**2026-10-04 起 bar 的改动不再走插件补丁**：浮空 bar 已并进这份 `niri.patch`（`shell/plugins/bar/` 那 6 个文件（4 个改动 + 2 个新文件），33 文件 / 106 hunk / 3022 行、md5 `bcb5aca36ace33d829c6773da7026801`，见 `docs/plugins.md` §5.4）—— bar 不再依赖那个没有自动重放器的插件补丁 |
+| `~/.config/omarchy/niri-port/`（`niri.patch` + `Niri.qml` + `plugins/` + `plugin-patches/`）| 移植覆盖层产物（仓库外，重放用）。**当前：`niri.patch` 48 文件 / 133 hunk / 3276 行**，`--reverse --check` 通过、repatch 幂等，md5 `15f3e9533b92eb5be00c133af9d1e40f`（2026-11-15 追加截图通知缩略图修复后重导出，见 `docs/upstream.md` §8.27：新增 `shell/plugins/notifications/Store.js`）。历史版本链见 [niri.patch 版本史](history/niri-patch-versions.md)。**`backups/` 已不在这里**（2026-09-21 全部备份搬进 `~/.local/state/backups/`，见 `local-overrides.md` §0.1），安全网是断的。**2026-10-04 起 bar 的改动不再走插件补丁**：浮空 bar 已并进这份 `niri.patch`（`shell/plugins/bar/` 那 6 个文件（4 个改动 + 2 个新文件），33 文件 / 106 hunk / 3022 行、md5 `bcb5aca36ace33d829c6773da7026801`，见 `docs/plugins.md` §5.4）—— bar 不再依赖那个没有自动重放器的插件补丁 |
 | `~/bin/omarchy-sleep-lock-start` (+x) | **合盖/挂起锁屏的启动包装器**（上游 `omarchy-sleep-lock.service` 在本机两条 `ConditionEnvironment=` 都过不去，改由它拉起）：有界等（30s 封顶）会话把环境发布进用户管理器 → 采纳 `WAYLAND_DISPLAY`/`XDG_RUNTIME_DIR`/`XDG_SESSION_TYPE`/`NIRI_SOCKET`/`XDG_CURRENT_DESKTOP`/`DBUS_SESSION_BUS_ADDRESS` → `exec` 上游 `omarchy-system-sleep-monitor`；单元见 `local-config/systemd/user/omarchy-sleep-lock.service`，全过程见 `lock.md` §11.28 |
 | `~/bin/omarchy-hyprland-window-gaps-toggle` (+x) | **窗口缝隙开关垫片**（2026-09-24）：上游靠 `default/hypr/toggles/window-no-gaps.lua` 把 gaps/border/rounding 归零；niri 侧改成写/删 `~/.config/niri/layout-no-gaps.kdl`（`layout.kdl` 尾部 `include optional=true` 读它，include 是位置性的 ⇒ 只覆盖它点名的属性），并按上游语义写同一个 flag 文件；`~/bin/hyprctl` 的 `getoption` 在 flag 在时对 `general:gaps_out`/`decoration:rounding` 返回 0 ⇒ **壳层跟着塌**（`Style.gapsOut`/`cornerRadius`）。规格、坑与实测见 `docs/shims.md` §4；仓库副本 `port-bin/omarchy-hyprland-window-gaps-toggle` |
 | `~/bin/omarchy-launch-screensaver` (+x) | **闲置策略垫片**（2026-09-24）：上游这份在终端跑 ASCII 屏保（早被 `screensaver-off` flag 停用），本机改成「**不插电 + 非全屏 + 非播放视频**才 `omarchy-system-lock`，灭屏交给锁自己（5 秒）；插电/全屏/已锁一概不动」，触发点 = `shell.json` 的 `idle.screensaver`（那天 150 → 300）。规格与四分支实测见 `docs/behavior.md` 的 §8 第 23 条；仓库副本 `port-bin/omarchy-launch-screensaver`，PATH-first（改动必须 `install -m 0755` 同步两份） |
@@ -781,10 +787,10 @@ false` 让 niri 把焦点环画在窗口**周围**而非背后，问题解决（
 
 ## 10. 关键环境信息
 
-- 两个账户**同属用户本人**。**移植现在就跑在主账户（uid 1000）上** —— 2026-09-19/20 按 §11 从实验账户迁回，本文档里 `$DEV_HOME`、`/home/<dev-user>` 这类写法是迁移前的历史记号，迁移后一律等于 `~`。实验账户（已停用）还在，但已不参与本移植（其户目录仍是 0700，读不到）。迁移后 `dms-shell` / `dms-shell-niri` / `dankcalendar` **已不在包列表**，`/etc/greetd/config.toml` 的 `default_session` 指向自研 `/usr/local/bin/split-greeter`（`greetd-dms-greeter-bin` 包仍在，只是不再当登录会话）。
+- 两个账户**同属用户本人**。**移植现在就跑在主账户（uid 1000）上** —— 2026-09-19/20 按 §11 从实验账户迁回，本文档里 `$DEV_HOME`、`/home/<dev-user>` 这类写法是迁移前的历史记号，迁移后一律等于 `~`。迁移后 `dms-shell` / `dms-shell-niri` / `dankcalendar` **已不在包列表**，`/etc/greetd/config.toml` 的 `default_session` 指向自研 `/usr/local/bin/split-greeter`（`greetd-dms-greeter-bin` 包仍在，只是不再当登录会话）。
 - niri 26.04 (8ed0da4) 位于 `/usr/bin/niri`。
 - 显示管理器：greetd / dms-greeter（DMS 自家 greeter，`/etc/greetd/config.toml` / `niri/dms.kdl` 归主账户所有）。包管理器 paru。
-- 电源后端：**TLP**（`tlp` + `tlp-pd` 1.10.2，D-Bus `net.hadess.PowerProfiles`），**无** power-profiles-daemon（`powerprofilesctl` 缺失）。
+- 电源后端：**TLP**（`tlp` + `tlp-pd` 1.11.0，D-Bus `net.hadess.PowerProfiles`），**无** power-profiles-daemon（`powerprofilesctl` 缺失）。
 - 引导：**systemd-boot + Secure Boot，无 Limine**；内核是 stock `linux`（不是上游推的 `linux-omarchy`）。
 - 仓库源（本机 `pacman-conf --repo-list` 核对）：`omarchy` / `core` / `extra` / `multilib` / `archlinuxcn` / `tui-tools`；此前未配置 Omarchy 源的结论是历史记录。
 - 快照：**snapper** 已启用（`root` / `home` / `data` 三个配置，`root` 的 `SUBVOLUME="/"`），pacman 事务前后自动打快照（钩子 `05-snap-pac-pre` / `zz-snap-pac-post`）。原 `opencode` 配置与 `/opt/opencode` 子卷（含 4 个 bind）2026-11-02 已拆。

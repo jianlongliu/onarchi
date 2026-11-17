@@ -1,5 +1,7 @@
 # Omarchy theming
 
+> **Genre**: current reference (audience: users and maintainers). **Last reviewed**: 2026-11-17 (genre and links only; content not re-verified).
+
 Omarchy themes live under `themes/<name>/` in the source tree (installed at
 `/usr/share/omarchy/themes/<name>/`), with optional user themes under
 `~/.config/omarchy/themes/<name>/`. A theme normally starts with a

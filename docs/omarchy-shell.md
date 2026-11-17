@@ -1,5 +1,7 @@
 # omarchy-shell
 
+> **Genre**: current reference (audience: users and maintainers). **Last reviewed**: 2026-11-17 (genre and links only; content not re-verified).
+
 A single long-running [Quickshell](https://quickshell.org/) instance
 that hosts the Omarchy desktop. The bar, panels, overlays, menus, and
 services all run inside as plugins. Hyprland autostart launches the

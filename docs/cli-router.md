@@ -1,5 +1,7 @@
 # The Omarchy CLI router
 
+> **Genre**: current reference (audience: users and maintainers). **Last reviewed**: 2026-11-17 (genre and links only; content not re-verified).
+
 `bin/omarchy` maps spaced commands onto the flat `bin/omarchy-*` namespace:
 `omarchy theme set foo` becomes `exec bin/omarchy-theme-set foo`. There is no
 registry to maintain — every executable `bin/omarchy-*` file is a command, and

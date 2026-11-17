@@ -1,5 +1,7 @@
 # Speaker tunings
 
+> **Genre**: current reference (audience: users and maintainers). **Last reviewed**: 2026-11-17 (genre and links only; content not re-verified).
+
 Laptop speakers ship voiced by the vendor's Windows DSP layer, which Linux does
 not get. A tuning restores that as a PipeWire filter-chain in front of the
 internal speaker sink: a declarative graph hosted by a small PipeWire client, with

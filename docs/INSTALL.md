@@ -2,6 +2,8 @@
 
 > **简体中文 → [INSTALL.zh.md](INSTALL.zh.md)**
 
+> **Genre**: procedure (audience: users and maintainers). **Last reviewed**: 2026-11-17 (genre and links only; steps not re-run).
+
 This is a reference for people and agents, not a guarantee: it has not been end-to-end tested on another machine. Review and adapt each step. The optional `install.sh` differs: it does not stage the overlay or plugins, install packages, configure backlight or PAM, or merge the niri config. It installs two user units and warns rather than failing if repatch fails. Both paths can overwrite existing files; back them up first.
 
 Assumptions: you are on **Arch + niri**, logged in as your user, and **Omarchy is already installed** at

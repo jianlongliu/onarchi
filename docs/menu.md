@@ -1,5 +1,7 @@
 # The Omarchy menu
 
+> **Genre**: current reference (audience: users and maintainers). **Last reviewed**: 2026-11-17 (genre and links only; content not re-verified).
+
 The menu is the `omarchy.menu` plugin of the Quickshell desktop, with its
 content defined as data in `default/omarchy/omarchy-menu.jsonc` (read at
 runtime from `$OMARCHY_PATH`) and overlaid by the user's

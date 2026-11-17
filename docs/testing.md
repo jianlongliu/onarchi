@@ -1,5 +1,7 @@
 # Testing
 
+> **Genre**: current reference (audience: maintainers). **Last reviewed**: 2026-11-17 (genre and links only; content not re-verified).
+
 How the non-graphical test suites are organized: what each runner owns, the
 protocol test files speak, and the conventions that keep them runnable on any
 machine — including headless CI sandboxes with no compositor. The graphical
