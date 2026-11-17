@@ -946,7 +946,7 @@ Omarchy 有两层配置，只有层1在 niri 上真正生效：
       **触后 2 分钟稳在 80%（未越过到 79%）**——正是缺刹车时不会发生的事。④`systemd-analyze verify`
       两个单元 0 错（**这个命令值得当单元 lint 用**：它抓到我把 `ConditionPathExists` 写进了 `[Service]`）。
       ⑤契约测试 **47 检查全绿**（假 sysfs，不碰真硬件；含 SIGKILL 缺口那条，如实断言而非假装闭合）。
-    - **回退**：`pkexec bash ~/Projects/omarchy-on-niri/battery-care/install.sh --remove`（先 disarm 再删）。
+    - **回退**：`pkexec bash ~/Projects/onarchi/battery-care/install.sh --remove`（先 disarm 再删）。
       **改仓库后必须重跑 `install.sh`**（装的是 root 属主真副本，不是指回用户可写树的软链——同 §5 那条理由），
       `omarchy update` 不会刷新它。暂停：`touch /etc/omarchy-battery-care-off && systemctl restart omarchy-battery-care`。
     - **写脚本时踩到的坑（可复用）**：`$(<file 2>/dev/null || true)` **恒为空**——`|| true` 破坏了 bash 的

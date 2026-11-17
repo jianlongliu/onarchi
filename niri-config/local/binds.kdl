@@ -19,7 +19,7 @@ Mod+Shift+Slash { show-hotkey-overlay; }
 // 终端类统一走 Omarchy 自己的包装器 omarchy-launch-terminal（它会用「默认终端」设置、
 // 并跟随当前终端的 cwd，跟菜单里那些入口是同一条路）。它以前在这台机器上是哑的，
 // 因为内部走 `setsid uwsm-app` 而本机没有 uwsm-app —— 已由 ~/bin/uwsm-app 垫片统一解决，
-// 见 ~/Projects/omarchy-on-niri/docs/omarchy-on-niri-port.md §8 第 22 条。
+// 见 ~/Projects/onarchi/docs/omarchy-on-niri-port.md §8 第 22 条。
 Mod+Return hotkey-overlay-title="Terminal (default)" { spawn-sh "omarchy-launch-terminal"; }
 Mod+Ctrl+Return hotkey-overlay-title="Herdr" { spawn-sh "omarchy-launch-terminal herdr"; }
 Mod+D hotkey-overlay-title="Apps menu" { spawn-sh "omarchy-menu toggle apps"; }

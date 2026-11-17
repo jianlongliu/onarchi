@@ -60,7 +60,7 @@ install -Dm644 local-config/fastfetch/config.jsonc ~/.config/fastfetch/config.js
 所以不像 niri 配置那样存在"占位符差异"）：
 
 ```bash
-cd ~/Projects/omarchy-on-niri
+cd ~/Projects/onarchi
 ./scripts/local-files-sync.sh     # 三层一起对账：local-config/ + plugins/ + split-lock/ir-light
 ```
 

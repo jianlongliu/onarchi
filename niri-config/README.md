@@ -70,7 +70,7 @@ niri validate                                      # 必须通过；见下面的
 通过后同步过来：
 
 ```bash
-cd ~/Projects/omarchy-on-niri
+cd ~/Projects/onarchi
 for f in config input monitor layout window-rules effects binds; do
   sed "s|$HOME|/home/<user>|g" ~/.config/niri/$f.kdl > niri-config/local/$f.kdl
 done

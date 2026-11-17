@@ -11,7 +11,7 @@ Assumptions: you are on **Arch + niri**, logged in as your user, and **Omarchy i
 below to that path.
 
 ```sh
-REPO=/path/to/omarchy-on-niri     # <-- change me
+REPO=/path/to/onarchi     # <-- change me
 ```
 
 ---

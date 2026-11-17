@@ -638,10 +638,10 @@ shell/plugins/lock/LockView.qml shell/services/PluginRegistry.qml`，再删
 16. **GitHub 发布流程（2026-08-25 建立）**：移植差分推到 pub 仓库
     `github.com/jianlongliu/onarchi`（PUBLIC，默认分支 `quattro`）。要点：
     - **仓名**：2026-09-28 GitHub 改名 `omarchy-on-niri` → `onarchi`（旧 slug 仍 301 重定向）；
-      本地目录 `~/Projects/omarchy-on-niri` 与 `docs/omarchy-on-niri-port.md` 文件名**不改**。
+      本地目录现为 `~/Projects/onarchi`（旧名 `omarchy-on-niri`）；`docs/omarchy-on-niri-port.md` 文件名**不改**。
       ⚠ `github.com/jianlongliu/Nirism` 是**另一个项目**（Hyprland 仿 niri，`master` 分支），
       README 改名提交一度把 clone URL 写成它，已改回 `onarchi`。
-    - 本地 working clone 在 `/home/<dev-user>/omarchy-on-niri`（独立的临时构建仓库，
+    - 本地 working clone 在 `/home/<dev-user>/onarchi`（独立的临时构建仓库，
       **不是** LIVE 的 `~/.local/share/omarchy`——后者保留未提交工作树改动，避免破坏
       `git pull --ff-only`）。
     - push 走 **SSH**（`gh auth git-credential` 走 https 会弹密码，不可用）。

@@ -127,7 +127,7 @@ pkexec ~/.local/share/omarchy/bin/omarchy-apply-lock     # 或 sudo omarchy-appl
 
 ### 11.11 登录界面：自研 Quickshell greeter「Split Greeter」（Split 设计，多账户 + 人脸）
 
-§11.10 的三条路里选了"自研"：**直接复用锁屏插件的 Split 设计当 DM**，既不依赖 dms-shell，也不依赖会话内 shell。代码在仓库 `split-greeter/`（本机 `~/Projects/omarchy-on-niri/greeter/`，**只在本地提交，未推远端**）。顺带确认：`greetd-dms-greeter-bin` 只依赖 `greetd quickshell qt6-declarative`，**不依赖 dms-shell**，与 DMS 的唯一耦合是 `dms-greeter sync` 把 DMS 主题/壁纸拷进 `/var/cache/dms-greeter`（0750 `greeter:greeter`，普通用户读不到）。
+§11.10 的三条路里选了"自研"：**直接复用锁屏插件的 Split 设计当 DM**，既不依赖 dms-shell，也不依赖会话内 shell。代码在仓库 `split-greeter/`（本机 `~/Projects/onarchi/greeter/`，**只在本地提交，未推远端**）。顺带确认：`greetd-dms-greeter-bin` 只依赖 `greetd quickshell qt6-declarative`，**不依赖 dms-shell**，与 DMS 的唯一耦合是 `dms-greeter sync` 把 DMS 主题/壁纸拷进 `/var/cache/dms-greeter`（0750 `greeter:greeter`，普通用户读不到）。
 
 **结构**——greetd 拉起一个只跑本 greeter 的 niri 实例：
 
@@ -530,7 +530,7 @@ Omarchy 的锁层从 `hyprctl -j monitors` 读两个字段，shim 之前都在�
 - 桌面 bar 滑入**真机验过**（等价于真登录里壳层启动那一段）：写标记 → kill 旧壳 + `niri msg action spawn -- omarchy-launch-shell`（`omarchy-restart-shell` 也行）→ 逐帧 `grim -t ppm` 并把**顶部条带**裁出来拼图看（`magick -crop 2560x75+0+0` + `montage`，这一步不能省：**亮度数字很容易被别的窗口污染**）—— 抓到"无 bar → 半透明中间态 → 落位"三态，标记被消费，journal 无 QML 错误；**不写标记直接重启后条带立刻是落位值 0.509075**（不滑、不藏 bar）。`niri msg layers | grep -c omarchy-bar` 不作为判据：parking 是**改 margin、surface 一直 mapped**，图层计数不变。
 - `qmllint` 对带 Quickshell 导入的文件只会静默失败（干净 HEAD 版同样 exit 255），别拿它当验证。
 
-**验证/状态**：整条链已在一次**真登录**里目视确认过（用户认可动画与时机；随后指出两个观感问题——"没 blur"与"顶部一块空 blur + 一个 bar 追下来"，都已修掉 ⇒ 最终形态是上面的"整块出现"）。`omarchy-restart-shell` 只能验桌面侧那一段（而且锁屏期间会被拒）。greeter 侧四处改动**已装**（`sudo ~/Projects/omarchy-on-niri/split-greeter/install.sh` 跑过了，回退件 `/etc/greetd/config.toml.backup-*`）。
+**验证/状态**：整条链已在一次**真登录**里目视确认过（用户认可动画与时机；随后指出两个观感问题——"没 blur"与"顶部一块空 blur + 一个 bar 追下来"，都已修掉 ⇒ 最终形态是上面的"整块出现"）。`omarchy-restart-shell` 只能验桌面侧那一段（而且锁屏期间会被拒）。greeter 侧四处改动**已装**（`sudo ~/Projects/onarchi/split-greeter/install.sh` 跑过了，回退件 `/etc/greetd/config.toml.backup-*`）。
 
 **还没做的两件事**（2026-09-21 只评估，下次研究）：见 §11.27。
 ### §11.27 交接那段黑：方向 A（底部 `Thinking…` 卡片）已实施，方向 B（plymouth 盖交接）仍搁置（2026-09-21）

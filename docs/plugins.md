@@ -9,7 +9,7 @@
 > **分工**：
 > - **本文**：第三方 / 自研插件的**现状与日常运维** —— 装了哪些、怎么配、怎么验、怎么更新、踩过什么坑；
 > - **魔改与正本**：改插件源码产生的 patch 存档在 `~/.config/omarchy/niri-port/plugin-patches/`，
->   自研插件（split-lock）的源码正本在 `~/Projects/omarchy-on-niri` 仓库。
+>   自研插件（split-lock）的源码正本在 `~/Projects/onarchi` 仓库。
 
 > **体裁**：现状参考（读者：维护者 / 使用者）。坑清单见 §7；已知问题汇总见 [known-issues](known-issues.md)。
 
@@ -301,9 +301,9 @@ journalctl -t omarchy-shell --since "-10min" | tail -50
 
 | 插件 | 源码 | 说明 |
 |---|---|---|
-| `jianlongliu.arch-logo` | 正本在 `~/Projects/omarchy-on-niri/plugins/jianlongliu.arch-logo/`（3 文件；无 `clonedFrom`，不是上游克隆，所以没有 patch 可复现 —— 2026-09-20 收进仓库） | Arch logo 按钮 + 菜单 |
+| `jianlongliu.arch-logo` | 正本在 `~/Projects/onarchi/plugins/jianlongliu.arch-logo/`（3 文件；无 `clonedFrom`，不是上游克隆，所以没有 patch 可复现 —— 2026-09-20 收进仓库） | Arch logo 按钮 + 菜单 |
 | `jianlongliu.workspaces` | 上游克隆（`clonedFrom: omarchy.workspaces`）+ 仓库里的 `niri-port/plugin-patches/jianlongliu.workspaces.patch`，机器上那份只在 `~/.config/omarchy/plugins/` | 胶囊工作区，第一方 `omarchy.workspaces` 已停用；**点数动态**（§5.5 末） |
-| `jianlongliu.split-lock` | 正本在 `~/Projects/omarchy-on-niri/split-lock/`（含 `install.sh`、测试、`face-pam.sh`） | 分屏锁屏，`clonedFrom: omarchy.lock`；在 `shell.json` 的 `plugins[]` 里常驻 |
+| `jianlongliu.split-lock` | 正本在 `~/Projects/onarchi/split-lock/`（含 `install.sh`、测试、`face-pam.sh`） | 分屏锁屏，`clonedFrom: omarchy.lock`；在 `shell.json` 的 `plugins[]` 里常驻 |
 
 三者都**没有 `.git`**，所以 `omarchy plugin update` 不会碰它们（更新只收有 `.git` 的目录）。
 ⚠ 后两个的源码改动要**同时**同步到 `~/.config/omarchy/plugins/` 那份才生效（install.sh 负责拷贝）。
@@ -377,8 +377,8 @@ journalctl -t omarchy-shell --since "-10min" | tail -50
 | `~/.config/omarchy/shell.toml` | 字号 / 通透度（`[bar] icon-font` 要 `Style.qml` 白名单）；仓库 `local-config/omarchy/shell.toml` |
 | `~/.config/omarchy/extensions/omarchy-menu.jsonc` | 菜单 override；仓库 `local-config/omarchy/extensions/omarchy-menu.jsonc` |
 | `~/.config/omarchy/niri-port/plugin-patches/` | 第三方插件的本地魔改存档（3 个 patch + README） |
-| `~/Projects/omarchy-on-niri/plugins/jianlongliu.arch-logo/` | 自研插件源码正本（仓库 `plugins/` 下仅此一份） |
-| `~/Projects/omarchy-on-niri/split-lock/` | `jianlongliu.split-lock` 源码正本 |
+| `~/Projects/onarchi/plugins/jianlongliu.arch-logo/` | 自研插件源码正本（仓库 `plugins/` 下仅此一份） |
+| `~/Projects/onarchi/split-lock/` | `jianlongliu.split-lock` 源码正本 |
 | `docs/plugins.md` | 本文档正本 |
 | `docs/omarchy-on-niri-port.md` | 主文档（当前事实 + 模块映射表）；本卷末附 §8.11，§8.17 在 `docs/behavior.md`，blur 全栈在 `docs/visual.md` |
 | `$OMARCHY_PATH/shell/services/PluginRegistry.qml` | 壳层实际执行的插件注册与启用规则 |

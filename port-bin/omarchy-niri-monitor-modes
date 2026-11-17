@@ -35,7 +35,7 @@ LOG="$STATE_DIR/monitor-modes.log"
 NIRI_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/niri"
 MONITOR_KDL="$NIRI_CONFIG_DIR/monitor.kdl"
 BACKUP_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/backups/.config/niri"
-REPO_MIRROR="${OMARCHY_NIRI_REPO:-$HOME/Projects/omarchy-on-niri}/niri-config/local/monitor.kdl"
+REPO_MIRROR="${OMARCHY_NIRI_REPO:-$HOME/Projects/onarchi}/niri-config/local/monitor.kdl"
 # The native tier is the EDID's DTD1; niri names it by geometry + refresh rate.
 NATIVE_MODE="3840x2400@60.000"
 

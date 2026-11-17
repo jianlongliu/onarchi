@@ -31,7 +31,7 @@ source, merge baseline and rollback: `docs/plugins.md` §5.4.
 
 ```sh
 cd ~/.config/omarchy/plugins/<id>
-git apply ~/Projects/omarchy-on-niri/niri-port/plugin-patches/<id>.patch
+git apply ~/Projects/onarchi/niri-port/plugin-patches/<id>.patch
 ```
 
 `jianlongliu.arch-logo`, `jianlongliu.workspaces` and `jianlongliu.split-lock` are ours, have no `.git`, and

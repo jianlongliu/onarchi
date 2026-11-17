@@ -10,7 +10,7 @@
 你已经克隆了本仓库到某处；把下面的 `REPO` 设为该路径。
 
 ```sh
-REPO=/path/to/omarchy-on-niri     # <-- 改成你的路径
+REPO=/path/to/onarchi     # <-- 改成你的路径
 ```
 
 ---
