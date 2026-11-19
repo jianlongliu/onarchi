@@ -18,7 +18,7 @@
 - 8.7 更新覆盖层：上游更新后自动重放
 - 8.9 上游合并基线（`43bfe9b` → `d174d4a`，2026-09-18）
 - 8.13 上游小更新（`d174d4a` → `8675600`，2026-09-19）
-- 8.20 上游 sudo 安全机制：代码已合入、机制未启用（2026-09-27）
+- 8.20 上游 sudo 安全机制：代码已合入、2026-11-19 本机启用（2026-09-27 记录）
 - 8.21 上游 shell 层的取舍：只跟 `Color.qml` 的颜色环修复（2026-09-27）
 - 8.22 上游单条挑拣：壳层四条（2026-10-19）
 - 8.23 全量 FF 到 `bc220e70`（2026-10-28）：846 提交、32 冲突、补丁失效
@@ -49,7 +49,7 @@
   与两个新文件 `LICENSE`、`UPSTREAM.md`，共 +6 文件；`shell/plugins/bar/widgets/Workspaces.qml` 的 niri 适配（`Hyprland.*`→`Niri.*`）
   仍在这份补丁里（合并时该文件一度被插件那份覆盖回上游写法、与基线逐字节相同，2026-10-04 当天恢复，见 `docs/omarchy-on-niri-port.md` §3.2）
   —— 上面起步名单里那两个 bar 文件同属 `shell/plugins/bar/`。
-  ——这 40 个文件正是 `niri.patch` 的起点；**当前（2026-11-18）为 48 文件 / 134 hunk / 3327 行、md5 `9db0fc097055fb14dbdec3070dfbced2`**，见 §8.27。2026-11-15 那版为 48 文件 / 133 hunk / 3276 行、md5 `15f3e9533b92eb5be00c133af9d1e40f`；2026-11-04 那版为 40 文件 / 131 hunk / 3412 行、md5 `b7d3f453e99631823bd76b0d2f477f25`（同日重导出：通知霜化那行在补丁里写成 `service.cornerRadius`，而该文件没有这个属性、根对象是裸 `Item`，重放会把圆角变成 0；工作树本来是对的 `Style.cornerRadius`，只补丁陈旧 ⇒ 行数/hunk 不变、md5 由 `a9f9e107…` 变为此值）；2026-10-05 那版为 33 文件 / 106 hunk / 3098 行、md5 `f6ef5a467795e2bd6f1ccf14161b185e`；同日前一版 3088 行 / md5 `423813f5…` = 弹层投影；3022 行 / md5 `bcb5aca36ace33d829c6773da7026801` 为当天早些的 menu 投影版；105 hunk / 2956 行那版为 md5 `2cea1e9517bd498df185e02414595bc8`（2026-10-04 合并浮空 bar）；
+  ——这 40 个文件正是 `niri.patch` 的起点；**当前（2026-11-19）为 49 文件 / 135 hunk / 3340 行、md5 `79060b759dd8846baa17e7ec7515618d`**，见 §8.27。2026-11-15 那版为 48 文件 / 133 hunk / 3276 行、md5 `15f3e9533b92eb5be00c133af9d1e40f`；2026-11-04 那版为 40 文件 / 131 hunk / 3412 行、md5 `b7d3f453e99631823bd76b0d2f477f25`（同日重导出：通知霜化那行在补丁里写成 `service.cornerRadius`，而该文件没有这个属性、根对象是裸 `Item`，重放会把圆角变成 0；工作树本来是对的 `Style.cornerRadius`，只补丁陈旧 ⇒ 行数/hunk 不变、md5 由 `a9f9e107…` 变为此值）；2026-10-05 那版为 33 文件 / 106 hunk / 3098 行、md5 `f6ef5a467795e2bd6f1ccf14161b185e`；同日前一版 3088 行 / md5 `423813f5…` = 弹层投影；3022 行 / md5 `bcb5aca36ace33d829c6773da7026801` 为当天早些的 menu 投影版；105 hunk / 2956 行那版为 md5 `2cea1e9517bd498df185e02414595bc8`（2026-10-04 合并浮空 bar）；
   合并前为 27 个文件 / 82 hunk、md5 `cdc361f9f534e16dd9043ac21c3ce352`；
   2026-09-30 为 27 文件 / 81 hunk、md5 `3c672ab5…`；2026-09-27 为 26 文件 / 77 hunk；
   2026-09-26 为 24 文件 / 72 hunk；
@@ -227,10 +227,12 @@ laravel 从 `~/.config/composer/vendor/bin/laravel` 改成 `~/.local/bin/laravel
 - **下次更新的预期**：上游一旦改到我们那 24 个文件（当时 17，2026-09-20 起 18、当晚 19；2026-09-26 起 23，同日再加 `bin/omarchy-battery-status` 成 24，见 §8.7）里的**同一函数**，`omarchy-niri-repatch` 会以退出码 2
   明确报冲突且不动仓库（见 §8.7），那时才需要手工翻译合并。
 
-### 8.20 上游 sudo 安全机制：代码已合入、机制未启用（2026-09-27）
+### 8.20 上游 sudo 安全机制：代码已合入、2026-11-19 本机启用（2026-09-27 记录）
+
+**2026-11-19 状态：本机已启用（dev-link 形态）。** 安装 root 属主真实文件 `/usr/bin/omarchy-sudo-passwordless`、`/usr/bin/omarchy-security-functions`，以及逐字节等于上游模板的 `/etc/tmpfiles.d/omarchy-nopasswd-sudo.conf` 与 `/usr/share/libalpm/hooks/05-omarchy-passwordless-revoke.hook`；`/usr/bin/omarchy-shell` 指向 `~/.local/share/omarchy/bin/omarchy-shell`，只用于把 `omarchy.indicators refresh` 送给运行中的壳层。`omarchy-sudo-passwordless 15` 能发布 `NOTAFTER` 规则，`sudo -n true` / `--active` 均返回 0；bar 指示器激活时变红，点击会撤销授权。root 属主副本在 `omarchy update` 后不会自动刷新，需重跑安装；`/usr/bin/omarchy-shell` 是指向用户可写树的软链，不进入提权路径。2026-11-19 已修：`schedule_expiry_refresh` 的 `systemd-run --user` 加 `--setenv=OMARCHY_PATH`，随 `niri.patch` 重放；到期刷新不会再因用户管理器缺这个变量而静默失败。下面的 2026-09-27 记录保留为历史。
 
 上游 `8675600` → `c5b4db77`（138 提交）这一批里，"提权"被统一成**命令作用域 sudo**。合入的是代码，
-**系统件没装、机制没启用**。
+**2026-09-27 时系统件没装、机制没启用**。
 
 **是什么**
 
@@ -253,7 +255,7 @@ laravel 从 `~/.config/composer/vendor/bin/laravel` 改成 `~/.local/bin/laravel
 - 上游打包用的系统件：`etc/tmpfiles.d/omarchy-nopasswd-sudo.conf`（开机删残留授权）、
   `default/libalpm/hooks/05-omarchy-passwordless-revoke.hook`（settings 包变更前先撤授权）。
 
-**本机形态过不去的三条**
+**本机形态过不去的三条（2026-09-27 记录；已被上面的 2026-11-19 落地方式取代）**
 
 1. `INSTALLED_SELF=/usr/bin/omarchy-sudo-passwordless`：UI 提权（`sudo -N -- "$INSTALLED_SELF" __enable …`）
    与到期定时器都走这个**绝对路径**。本机 `/usr/bin` 下只有 `omarchy-setup-security-paru`、
@@ -268,7 +270,7 @@ laravel 从 `~/.config/composer/vendor/bin/laravel` 改成 `~/.local/bin/laravel
 **为什么不用补丁绕过**：这套东西的安全前提就是"被提权的代码在 root 拥有、普通用户写不了的地方"。
 在本机摆一条用户可写的入口再给它 pkexec 免密，等于把那台机器的"无密码 root"送给任何能写该目录的进程
 （含任何 agent 进程）——这不是移植，是开洞。真要这套，正当路径是把 omarchy 装成 `/usr/share/omarchy` +
-`/usr/bin` 的包形态，即放弃 dev-link 装机。
+`/usr/bin` 的包形态，即放弃 dev-link 装机。2026-11-19 的落地没有在用户可写路径上放提权入口：`/usr/bin/omarchy-sudo-passwordless` 与 `/usr/bin/omarchy-security-functions` 是 root 属主真实副本，两个模板逐字节照抄；`/usr/bin/omarchy-shell` 只是用户侧刷新通道。
 
 **验证（2026-09-27 实测）**：`bash -n` 过全部 13 个改动/新增脚本；`realpath ~/.local/share/omarchy`
 与原值一致（`require_source_root` 的前提）；`gum` 在 `/usr/bin/gum`（UI 确认框要用）；
@@ -277,7 +279,7 @@ laravel 从 `~/.config/composer/vendor/bin/laravel` 改成 `~/.local/bin/laravel
 `/etc/sudoers.d` 仍是 `00_jianlongliu` / `fprint-timer` / `omarchy-theme-browser` 三条，`/etc/tmpfiles.d`
 与 `/usr/share/libalpm/hooks` 无新增。
 
-**机制未启用意味着**：`omarchy-sudo-passwordless` 本机跑到提权那步就失败（fail closed，不会半发布）；
+**2026-09-27 时机制未启用意味着**：`omarchy-sudo-passwordless` 本机跑到提权那步就失败（fail closed，不会半发布）；
 `omarchy-update` 的上游流程本机本来就走不通（没装 omarchy 包、没配 Omarchy 仓库）：菜单与 bar 的 Update
 走 `~/bin/omarchy-update` 垫片，**CLI `omarchy update` 自 2026-09-30 起也走同一个垫片**（`bin/omarchy-update`
 顶部的三行委派，随 `niri.patch` 重放；见 §8.7 与 `local-overrides.md` §8 第 19 项），想跑上游真身用

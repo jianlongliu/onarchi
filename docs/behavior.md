@@ -1015,7 +1015,7 @@ Omarchy 有两层配置，只有层1在 niri 上真正生效：
 | 弹窗让位浮栏（toast/面板被浮动 bar 压住 `floatGap` 8） | **随时可做**，答案已查清 | 两处上游文件要改（`shell/plugins/notifications/Service.qml` 的 `barClearance`、`shell/Ui/KeyboardPanel.qml` 的 `gap`）。**做不了垫片**（`readonly` 计算值，外部无从覆盖）⇒ 正解是进 `niri.patch`（+2 hunk、限路径重导）。按插件 README 用 root 手改会在 `omarchy update` 后静默丢掉 |
 | clamshell 的"不挂起"那半（合盖 + 外屏 ⇒ 继续用外屏） | 显示半边已做（2026-09-24，见 D 表）；这一半**没动** | `/etc/systemd/logind.conf.d/lid-suspend.conf`（装机写入）是 `HandleLidSwitchDocked=suspend`，"插着外屏"也算 docked ⇒ 合盖+外屏照样挂起。要改成 `ignore` 才谈得上"合盖不挂起" —— **root 改动，等用户拍板**（备份 + 回退命令见 `docs/shims.md` §4 的 clamshell 小节） |
 | 单窗口方形比例（上游 Hyprland `single_window_aspect_ratio = 1,1`） | 没有 | niri **没有 aspect 约束**；最近的是列宽（`default-column-width` / window-rule 定宽），效果是"定宽"而非"正方"。要做先定口径：要正方，还是只要"别太宽" |
-| 色温（手动，低优先） | 没有 | `wlsunset` **已在 `/usr/bin`**（唯一现成的 niri 可用件）但全树无引用；`gammastep`/`hyprsunset` 未装（后者是 Hyprland 专有）。**与"夜灯"歧义未清**（见 B 表末注） |
+| 色温（手动，低优先） | 没有 | 2026-11-19 实测：niri 26.04 的 gamma-control 在 eDP-1 上失败（`wlsunset` 起得来但 `gamma control ... failed`），`wlsunset` 不是可用件；`gammastep` 未装。拍板等 niri 修 gamma，不做软件暖色遮罩 |
 | 内屏开关（`omarchy-hyprland-monitor-internal off`） | ~~假成功~~ → **2026-09-24 已修**（见 D 表） | — |
 
 ### B. 用户主动遗弃（别再提议）
@@ -1042,8 +1042,8 @@ Omarchy 有两层配置，只有层1在 niri 上真正生效：
   要真替代得自己改 PATH 或覆盖 `/usr/bin/sudo`（与 sudo 包互踩：pacman 升级覆盖、属主打架，
   且它必须 root 属主 + setuid）。收益是 sudo 自身的内存安全，代价是多养一条提权入口 + 每次系统更新盯着。
   **除非"减少提权面"成为明确目标（且接受并存维护），否则不回头。**
-- ⚠ **歧义**：「夜灯遗弃」与「色温做低优先垫片」在同一台机器上是**同一个功能面**。
-  目前的记法是"**日落自动夜灯不做，纯手动色温以后再说**"；若用户的意思是"色温整个不要"，把 A 表最后一行划掉。
+- ⚠ **歧义（2026-11-19 已拍板）**：「夜灯遗弃」与「色温做低优先垫片」在同一台机器上是**同一个功能面**。
+  2026-11-19 实测 niri 26.04 的 gamma-control 在 eDP-1 上失败 ⇒ **等 niri 修 gamma，手动色温暂不做；软件暖色遮罩方案已否**（会污染截图，且不是真色温）。
 
 ### C. 环境不成立（用户明确**不算**移植缺口）
 

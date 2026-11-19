@@ -11,7 +11,7 @@
 > `docs/behavior.md` 覆盖账的 A / D 表与各卷正文）。
 > 跨卷编号找不到在哪一卷时，查主文档 `docs/omarchy-on-niri-port.md` 的 §0 文档地图与 §8 映射表。
 
-> **体裁**：待办（读者：维护者）。**核对**：2026-11-17（仅体裁与链接，条目未逐项复测）。
+> **体裁**：待办（读者：维护者）。**核对**：2026-11-19（删去已完成的临时免密 sudo 与已拍板的浮动窗；夜灯改为等 niri；其余条目未逐项复测）。
 
 ## 本卷目录
 
@@ -27,11 +27,8 @@
 | 2 | **窗口缝隙垫片的 niri 侧待重验** | `~/.config/niri/layout.kdl`（仓库副本 `niri-config/local/layout.kdl`）那条 `include optional=true "layout-no-gaps.kdl"` 从**尾部挪到顶部**，再量窗边像素 | 不挪大概率一直是空转（niri 同名键只认第一次定义）；**壳层那半是真的**（`getoption` 是垫片写死的映射）；依据与两份反证见 `docs/shims.md` §4 的「更正」 |
 | 3 | **弹窗让位浮栏**（toast / 面板被浮动 bar 压住 `floatGap` 8） | 进 `niri.patch` 改 `shell/plugins/notifications/Delivery.js` 的 `barThickness`（只返回 bar 高度，**不含 `floatGap`**，而 `deckMargins` 只拿它 + `Style.gapsOut` 算边距）；`shell/Ui/KeyboardPanel.qml` 的 `gap` 同理 | **2026-10-30 复校**：`barClearance` 这个字段上游重构后已不存在，落点换成 `barThickness`/`deckMargins`，问题依旧成立（浮栏浮起时通知会盖住那 8px）。**做不成垫片**（`readonly` 计算值，外部无从覆盖）；按插件 README 用 root 手改会在 `omarchy update` 后静默丢掉 |
 | 4 | **单窗口方形比例** | niri **没有 aspect 约束**，最近的是列宽（`default-column-width` / window-rule 定宽）⇒ 效果是"定宽" | 动手前先定口径：要**正方**，还是只要"别太宽" |
-| 5 | **夜灯 / 色温的歧义** | 手动色温做不做（`wlsunset` **已在 `/usr/bin`**、全树无引用；`gammastep` 未装） | 现在的记法是"日落自动夜灯不做、**手动**色温以后再说"；若用户的意思是"色温整个不要"，把 `docs/behavior.md` A 表最后一行划掉。**做的话怎么落**：照 `docs/shims.md` 的垫片标准写——`wlsunset` 是唯一现成的 niri 可用件，`hyprsunset` 是 Hyprland 专有 |
-| 6 | **浮动工具窗底色提亮**（`Ctrl+Shift+Esc` / `Mod+Y` / `Mod+E` 太黑） | 三选一：① 全局 —— `~/.config/ghostty/config` 在 include 之后写一行 `background`（取主题亮档 `#282a2f`，**连 Mod+Return 一起变亮**）+ nautilus 跟主题的 `~/.config/gtk-4.0/gtk.css`；② 只这两个键 —— 加 `XDG_CONFIG_HOME` 垫片指到另一份 ghostty 配置（btop 子进程会继承该变量）；③ 不动 | 漏项已补：三键 + nautilus 都补了 `opacity`（2026-09-25）。**alpha 实测对浮动窗只有 2–3/255 的效果**，主因是底色；机制与全套实测数据见 `docs/visual.md` §8.8 第 37 条（用户 2026-09-25「晚上看看文档」） |
-
+| 5 | **夜灯 / 色温：等 niri 修 gamma** | 等 niri 上游支持可用的 `zwlr_gamma_control_v1` 实现；本地不做软件暖色遮罩 | **2026-11-19 实测**：niri 26.04 的 gamma-control 在 eDP-1 上直接 `failed()`；`wlsunset -t 4000 -T 4001` 起得来但报 `gamma control of output eDP-1 failed`，不生效。`gammastep` 未装；拍板等 niri 修 gamma，软件遮罩会污染截图且不是真色温 |
 | 7 | **把三条自定义时序塞进注入 EDID**（让它们成为内核原生模式，少依赖自定义 modeline） | 改 `/usr/lib/firmware/edid/CSO1411.bin`（先备份）→ `pkexec mkinitcpio -P` → 重启；试件已备好（`~/.local/state/omarchy/edid-trial/trial-2.bin` = 合法重排 + 三条 CTA DTD，本地校验通过） | 起因：用户以为"四档分辨率就在注入件里"，2026-09-26 复核**不成立**（件里只有 DTD1 4K + 一条被内核丢弃的 DTD2）。**收益有限** —— 档位靠 modeline 注入已经能上屏；且 EDID 是承重墙、验证必须走重启。`debugfs edid_override` 热验**不通**（eDP 不重探测，试完）。见 `local-overrides.md` §5 第 16 条 |
-| 8 | **要不要真启用上游的"临时免密 sudo"**（`omarchy-sudo-passwordless [MINUTES]`，默认 15、上限 1440：往 `/etc/sudoers.d/99-omarchy-nopasswd-<uid>` 发布一条带 `NOTAFTER` 截止的规则，配 `systemd-run` 日历定时器到期自撤） | 启用需三样 **root 拥有、路径链不可被普通用户写** 的东西：`/etc/tmpfiles.d/omarchy-nopasswd-sudo.conf`（开机清残留授权）、`/usr/share/libalpm/hooks/05-omarchy-passwordless-revoke.hook`（内容要逐字节等于模板）、**真实文件**（非符号链接）`/usr/bin/omarchy-sudo-passwordless` | 代码 2026-09-27 已随上游合入工作树（见 `docs/upstream.md` §8.20），**机制未启用**。2026-10-30：`/usr/bin/omarchy-sudo-passwordless` 已按第三条前提装好（root 属主真实文件，`install.sh` 步骤 8 与 `omarchy-niri-repatch` 的漂移提示共同保活）——**这不是启用机制**，只是让 bar 指示器的 `--active` 轮询不再因文件缺失而每次记一条 "a password is required"。另外两项前提（tmpfiles 规则、libalpm hook）仍未安装，启用与否照旧待决。dev-link 形态与上游三条前提正面冲突（`omarchy_security_require_source_root` 只认 `$OMARCHY_PATH/bin/<cmd>` 或 `/usr/share/omarchy` + `/usr/bin/<cmd>`；`verify_root_path` 拒绝符号链接、逐级查 root 属主）。**别为了绕过而在用户可写路径放入口再配 pkexec 免密**：那等于把"无密码 root"送给任何能写该目录的进程 |
 
 ## 2026-10-28 上游 FF 之后新增
 

@@ -199,8 +199,8 @@ cd onarchi
 
 本移植当前跟到上游 `quattro` 的 **`723072a55`**（2026-11-14）—— 2026-11-14 从 `6194f4606` 快进，
 共 248 个提交、1163 个文件、+48176/−28306。`v4.5.0` 正式 tag 打在发布分支 `v4-5-0` 上、**不在 `quattro`**，
-本移植只跟 `quattro`。当前 `niri.patch` 为 **48 文件 / 133 hunk / 3276 行**，md5
-`15f3e9533b92eb5be00c133af9d1e40f`（未跟踪的覆盖层文件另计）。本轮同步了运行树与覆盖层补丁；
+本移植只跟 `quattro`。当前 `niri.patch` 为 **49 文件 / 135 hunk / 3340 行**，md5
+`79060b759dd8846baa17e7ec7515618d`（未跟踪的覆盖层文件另计）。本轮同步了运行树与覆盖层补丁；
 仓库里 vendored 的 `bin/`/`shell/` 源码快照仍停在 `bc220e70`，等下一次全量源码同步。
 
 上游**仍然没有 niri 支持**：`723072a55` 上仍是 Hyprland 耦合。下面每一条都是这个前提的产物。
@@ -219,6 +219,7 @@ cd onarchi
 | bar 图标居中 | `OpticalGlyph` 报的是**旋转前**的墨迹中心，pocket 的标记展开时转 90° ⇒ 按没转的位置摆。另外 `BarIconButton` 新增 `contentOffsetY`，给墨迹远矮于行盒的字形用 |
 | 截图 | 退回合并前的 satty 版 —— 见下节 |
 | 系统动作（`omarchy-system`） | 上游统一入口的 logout 走 `uwsm stop`，niri 上没有 uwsm：所有窗口先关掉，再报「Logout failed」。现在 logout 改为请求合成器退出（`niri msg action quit --skip-confirmation`），并把 `NIRI_SOCKET`、`XDG_CURRENT_DESKTOP` 传进 detach 出去的 worker —— 缺任何一个，worker 里都选不到 niri 分支 |
+| 临时免密 sudo | **2026-11-19 已启用。** root 属主的 `/usr/bin/omarchy-sudo-passwordless`、`omarchy-security-functions`、上游 tmpfiles 规则与 ALPM 撤销 hook 已装；另补 `/usr/bin/omarchy-shell` 软链供 bar 刷新。限时授权发布带 `NOTAFTER` 的 sudoers 规则，授权期间 `sudo -n true` 通过，到期自动撤销。回退见 [local-overrides](docs/local-overrides.md) |
 
 ### 放弃的东西，以及原因
 

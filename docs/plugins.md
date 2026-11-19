@@ -273,8 +273,8 @@ journalctl -t omarchy-shell --since "-10min" | tail -50
   shell.json 里，所以不靠它。
 - **交付 = `niri.patch`**：bar 的改动全在覆盖层里，随 `~/bin/omarchy-niri-repatch` 重放 ——
   `Bar.qml`（16 hunk）、`README.md`、`widgets/{ActiveWindow,KeyboardLayout,Tray}.qml`，外加两个新文件
-  `LICENSE`/`UPSTREAM.md`（这两个是活体树里的未跟踪 sidecar，不在补丁内）。整份补丁现在是 **48 文件 / 133 hunk / 3276 行**，md5
-  `15f3e9533b92eb5be00c133af9d1e40f`（2026-11-15 追加截图通知缩略图修复后重导出；旧版本用 `git log --follow -- niri-port/niri.patch` 查）。
+  `LICENSE`/`UPSTREAM.md`（这两个是活体树里的未跟踪 sidecar，不在补丁内）。整份补丁现在是 **49 文件 / 135 hunk / 3340 行**，md5
+  `79060b759dd8846baa17e7ec7515618d`（2026-11-19 加入 `omarchy-sudo-passwordless` 的到期刷新环境修复后重导出；旧版本用 `git log --follow -- niri-port/niri.patch` 查）。
   `Bar.qml` 那 16 个 hunk 就是浮空全套：`floatGap`/`cornerRadius` 读取、boot reveal（`PanelWindow.visible`
   开关，加载期整块不上屏，见 `docs/visual.md` 第 33 条）、霜化内缩 2px（`barBlurAnchor` 的
   `anchors.margins: 2` + `radius: effectiveCornerRadius - 2`，见 §8 第 44 条）、加载期底部 `Thinking…`

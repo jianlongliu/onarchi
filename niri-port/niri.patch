@@ -825,6 +825,19 @@ index 6549c6935..730288404 100755
  omarchy-refresh-config hypr/.luarc.json
  omarchy-refresh-config hypr/autostart.lua
  omarchy-refresh-config hypr/bindings.lua
+diff --git a/bin/omarchy-sudo-passwordless b/bin/omarchy-sudo-passwordless
+index b16c98356..32e36bcf6 100755
+--- a/bin/omarchy-sudo-passwordless
++++ b/bin/omarchy-sudo-passwordless
+@@ -483,7 +483,7 @@ change_grant() {
+ # during suspend still refreshes on resume.
+ schedule_expiry_refresh() {
+   [[ $minutes == "permanent" ]] && return 0
+-  /usr/bin/systemd-run --user --quiet --collect --on-calendar="@$((EPOCHSECONDS + 10#$minutes * 60 + 2))" \
++  /usr/bin/systemd-run --user --quiet --collect --setenv=OMARCHY_PATH="$OMARCHY_PATH" --on-calendar="@$((EPOCHSECONDS + 10#$minutes * 60 + 2))" \
+     --timer-property=AccuracySec=1s \
+     -- /usr/bin/omarchy-shell -q omarchy.indicators refresh >/dev/null 2>&1 || true
+ }
 diff --git a/bin/omarchy-system b/bin/omarchy-system
 index 02ab05c30..670bd0ada 100755
 --- a/bin/omarchy-system

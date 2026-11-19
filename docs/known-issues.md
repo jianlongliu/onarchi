@@ -14,8 +14,8 @@
 | 通知 / 面板被浮栏压住 8px | toast 与键盘面板和浮动 bar 重叠 | 需改 `niri.patch` 里的 `barThickness` / `deckMargins`，做不成垫片 | [todo](todo.md) #3 · [behavior 覆盖账](behavior.md) |
 | 内置 `omarchy.workspaces` 不可通用 | 内置部件的点击 / 滚轮不发 niri action，工作区事件仍走 Hyprland 模型 | 当前桌面用 `jianlongliu.workspaces`；「看起来能用」不代表内置部件可用 | [README](../README.md) |
 | 单窗口方形比例 | 只能定宽，做不到 1:1 | niri 没有 aspect 约束；要先定口径 | [todo](todo.md) #4 · [behavior 覆盖账](behavior.md) |
-| 手动色温 / 夜灯 | 没有可用入口 | `wlsunset` 在 `/usr/bin` 但全树无引用；日落自动夜灯明确不做 | [todo](todo.md) #5 · [behavior 覆盖账](behavior.md) |
-| 浮动工具窗底色偏黑 | `Ctrl+Shift+Esc` / `Mod+Y` / `Mod+E` 太黑 | 三选一未拍板；alpha 只能改 2–3/255，主因是底色 | [todo](todo.md) #6 |
+| 手动色温 / 夜灯 | 没有可用入口 | 2026-11-19 实测 niri 26.04 的 gamma-control 在 eDP-1 上失败（`wlsunset` 起得来但 `gamma control ... failed`）；拍板等 niri 修 gamma，不做软件暖色遮罩 | [todo](todo.md) #5 · [behavior 覆盖账](behavior.md) |
+| 浮动工具窗底色偏黑 | `Ctrl+Shift+Esc` / `Mod+Y` / `Mod+E` 太黑 | 2026-11-19 拍板先不动；alpha 只值 2–3/255，主因是主题 ghostty 底色 `#19120c` | [visual](visual.md) §8.8 第 37 条 |
 
 ## 交付与验收边界
 

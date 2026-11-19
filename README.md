@@ -217,8 +217,8 @@ The overview backdrop needs no adjustment: niri draws that layer itself, so the 
 The port currently tracks upstream `quattro` at **`723072a55`** (2026-11-14), fast-forwarded from
 `6194f4606` on 2026-11-14 — 248 commits, 1163 files, +48176/−28306. The `v4.5.0` tag itself sits
 on the `v4-5-0` release branch, not on `quattro`, and this port follows `quattro` only.
-The current `niri.patch` has **48 files / 133 hunks / 3276 lines**, md5
-`15f3e9533b92eb5be00c133af9d1e40f` (untracked overlay files are separate). This sync
+The current `niri.patch` has **49 files / 135 hunks / 3340 lines**, md5
+`79060b759dd8846baa17e7ec7515618d` (untracked overlay files are separate). This sync
 updated the running tree and the overlay patch; the repository's vendored
 `bin/`/`shell/` source snapshot remains at `bc220e70` until the next full source sync.
 
@@ -239,6 +239,7 @@ below exists because of that.
 | Bar icon centring | `OpticalGlyph` reported the ink centre before rotation, so the pocket's mark (which turns 90° when it opens) was placed as if it had not. `BarIconButton` also gained `contentOffsetY` for glyphs whose ink is far shorter than their line box |
 | Screenshot | Reverted to the pre-merge satty version — see "Dropped" |
 | System actions (`omarchy-system`) | Upstream's unified entry ran `uwsm stop` for logout, which does not exist on niri: every window closed and then the menu reported "Logout failed". `logout` now asks the compositor to quit (`niri msg action quit --skip-confirmation`), and the detached worker is given `NIRI_SOCKET` and `XDG_CURRENT_DESKTOP` — without both it cannot pick the niri branch |
+| Temporary passwordless sudo | **Enabled 2026-11-19.** Root-owned `/usr/bin/omarchy-sudo-passwordless` and `omarchy-security-functions`, the upstream tmpfiles rule and ALPM revoke hook, plus a `/usr/bin/omarchy-shell` link for the bar refresh. A timed grant publishes a `NOTAFTER` sudoers rule; `sudo -n true` passes while it is active and the rule is removed at the deadline. See [local overrides](docs/local-overrides.md) for the rollback |
 
 ### Dropped, and why
 

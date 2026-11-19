@@ -137,7 +137,7 @@ hyprctl 调用面有界、可直接映射。
 | `~/bin/omarchy-display-text-size` (+x) | bar 的 Display 面板 TEXT SIZE 滑块垫片：官方脚本只管 shell `[font]`/GTK factor/终端 pt，这个补 GTK dconf+settings.ini、Qt(qt6ct)、fcitx5、XSETTINGS 各层（§8.19）。仓库 `port-bin/omarchy-display-text-size` |
 | `~/.config/omarchy/hooks/theme-set.d/10-niri-border` | 换 style 时自动 `omarchy-niri-apply-theme`（只写不重载，保护 SCALE）|
 | `~/.config/omarchy/hooks/post-update.d/10-niri-repatch` | 上游真身的 post-update 阶段重放覆盖层；本机四段垫片不调用该钩子 |
-| `~/.config/omarchy/niri-port/`（`niri.patch` + `Niri.qml` + `plugins/` + `plugin-patches/`）| 移植覆盖层产物（仓库外，重放用）。**当前：`niri.patch` 48 文件 / 133 hunk / 3276 行**，`--reverse --check` 通过、repatch 幂等，md5 `15f3e9533b92eb5be00c133af9d1e40f`（2026-11-15 追加截图通知缩略图修复后重导出，见 `docs/upstream.md` §8.27：新增 `shell/plugins/notifications/Store.js`）。旧版本用 `git log --follow -- niri-port/niri.patch` 查（md5 / hunk 数随提交可复算）。**`backups/` 已不在这里**（2026-09-21 全部备份搬进 `~/.local/state/backups/`，见 `local-overrides.md` §0.1），安全网是断的。**2026-10-04 起 bar 的改动不再走插件补丁**：浮空 bar 已并进这份 `niri.patch`（`shell/plugins/bar/` 那 6 个文件（4 个改动 + 2 个新文件），33 文件 / 106 hunk / 3022 行、md5 `bcb5aca36ace33d829c6773da7026801`，见 `docs/plugins.md` §5.4）—— bar 不再依赖那个没有自动重放器的插件补丁 |
+| `~/.config/omarchy/niri-port/`（`niri.patch` + `Niri.qml` + `plugins/` + `plugin-patches/`）| 移植覆盖层产物（仓库外，重放用）。**当前：`niri.patch` 49 文件 / 135 hunk / 3340 行**，`--reverse --check` 通过、repatch 幂等，md5 `79060b759dd8846baa17e7ec7515618d`（2026-11-19 加入 `omarchy-sudo-passwordless` 的到期刷新环境修复后重导出；此前 2026-11-15 追加截图通知缩略图修复，见 `docs/upstream.md` §8.27：新增 `shell/plugins/notifications/Store.js`）。旧版本用 `git log --follow -- niri-port/niri.patch` 查（md5 / hunk 数随提交可复算）。**`backups/` 已不在这里**（2026-09-21 全部备份搬进 `~/.local/state/backups/`，见 `local-overrides.md` §0.1），安全网是断的。**2026-10-04 起 bar 的改动不再走插件补丁**：浮空 bar 已并进这份 `niri.patch`（`shell/plugins/bar/` 那 6 个文件（4 个改动 + 2 个新文件），33 文件 / 106 hunk / 3022 行、md5 `bcb5aca36ace33d829c6773da7026801`，见 `docs/plugins.md` §5.4）—— bar 不再依赖那个没有自动重放器的插件补丁 |
 | `~/bin/omarchy-sleep-lock-start` (+x) | **合盖/挂起锁屏的启动包装器**（上游 `omarchy-sleep-lock.service` 在本机两条 `ConditionEnvironment=` 都过不去，改由它拉起）：有界等（30s 封顶）会话把环境发布进用户管理器 → 采纳 `WAYLAND_DISPLAY`/`XDG_RUNTIME_DIR`/`XDG_SESSION_TYPE`/`NIRI_SOCKET`/`XDG_CURRENT_DESKTOP`/`DBUS_SESSION_BUS_ADDRESS` → `exec` 上游 `omarchy-system-sleep-monitor`；单元见 `local-config/systemd/user/omarchy-sleep-lock.service`，全过程见 `lock.md` §11.28 |
 | `~/bin/omarchy-hyprland-window-gaps-toggle` (+x) | **窗口缝隙开关垫片**（2026-09-24）：上游靠 `default/hypr/toggles/window-no-gaps.lua` 把 gaps/border/rounding 归零；niri 侧改成写/删 `~/.config/niri/layout-no-gaps.kdl`（`layout.kdl` 尾部 `include optional=true` 读它，include 是位置性的 ⇒ 只覆盖它点名的属性），并按上游语义写同一个 flag 文件；`~/bin/hyprctl` 的 `getoption` 在 flag 在时对 `general:gaps_out`/`decoration:rounding` 返回 0 ⇒ **壳层跟着塌**（`Style.gapsOut`/`cornerRadius`）。规格、坑与实测见 `docs/shims.md` §4；仓库副本 `port-bin/omarchy-hyprland-window-gaps-toggle` |
 | `~/bin/omarchy-launch-screensaver` (+x) | **闲置策略垫片**（2026-09-24）：上游这份在终端跑 ASCII 屏保（早被 `screensaver-off` flag 停用），本机改成「**不插电 + 非全屏 + 非播放视频**才 `omarchy-system-lock`，灭屏交给锁自己（5 秒）；插电/全屏/已锁一概不动」，触发点 = `shell.json` 的 `idle.screensaver`（那天 150 → 300）。规格与四分支实测见 `docs/behavior.md` 的 §8 第 23 条；仓库副本 `port-bin/omarchy-launch-screensaver`，PATH-first（改动必须 `install -m 0755` 同步两份） |
@@ -151,7 +151,7 @@ hyprctl 调用面有界、可直接映射。
 | `~/.local/share/omarchy/shell/Commons/qmldir` | 加一行 `singleton Niri 1.0 Niri.qml` |
 | `~/.local/share/omarchy/shell/Commons/Style.qml` | `applyShellValues()` 的 `[bar]` 分支原来只认 `scale-with-font` + 两个 size 键、**其余键静默丢弃**；扩成 `Style.bar` 全部整型 token，于是 `[bar] icon-font = 12` 这类调法能从 `shell.toml` 热改（见 §8 第 31 条） |
 | `~/.local/share/omarchy/shell/shell.qml` | 标记读取：真登录时（`$XDG_RUNTIME_DIR/omarchy-boot-splash`，由 `split-greeter/session.sh` 落、读完即 `rm`）把 `bootRevealArmed` 置真，`omarchy-restart-shell` 不重放（§8 第 33 条） |
-| `~/.local/share/omarchy/shell/plugins/bar/widgets/Workspaces.qml` | **niri 适配在补丁里**：4 处改用移植层的 `Niri`（去掉 `import Quickshell.Hyprland`，`workspaces.values` ×2、`focusedWorkspace` ×1）。2026-10-04 合并浮空 bar 时该文件一度被插件那份覆盖回上游写法，**当天已恢复**（验法：`diff <(git -C ~/.local/share/omarchy show 60663faf:shell/plugins/bar/widgets/Workspaces.qml) ~/.local/share/omarchy/shell/plugins/bar/widgets/Workspaces.qml` 应见那 4 处），所以现在这份 `niri.patch`（48 文件 / 133 hunk / 3276 行、md5 `15f3e953…`）自带它，重放后不会再退化成读 Hyprland。影响面：本机 bar 用的是 clone `jianlongliu.workspaces`（§8.11），这件内置部件没在用 ⇒ 恢复与否都不改观感 |
+| `~/.local/share/omarchy/shell/plugins/bar/widgets/Workspaces.qml` | **niri 适配在补丁里**：4 处改用移植层的 `Niri`（去掉 `import Quickshell.Hyprland`，`workspaces.values` ×2、`focusedWorkspace` ×1）。2026-10-04 合并浮空 bar 时该文件一度被插件那份覆盖回上游写法，**当天已恢复**（验法：`diff <(git -C ~/.local/share/omarchy show 60663faf:shell/plugins/bar/widgets/Workspaces.qml) ~/.local/share/omarchy/shell/plugins/bar/widgets/Workspaces.qml` 应见那 4 处），所以现在这份 `niri.patch`（49 文件 / 135 hunk / 3340 行、md5 `79060b75…`）自带它，重放后不会再退化成读 Hyprland。影响面：本机 bar 用的是 clone `jianlongliu.workspaces`（§8.11），这件内置部件没在用 ⇒ 恢复与否都不改观感 |
 | `~/.local/share/omarchy/shell/plugins/menu/Menu.qml` | 加 `import Quickshell.Wayland._BackgroundEffect`；根 `PanelWindow` 挂 `BackgroundEffect.blurRegion: Region { item: card; radius: root.cornerRadius }`（只磨砂菜单卡片，不全屏，见 §8.8）|
 | `~/.local/share/omarchy/shell/Ui/KeyboardPanel.qml` | 加 `import Quickshell.Wayland._BackgroundEffect`；根 `PanelWindow` 挂 `BackgroundEffect.blurRegion: Region { item: card; radius: Style.cornerRadius }`（覆盖所有 bar 弹窗面板，见 §8.8）|
 | `~/.local/share/omarchy/shell/plugins/bar/Bar.qml` | 去掉 import；`Hyprland.focusedMonitor`→`Niri.focusedMonitor`；**boot reveal**：`bootRevealArmed` → `bootRevealShown` 驱动 `PanelWindow.visible`（加载期整块不上屏，到点整块出现，见 §8 第 33 条）；**2026-10-04 起这个文件就是本机在用的浮空 bar**（插件那 28 个文件并进来，`bar.id = omarchy.bar`，见 §8.11 / `docs/plugins.md` §5.4）——上面那句"`margins` 停屏外 + 1500ms 后 900ms 滑入"是合并前的老写法，`Bar.qml` 里已经没有了 |
@@ -664,7 +664,7 @@ false` 让 niri 把焦点环画在窗口**周围**而非背后，问题解决（
 | `§8.17` | 输入源徽章 | `docs/behavior.md` |
 | `§8.18` | 锁屏"不能锁" | `docs/lock.md` |
 | `§8.19` | 全桌面字号 / DPI 一致性 | `docs/visual.md` |
-| `§8.20` | 上游 sudo 安全机制（代码已合入、机制未启用） | `docs/upstream.md` |
+| `§8.20` | 上游 sudo 安全机制（代码已合入、2026-11-19 本机启用） | `docs/upstream.md` |
 | `§8.21` | 上游 shell 层取舍：只跟 `Color.qml` 颜色环修复 | `docs/upstream.md` |
 | `§8.22` | 上游单条挑拣：壳层四条（watcher 回收 / 锁状态 / 无主锁 / 密码框去重复） | `docs/upstream.md` |
 
@@ -789,7 +789,7 @@ false` 让 niri 把焦点环画在窗口**周围**而非背后，问题解决（
 - 引导：**systemd-boot + Secure Boot，无 Limine**；内核是 stock `linux`（不是上游推的 `linux-omarchy`）。
 - 仓库源（本机 `pacman-conf --repo-list` 核对）：`omarchy` / `core` / `extra` / `multilib` / `archlinuxcn` / `tui-tools`；此前未配置 Omarchy 源的结论是历史记录。
 - 快照：**snapper** 已启用（`root` / `home` / `data` 三个配置，`root` 的 `SUBVOLUME="/"`），pacman 事务前后自动打快照（钩子 `05-snap-pac-pre` / `zz-snap-pac-post`）。原 `opencode` 配置与 `/opt/opencode` 子卷（含 4 个 bind）2026-11-02 已拆。
-- **特权通道**：`pkexec` 免密可用；`sudo -n` 失败（要密码），`omarchy-pkg-add` 因此非交互不可用。
+- **特权通道**：`pkexec` 免密可用；默认没有活动授权时 `sudo -n` 失败（要密码），`omarchy-pkg-add` 因此非交互不可用。需要时先用 `omarchy-sudo-passwordless [MINUTES]` 开限时授权（见 §8.20）。
 - `mise` 来自 Arch `extra`（2026-09-09 装），上游用的是自家仓库的 `mise-bin`。
 - `XDG_CURRENT_DESKTOP=niri`（移植的 niri 守卫分支据此生效）。
 - 读取 `HYPRLAND_INSTANCE_SIGNATURE is unset` 警告仅影响便捷性，QuickShell 在 layer-shell
