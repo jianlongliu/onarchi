@@ -15,15 +15,26 @@
   //   一条 `include optional=true`）就是 niri 缺的那个运行时开关，见 docs/shims.md §4。
   // 图标转义注意：>U+FFFF 的码点必须写成 UTF-16 代理对（JSON.parse 的 \u 只吃 4 位十六进制）。
   // 例：Screensaver 的 U+F1104 = \udb84\udd04；写成 \uf1104 会被当成 U+F110 + '4'。
-  "trigger.hardware.mirror-display": {"icon":"\udb80\udf79","label":"Mirror Display","when":"false"},
+  // 2026-11-18: 默认项是 `-on` / `-off` 两条；旧的 `trigger.hardware.mirror-display`
+  // 是个新 id，盖不住默认项，菜单里仍会冒出 "Display Mirroring On"。两条默认项隐藏，
+  // 另补一条可见 toast 说明 niri 没有镜像输出（与 Laptop Display 等占位条目同形）。
+  "trigger.hardware.mirror-display-on": {"icon":"󰍹","label":"Display Mirroring On","when":"false"},
+  "trigger.hardware.mirror-display-off": {"icon":"󰍹","label":"Display Mirroring Off","when":"false"},
+  "trigger.hardware.mirror-display": {"icon":"󰍹","label":"Mirror Display","action":"omarchy-notification-send '暂时不可用' '镜像显示：niri 无镜像输出'"},
   "trigger.toggle.workspace-layout": {"icon":"\udb84\udcac","label":"Workspace Layout","when":"false"},
 
   // 暂时不可用（本机缺依赖或需要改写实现，见 §8 第 21 条那批 override）
   // 注：Capture → Color 的 override 已撤（2026-09-19 装了 hyprpicker 并在 niri 上实测能抓屏），
   //     现在走上游默认动作 `pkill hyprpicker || hyprpicker -a`。
-  "trigger.toggle.nightlight": {"action":"omarchy-notification-send '暂时不可用' '夜灯：niri 无 Hyprsunset，需 wlsunset 之类替代'"},
-  "trigger.hardware.laptop-display": {"action":"omarchy-notification-send '暂时不可用' '笔记本屏幕开关：niri 需改用 niri msg output'"},
-  "trigger.toggle.one-window-ratio": {"action":"omarchy-notification-send '暂时不可用' '单窗口方形比例：Hyprland 专属'"},
+  // 2026-11-18: 这三条是新增 id，合并后会追加到子菜单末尾；不带 label 会直接
+  // 显示 raw id，所以 label/icon 一并带上。
+  // 2026-11-19: niri 26.04 的 gamma-control 在 eDP-1 上失败，wlsunset 不生效 ⇒
+  // 默认的 Nightlight On/Off 两条隐藏，只留下面的 toast 说明等上游修复。
+  "trigger.toggle.nightlight-on": {"icon":"󰔎","label":"Nightlight On","when":"false"},
+  "trigger.toggle.nightlight-off": {"icon":"󰔎","label":"Nightlight Off","when":"false"},
+  "trigger.toggle.nightlight": {"icon":"󰔎","label":"Nightlight","action":"omarchy-notification-send '暂时不可用' '夜灯：niri 26.04 的 gamma-control 在 eDP-1 上失败，等上游修复'"},
+  "trigger.hardware.laptop-display": {"icon":"󰛧","label":"Laptop Display","action":"omarchy-notification-send '暂时不可用' '笔记本屏幕开关：niri 需改用 niri msg output'"},
+  "trigger.toggle.one-window-ratio": {"icon":"","label":"1-Window Ratio","action":"omarchy-notification-send '暂时不可用' '单窗口方形比例：Hyprland 专属'"},
 
   // 2026-09-19 用户要求：屏蔽 + 禁用 screensaver（idle 到 150s 就弹，很烦）。
   // 「禁用」本体**不在这里**——是官方开关 `~/.local/state/omarchy/toggles/screensaver-off`
@@ -32,7 +43,10 @@
   // （System 菜单、Trigger→Toggle、Style→Screensaver 那组 branding）——全部隐藏。
   // 隐藏是「只有显式 false 才生效」的 when 表达式，父项隐藏后子项也不会被渲染。
   "system.screensaver": {"icon":"\udb84\udd04","label":"Screensaver","when":"false"},
-  "trigger.toggle.screensaver": {"icon":"\udb84\udd04","label":"Screensaver","when":"false"},
+  // 2026-11-18: 默认项是 `-on` / `-off` 两条；旧的 `trigger.toggle.screensaver`
+  // 是个新 id，盖不住默认项，菜单里仍会显示 "Screensaver On"。两条都隐藏。
+  "trigger.toggle.screensaver-on": {"icon":"\udb84\udd04","label":"Screensaver On","when":"false"},
+  "trigger.toggle.screensaver-off": {"icon":"\udb84\udd04","label":"Screensaver Off","when":"false"},
   "style.screensaver": {"icon":"\udb84\udd04","label":"Screensaver","when":"false"},
   "style.screensaver.text": {"icon":"\uf044","label":"Edit Text","when":"false"},
   "style.screensaver.image": {"icon":"\uf03e","label":"Set From Image","when":"false"},
