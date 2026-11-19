@@ -229,7 +229,7 @@ cd onarchi
 | 霜化之外的 bar 装饰（投影、顶边高光、强制 12px 圆角） | 被上游自己的 bar 设计取代。接受覆盖 |
 | OSD 的卡片化表面 | 上游把 OSD 迁到 `OverlayWindow`，而后者要求全屏表面；卡片化版本渲染出来是空白 |
 | 经 `popupColumn` 的通知霜化 | 该元素上游已不存在，表面现在是窄条带 |
-| `omasnap`、`monologue`、`hype`、`signed` | 四个都要 **Qt 6.12**，本机钉在 6.11（见下）。`omasnap` 还硬依赖 `hyprland`。同批只有 `disktree-bin` 能跑 |
+| `omasnap`、`monologue`、`hype`、`signed` | Qt 6.12 已于 2026-11-11 解钉，旧的 6.11 阻塞不再成立。`omasnap` 仍硬依赖 `hyprland`，不做 niri 版；另外三件未安装、未重测。同批目前只有 `disktree-bin` 在跑 |
 
 ### Qt 6.12 与磨砂 bar
 
@@ -242,9 +242,9 @@ Qt 6.12 已解钉并在真实会话验收；此前的黑 bar 报告在受控测�
 - **91 条迁移待跑**（共 211 条）。33 条要 root 且是机型专属（N1x / ASUS ProArt / aarch64 / Limine）；
   42 条动 Hyprland 或 uwsm。已跑 6 条面向用户的（bar 布局拆分、壁纸重编号、Fcitx 主题、Chromium
   覆盖滚动条）。其余在 `docs/upstream.md` §8.23 有分类账。
-- **niri 上 `GDK_SCALE` 未设**。上游是 `omarchy-hyprland-monitor-scaling` 设的，而那个脚本只在
-  Hyprland 下跑。于是 GTK 应用（nautilus）在 2.0 输出上按 1× 渲染。`~/.config/niri/config.kdl`
-  的 `environment {}` 里已加 `GDK_SCALE "2"` —— **需要重启会话，reload 无效**，且尚未验证。
+- **niri 上 `GDK_SCALE` 的效果未验收**。上游是 `omarchy-hyprland-monitor-scaling` 设的，而那个脚本只在
+  Hyprland 下跑；没有它，GTK 应用（nautilus）在 2.0 输出上会按 1× 渲染。`~/.config/niri/config.kdl`
+  的 `environment {}` 里已加 `GDK_SCALE "2"` —— **需要重启会话，reload 无效** —— 视觉结果尚未验收。
   **不要再加 `GDK_DPI_SCALE`**，那会二次放大。
 - **WPS 的剪贴板与 DPI 未验证**。WPS 是 XWayland 客户端（`app_id: wpsoffice`），没设
   `QT_QPA_PLATFORM`，继承 `xwayland-satellite` 提供的东西；`Xft.dpi` 读到 192、与 2.0 输出一致，

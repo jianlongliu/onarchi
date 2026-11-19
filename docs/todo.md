@@ -35,7 +35,7 @@
 |---|---|---|---|
 | 9 | **验证 `GDK_SCALE` 是否修好 GTK 应用的 DPI** | 已写入 `~/.config/niri/config.kdl` 的 `environment {}`：`GDK_SCALE "2"`。**必须重启会话**（reload 不生效） | 判据：nautilus 的字体与控件尺寸应与 bar 的 `base-size 14` 视觉一致。**不要加 `GDK_DPI_SCALE`**，会二次放大。若无效，下一步查 GTK4 是否走 `gdctl`/portal 而非环境变量 |
 | 10 | **WPS 的剪贴板与 DPI** | 待定：给 WPS 强制 `QT_QPA_PLATFORM=wayland`，或维持 XWayland 另找缩放办法 | 现状：`app_id: wpsoffice`（XWayland），未设 `QT_QPA_PLATFORM`，`Xft.dpi` 是 192 与输出 2.0 一致，但 WPS 是否认它未测。剪贴板问题大概率出在 XWayland 中转 |
-| 11 | **等 Qt 6.12 修好再回头拿那四个工具** | `omasnap` / `monologue` / `hype` / `signed` | 全部硬依赖 Qt 6.12；上游 `b83d3df08` 只修了 palette 语法，没有 `MultiEffect` 修复 ⇒ 解钉前先实测 6.12 的模糊是否仍失效。**`omasnap` 例外：它硬依赖 `hyprland`，在 niri 上解钉也用不了——用户 2026-10-30 已明确不做 `omasnap for niri`，截图走 grim + satty（见 `local-overrides.md` §8.1）** |
+| 11 | **重测 `monologue` / `hype` / `signed`** | 三件均未安装，重测需先装；`omasnap` 已明确不做 niri 版（硬依赖 `hyprland`，截图走 grim + satty） | Qt 6.12 已于 2026-11-11 解钉并真机验收（`997a5e2`），旧的 `Qt_6.12` 符号缺失前提已消失（见 `local-overrides.md` §8.1 末尾）；本轮未重装/未重测 |
 
 ## 本机卫生项
 

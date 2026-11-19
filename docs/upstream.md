@@ -423,9 +423,9 @@ git stash pop                                  # 冲突集中在这一步
 - **A 组该跑、还没跑**：`1791640449`（keyboard-layout 挪到右侧，本机 bar 没这个 widget、跑了无效果）、
   `1791367434`（装 `fcitx5-{mozc,hangul,chinese-addons,chewing}` + `omarchy-input-method configure --defaults`，
   会改 fcitx 配置，**需要 root 装包**）—— 两条都卡在「要装包」，见下
-- **B 组是装 App，用户要的部分**：`omasnap`（用户明确要，替换 Satty/Tensaku）、`monologue`（摄像头录制）、
+- **B 组是装 App，用户要的部分**：`omasnap`（用户明确要，替换 Satty/Tensaku；2026-10-30 改为不做 niri 版）、`monologue`（摄像头录制）、
   `hype`（Markdown 演示）、`signed`（PDF 签名）、`disktree-bin`（替换 Disk Usage）、`1790702362`（编译器和 Qt 组件，
-  含 `qt6-*` ⇒ **与 Qt 6.11 钉版冲突，不能跑**）
+  含 `qt6-*` ⇒ **与 Qt 6.11 钉版冲突，不能跑**；2026-11-11 已解钉，旧阻塞不再成立）
 - **B 组 AI agent，用户跳过**：`1786967403` Kimi、`1790863209` Grok、`1792334754` OpenClaw、
   `1792345511` T3 Code、`1790017600` 退役 mise 版 Hermes
 - **C 组清理类，安全**：`1792648436`（删 4.0 通知引擎残留）等

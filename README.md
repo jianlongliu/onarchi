@@ -249,7 +249,7 @@ below exists because of that.
 | Bar decoration beyond frost (shadow, top highlight, forced 12 px radius) | Superseded by upstream's own bar design. Accepted the overwrite |
 | OSD card surface | Upstream moved OSD onto `OverlayWindow`, which requires a full-screen surface; the card-sized variant rendered nothing |
 | Notification blur via `popupColumn` | That element no longer exists upstream; the surface is a narrow strip now |
-| `omasnap`, `monologue`, `hype`, `signed` | All four need **Qt 6.12**; this machine pins Qt 6.11 (see below). `omasnap` additionally hard-depends on `hyprland`. Only `disktree-bin` from that batch runs |
+| `omasnap`, `monologue`, `hype`, `signed` | Qt 6.12 is unpinned (2026-11-11), so the old Qt 6.11 blocker is gone. `omasnap` still hard-depends on `hyprland` and is not pursued on niri. The other three are not installed and have not been retested; only `disktree-bin` from that batch runs. |
 
 ### Test suite: what is left to upstream
 
@@ -299,10 +299,10 @@ Qt 6.12 is un-pinned and verified on the live session; the earlier black-bar rep
   aarch64 / Limine); 42 touch Hyprland or uwsm. Six user-facing ones have been run (bar layout split,
   wallpaper renumbering, Fcitx theming, Chromium overlay scrollbars). The rest are tracked in
   `docs/upstream.md` §8.23.
-- **`GDK_SCALE` is unset on niri.** `omarchy-hyprland-monitor-scaling` is what sets it upstream, and
-  that script only runs under Hyprland. GTK apps (nautilus) therefore render at 1× against a 2.0
+- **`GDK_SCALE` effect is unverified.** `omarchy-hyprland-monitor-scaling` is what sets it upstream, and
+  that script only runs under Hyprland. Without it, GTK apps (nautilus) would render at 1× against a 2.0
   output. `~/.config/niri/config.kdl` now carries `GDK_SCALE "2"` in its `environment {}` block —
-  **this requires a session restart, not a reload**, and has not been verified yet. Do not also set
+  **this requires a session restart, not a reload** — and the visual result has not been verified. Do not also set
   `GDK_DPI_SCALE`; that would scale twice.
 - **WPS clipboard and DPI** are unverified. WPS is an XWayland client (`app_id: wpsoffice`) with no
   `QT_QPA_PLATFORM` set, so it inherits whatever `xwayland-satellite` provides; `Xft.dpi` reads 192,
