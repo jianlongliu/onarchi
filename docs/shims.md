@@ -289,12 +289,12 @@ niri 没有运行时 IPC 能改这些，所以三层都要接：
   「合盖 + 外屏 ⇒ 关内屏」这条只有离线测试覆盖，真机只验了"无外屏 ⇒ 内屏保持开"以及手工关/开内屏。
 - 单元**登录时自动拉起**没等到下次登录验（`WantedBy=graphical-session.target` + `…wants/` 软链，与 `omarchy-picker-warmup.service` 同款机制；本轮只 `systemctl --user start/restart` 手动验过 —— `Type=simple`，可以放心用 `restart`，不像 oneshot 那种会挂住）。
 
-**没做的那半：不挂起**。合盖是否挂起不在 niri 手里，而在
-`/etc/systemd/logind.conf.d/lid-suspend.conf`（**装机写入**，三档合盖都是 `suspend`，其中
-`HandleLidSwitchDocked=suspend` 把"插着外屏"也算 docked）。要"合盖继续用外屏"就得把它改成 `ignore`：
-root 改动 ⇒ **等用户拍板**；真要做：`cp` 备份到 `~/.local/state/backups/etc/systemd/logind.conf.d/lid-suspend.conf.bak-<后缀>`、
-改一行、`systemctl reload systemd-logind`，回退就是把备份 `cp` 回去再 reload。**本机没外屏 ⇒ 改完也验不了**，
-所以本轮**没动它**。
+**不挂起那半（2026-11-19 已改配置，真行为未验）**。合盖是否挂起不在 niri 手里，而在
+`/etc/systemd/logind.conf.d/lid-suspend.conf`。2026-11-19 已把 `HandleLidSwitchDocked` 从 `suspend` 改为
+`ignore`（`HandleLidSwitch` / `HandleLidSwitchExternalPower` 保持 `suspend`），并
+`systemctl reload systemd-logind`；`systemd-analyze cat-config systemd/logind.conf` 已确认生效。
+备份：`~/.local/state/backups/lid-suspend.conf.bak-20261119-173045`；回退：把备份 `cp` 回去再 reload。
+**本机没外屏 ⇒ 改完也验不了真行为**，只验了配置与 reload。
 
 **关开关 / 回退**
 - 停 watcher：`touch ~/.local/state/omarchy/toggles/clamshell-watch-off` —— 脚本下一个 tick
