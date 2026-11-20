@@ -59,6 +59,10 @@ niri validate                                      # 必须通过；见下面的
 机制与来龙去脉见 `docs/behavior.md`（按键与行为）、`docs/visual.md`（视觉）、
 `docs/local-overrides.md` §4（本机配置分层与陷阱）。
 
+## 保存/恢复本机默认
+
+`omarchy-niri-default save` 把当前七份快照成默认模板；`omarchy-niri-default reset` 恢复它。reset 前会把 live 七份打包到 `~/.local/state/backups/niri-config-<时间戳>.tar.gz`，并要求两道确认 + 输入 `DEFAULT`；`niri validate` 失败会自动从归档恢复。`status` 只读对比 live 与模板。全程用户权限，不需要 sudo。
+
 ## 两份怎么保持同步
 
 机器上的 `~/.config/niri/*.kdl` 是**权威版**（家目录是真路径），本目录是**占位符版**。两者之间

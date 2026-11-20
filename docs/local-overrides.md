@@ -74,7 +74,7 @@
 | `split-lock/ir-light` | PAM 人脸栈点名的 IR 补光脚本（`pam_exec.so /usr/local/bin/ir-light`）的仓库副本 | `install -m 0755 split-lock/ir-light /usr/local/bin/ir-light`；**硬件专属，见 §5** |
 | `niri-config/local/*.kdl`（7 份） | **本机在用的 niri 配置**（`config` + `input/monitor/layout/window-rules/effects/binds` 的模块化拆分） | 拷到 `~/.config/niri/`、把 `/home/<user>` 换成自己家目录、按自己显示器改 `monitor.kdl`，然后 `niri validate`；说明见 `niri-config/README.md` |
 | `niri-config/omarchy.kdl.template` + `shell.json` 示例 | niri 侧接线 | `install.sh` 会渲染成 `~/.config/niri/omarchy.kdl` 并拷 `shell.json`（**仅当不存在**）；**本机没走这条** —— 用的是模块化拆分，`config.kdl` 直接 include `{input,monitor,layout,window-rules,effects,binds}.kdl`，`omarchy.kdl` 不存在 |
-| `hooks/post-update.d/10-niri-repatch`、`hooks/theme-set.d/{10-niri-border,20-materal}` | 上游真身的 post-update 阶段重放覆盖层；换主题写边框渐变 | 上游钩子机制调用；本机四段更新垫片不触发 post-update |
+| `hooks/post-update.d/10-niri-repatch`、`hooks/theme-set.d/{10-niri-border,20-materal}` | 上游真身的 post-update 阶段重放覆盖层；换主题写边框渐变 | 上游钩子机制调用；本机更新垫片不触发 post-update |
 | `split-greeter/`、`split-lock/` | 自研登录器与锁屏，各带 `install.sh` + `tests/` | `sudo ./install.sh`（split-greeter 不碰 `config.toml`，最后一步手工） |
 | `battery-care/` | **omarchy-battery-care 的源件**（`omarchy-battery-care` 脚本 + `omarchy-battery-care{,-sleep}.service` + `install.sh` + `README.md` + `tests/`）：把"停在充电阈值之上"的电自动放回 STOP，见 §8 第 47 条 | `pkexec bash ~/Projects/onarchi/battery-care/install.sh`（装成 root 属主真副本；`--remove` 卸）；**改仓库后必须重跑 `install.sh`**（`omarchy update` 不刷新它） |
 | `default/omarchy/omarchy-menu.jsonc` | `install.package`/`install.aur`/`remove.package` 的 `xdg-terminal-exec` 回退 | 随仓库/覆盖层 |
@@ -108,9 +108,10 @@
 | `materal-update` | 取色/重上色 | ✅ |
 | `omarchy-niri-system` | logout/reboot/shutdown 统一入口（logind D-Bus，免密） | ✅ |
 | `omarchy-niri-apply-theme` | 按主题 token 写 niri 的边框渐变（两带方案） | ✅ |
+| `omarchy-niri-default` | 七份 niri 配置的本地默认模板：`save` 快照当前七份到 `~/.local/state/omarchy/niri-default/`；`reset` 先把 live 七份打包到 `~/.local/state/backups/niri-config-<时间戳>.tar.gz`，两道确认 + 输入 `DEFAULT` 后替换，`niri validate` 失败自动从归档恢复；`status` 只读对比。全程用户权限，无 sudo/pkexec | ✅ `port-bin/`（2026-11-20 新增；离线测试 `port-bin/tests/test-niri-default.sh`，20 项） |
 | `omarchy-niri-repatch` | 重放覆盖层（幂等） | ✅ |
 | `omarchy-powerprofiles-{list,set}` | 电源档位 | ✅ |
-| `omarchy-update` | 垫片 = 四段：`sudo pacman -Syu` → AUR（**paru 优先**，先查可执行；`-Sua` 只做 AUR；无外部包就跳过）→ `omarchy plugin update` → `mise up`（`MISE_MINIMUM_RELEASE_AGE=0`）；`--upstream` 跑上游真身。手装机跑不通上游 update 流程 | ✅ `port-bin/`（2026-09-20 收进；2026-09-30 改成四段并接住 CLI，见 §8 第 19 项） |
+| `omarchy-update` | 垫片默认只跑 `sudo pacman -Syu`；AUR / 插件 / mise 全部拆开：`omarchy-update aur`（paru 优先，`-Sua` 只做 AUR）、`omarchy plugin update`、`omarchy-update mise`（`MISE_MINIMUM_RELEASE_AGE=0 mise up`）；`--upstream` 跑上游真身。手装机跑不通上游 update 流程 | ✅ `port-bin/`（2026-09-20 收进；2026-09-30 接住 CLI；2026-11-20 拆出 AUR/插件/mise，见 §8 第 19 项） |
 | `omarchy-picker-warmup` | 配合用户单元延迟预热选择器缩略图 | ✅ `port-bin/`（2026-09-20 收进） |
 | `omarchy-display-text-size` | bar 的 Display 面板字号滑块驱动全桌面（CLI 路径绕过它） | ✅ `port-bin/`（2026-09-20 收进） |
 | `omarchy-toggle-input-device` | 触控板 / 触摸屏开关。上游脚本走 `hl.device`（niri 侧被垫片 no-op ⇒ 只弹 OSD、设备不关的"假成功"）；本垫片改成**写 / 删** `~/.config/niri/input-toggle-{touchpad,touchscreen}.kdl`，由 `input.kdl` 里两行 `include optional=true` 引入。菜单里的 Touchpad 项现在**真生效**，见垫片卷 `docs/shims.md` §4 | ✅ `port-bin/`（2026-09-23 收进） |
@@ -146,7 +147,7 @@
 |---|---|---|
 | `shell.json` | bar 用内置 `omarchy.bar`（浮空实现；`centerAnchor: omarchy.clock`、`floatGap 8`、`position: top`、`transparent: false`、**不写 `cornerRadius`** —— 走 `Style.cornerRadius` 12，2026-10-04 起）；`omarchy.tray.hidden: ["Fcitx"]`（藏掉 fcitx5 的托盘图标）；`omarchy.power.showPercentage`；`ronald.input-sources.showSourceName=false`；`meviusisback.ai-subs`（`barDisplay: Data`、900s）；`idle.lock 1800` / `idle.screensaver 300`（**screensaver 功能仍由 flag 禁用**；那条腿 2026-09-24 起由垫片 `omarchy-launch-screensaver` 接管成"不插电到点锁屏、锁后灭屏"，见 §8 第 23 条）；`disabledPlugins: ["omarchy.lock"]`；`plugins: [jianlongliu.split-lock, io.github.claudsondouglas.arcdock]` | `.bak-20260919-preaisubs`、`.bak-20260919-prehidetray`、`.bak-20260920-bar`、`.bak-20260920-bardisplay`、`.bak-20260924-idle300`、`.bak-20261004-barmrege`（合并 bar 前） |
 | `shell.toml` | `[font] base-size 12`；`[bar]` 尺寸 + `background-alpha 0.45` + **`icon-font 12`**（要 `Style.qml` 的白名单，已进覆盖层）；`[popups]/[notifications]/[tooltip]` alpha；`[menu]` 只有 `background-alpha 0.45`、**不写底色**（走主题的 `[menu] background` ＝ matugen 出的 `colors.toml` `background`，跟 `[bar]` 同档半透明磨砂；2026-09-21 起，替掉 9-20 写死的 `"#2a2a22"` @ 0.7） | `.bak-20260920-{consistency,iconfont,menu}`、`.bak-20260921-menu` |
-| `extensions/omarchy-menu.jsonc` | 菜单用户层 override：`trigger.*` 屏蔽、`setup.input` 指 `niri/input.kdl`、screensaver 6 条 `when:"false"`、**2026-09-22 再屏蔽 6 条**（`style.unlock` / `install.webapp` / `install.preinstalls` / `update.channel` / `update.config.{plymouth,shell}`，逐条根因与验证见 §8 第 27 条）、**Update 菜单改造**（`update.omarchy` → "System"、新增 `update.aur` = `paru -Sua` 与 `update.plugins` = `omarchy plugin update`；2026-09-27 按 `docs/menu.md` 的 Entry schema 重写文案 = 名词短语 + 供搜索的 `description`，见 §8 第 28 条）、**再屏蔽 `update.password.drive`**（无 LUKS，同 §8 第 28 条体检）。⚠ 同一 id 别写两遍；**别写行内注释**（`stripJsonc` 只删整行注释） | `.bak-20260919-{prehide,prelearn}`、`.bak-20260920-prescreensaver`、`.bak-20260922-{menuhides,updatemenu,updaudit}` |
+| `extensions/omarchy-menu.jsonc` | 菜单用户层 override：`trigger.*` 屏蔽、`setup.input` 指 `niri/input.kdl`、screensaver 6 条 `when:"false"`、**2026-09-22 再屏蔽 6 条**（`style.unlock` / `install.webapp` / `install.preinstalls` / `update.channel` / `update.config.{plymouth,shell}`，逐条根因与验证见 §8 第 27 条）、**2026-11-20 屏蔽 `update.config.tmux`**（会盖本机 tmux 配置），并把 `update.config.hyprland` 改名 **Niri**、动作换成 `omarchy-niri-default reset`（见 `port-bin/omarchy-niri-default`：先 tar.gz 归档当前七份，两道确认 + 输入 `DEFAULT`）、**Update 菜单改造**（`update.omarchy` → "System"、新增 `update.aur` = `paru -Sua` 与 `update.plugins` = `omarchy plugin update`，2026-11-20 再加 `update.mise` = `omarchy-update mise`；2026-09-27 按 `docs/menu.md` 的 Entry schema 重写文案 = 名词短语 + 供搜索的 `description`，见 §8 第 28 条）、**再屏蔽 `update.password.drive`**（无 LUKS，同 §8 第 28 条体检）。⚠ 同一 id 别写两遍；**别写行内注释**（`stripJsonc` 只删整行注释） | `.bak-20260919-{prehide,prelearn}`、`.bak-20260920-prescreensaver`、`.bak-20260922-{menuhides,updatemenu,updaudit}`、`.bak-20261120` |
 | `niri-port/` | `niri.patch`（与仓库同 md5）、`Niri.qml`、`plugin-patches/*.patch`（3 个，机器独有，见 §6） | 各自的 `.bak-*` |
 | `plugins/`（7 个） | 自研：`jianlongliu.arch-logo`（**源码已进仓库 `plugins/jianlongliu.arch-logo/`**）、`jianlongliu.workspaces`（上游克隆 + `niri-port/plugin-patches/jianlongliu.workspaces.patch`）、`jianlongliu.split-lock`（**正本 `split-lock/`**）（**没有 `.git`**，`omarchy plugin update` 不碰）；第三方：`ronald.input-sources`、`meviusisback.ai-subs`、`jrmmhm.pocket`、`io.github.claudsondouglas.arcdock`（**本身就是上游 git 克隆**，本地魔改用 `git diff` 就地生成 patch）。**浮空 bar 不在这里**（2026-10-04 起）——它是 `$OMARCHY_PATH/shell/plugins/bar/` 里的 `omarchy.bar`，随 `niri.patch` 走 | `plugin-patches/*.patch` 反向 `git apply -R` |
 | `hooks/` | 与仓库同（`post-update.d/10-niri-repatch` 的 `omarchy-restart-shell` 那 8 行 2026-09-20 已并回仓库，两侧 md5 `b077156959bc9cfb4c37941a4ffb3a5e` 一致） | 从仓库重拷 |
@@ -541,12 +542,18 @@ cp /tmp/niri.patch ~/.config/omarchy/niri-port/niri.patch              # 重放�
     - 回退：`cp ~/.local/state/backups/.local/share/omarchy/bin/omarchy-launch-shell.bak-20260930 ~/.local/share/omarchy/bin/omarchy-launch-shell`
       （测试件同理 `…/test/shell.d/launch-shell-test.sh.bak-20260930`）。
 19. **CLI `omarchy update` 也走本机垫片（2026-09-30）**：`~/bin/omarchy-update` 从"`sudo pacman -Syu` 一行"
-    扩成**四段** —— `sudo pacman -Syu` → AUR（**paru 优先**：先 `command -v` + `[[ -x ]]` 确认可执行，
-    再 `pacman -Qem` 看有没有外部包，没有就跳过；paru 缺了就退 yay，都没有则打印跳过）→ `omarchy plugin update`
-    → `MISE_MINIMUM_RELEASE_AGE=0 mise up`（本机 mise 只管 `bun` 一个工具，见 §8 第 15 项那批字体无关）。
-    - AUR 段用 **`-Sua`**（`-a` = `--aur`，本机 help 原话 "Assume targets are from the AUR"）：**只做 AUR**。
-      不带 `-a` 的 `-Su` 会连 repo 一起升级（`-Su` 只省掉 `-y` 刷库，不等于"只 AUR"）⇒ 与第一段重复；
+    扩成多段更新。**2026-11-20 起默认流程只跑 `sudo pacman -Syu`** —— AUR / Omarchy 插件 / mise 工具
+    全部拆成独立入口：`omarchy-update aur`、`omarchy plugin update`、`omarchy-update mise`
+    （菜单 Update 里分别是 AUR Packages / Plugins / Mise Tools）。菜单 Update → System、bar 的
+    system-update 部件、CLI `omarchy update` 都只更 repo 包。
+    - `aur` 子命令用 **`-Sua`**（`-a` = `--aur`，本机 help 原话 "Assume targets are from the AUR"）：**只做 AUR**。
+      不带 `-a` 的 `-Su` 会连 repo 一起升级（`-Su` 只省掉 `-y` 刷库，不等于"只 AUR"）⇒ 与系统更新重复；
       repo 那半边交给 `sudo pacman -Syu`，paru 只管它真正独占的那部分。
+      helper 选择：**paru 优先**（先 `command -v` + `[[ -x ]]` 确认可执行），再 `pacman -Qem` 看有没有外部包，
+      没有就跳过；paru 缺了就退 yay，都没有则打印跳过。
+    - `mise` 子命令 = `MISE_MINIMUM_RELEASE_AGE=0 mise up`；mise 不在 PATH 上时报错退出（菜单条目的
+      `when` 用 `omarchy-cmd-present mise` 提前隐藏）。mise 是工具版本管理器（本机管 `bun` 这类 dev 工具），
+      与 `~/.config/omarchy/plugins/` 下的 QML 插件不是一回事，所以单独一条。
     - **为什么要在 checkout 里动手**：dispatcher（`bin/omarchy`）按 `$OMARCHY_BIN_DIR/<最长前缀>` **绝对路径** exec，
       PATH 上的垫片拦不到 CLI，所以 `$OMARCHY_PATH/bin/omarchy-update` 顶部加三行
       `exec "$HOME/bin/omarchy-update" "$@"`（`OMARCHY_UPDATE_NO_DELEGATE=1` 时跳过，供逃生口用），插在安全脚手架**之前**
@@ -555,14 +562,16 @@ cp /tmp/niri.patch ~/.config/omarchy/niri-port/niri.patch              # 重放�
     - **由此丢掉的上游步骤**：`omarchy-update-dev`（代码 FF = `git pull --ff-only`）、`omarchy-update-keyring`、
       `omarchy-migrate`、snapshot、`omarchy-update-pkg-prune`、孤儿包清理、status/服务重启。
       逃生口 = `~/bin/omarchy-update --upstream`（跑上游真身；上游代码跟进仍走 `docs/upstream.md` §8.7 手动路径）。
-    - **参数**：垫片认 `-h/--help`、`--upstream`、**`aur`**（只跑 AUR 段 = `paru -Sua`，即
-      `omarchy update aur`；后面不接别的参数），**其余一律拒绝（exit 2）**。`aur` 之所以要单独实现：dispatcher 按最长前缀
-      只匹配到 `omarchy-update`，`aur` 是当**残留参数**传进来的，上游那份静默忽略它 ⇒ 不接住的话
-      `omarchy update aur` 什么也不做（本机垫片早期版本是直接拒掉）。这里是"只更 AUR"的唯一实现，
+    - **参数**：垫片认 `-h/--help`、`--upstream`、**`aur`**（只跑 AUR 段 = `paru -Sua`）、**`mise`**
+      （只跑 mise 段 = `MISE_MINIMUM_RELEASE_AGE=0 mise up`），后面都不接别的参数；其余一律拒绝（exit 2）。
+      `aur` 之所以要单独实现：dispatcher 按最长前缀只匹配到 `omarchy-update`，`aur` 是当**残留参数**传进来的，
+      上游那份静默忽略它 ⇒ 不接住的话 `omarchy update aur` 什么也不做（本机垫片早期版本是直接拒掉）。
       菜单 Update → AUR Packages 那条扩展走的是同一语义的 `paru -Sua`（`~/.config/omarchy/extensions/omarchy-menu.jsonc`）。
     - 验法（离线、不碰系统）：`OMARCHY_PATH=<假根> PATH=<桩目录>` 跑垫片，桩掉 `sudo`/`paru`/`pacman`/`mise` 并放一个桩
-      `omarchy`，看四段顺序、`paru -Sua`、`MISE_MINIMUM_RELEASE_AGE=0` 是否真传进 mise；分支单测：paru 不可执行 → 退到 yay、
-      两者都无 → 打印跳过、无外部包 → 跳过 AUR。委派验证：`$OMARCHY_PATH/bin/omarchy-update -h` 打印的是**垫片**用法
+      `omarchy`，看默认流程**只跑 `sudo pacman -Syu`**（不调用 paru / `omarchy plugin` / mise）；
+      `omarchy-update aur` 单测 `paru -Sua` 与分支：paru 不可执行 → 退到 yay、两者都无 → 打印跳过、无外部包 → 跳过 AUR；
+      `omarchy-update mise` 单测 `MISE_MINIMUM_RELEASE_AGE=0 mise up`。
+      委派验证：`$OMARCHY_PATH/bin/omarchy-update -h` 打印的是**垫片**用法
       （= 委派生效），而 `omarchy update --help` 仍是 dispatcher 帮助。⚠ 桩目录别把真 `~/bin` 留在 PATH 里，
       否则 paru 缺失时会回落到 `~/bin/yay` 垫片 → **真 paru**（2026-09-30 初测踩到；`sudo` 被桩掉所以没真升级）。
     - **别给垫片加 `SUDO_ASKPASS` / `sudo -A` / 前置 `sudo true` 授权（2026-10-28 试过、已回退）**：起因是
@@ -709,4 +718,4 @@ pkexec pacman -S --needed omarchy-speedtest   # 2.75 MiB → /usr/lib/omarchy/sp
 | 字体/中文回退改坏 | `rm ~/.config/fontconfig/conf.d/60-cjk-fallback.conf`（回系统默认：中文会落到 MS Gothic、图标无回退）；`fonts.conf` 本身由菜单管，`menu → style → font` 重选一次即重建；仓库副本 `local-config/fontconfig/conf.d/` 可拷回来（见 §8 缺口第 15 项） |
 | 品牌图标字体（菜单里的 AI logo） | `rm ~/.local/share/fonts/omarchy/omarchy.ttf && fc-cache -f && omarchy-restart-shell`（回到豆腐块，别的照常；见 §8 缺口第 17 项） |
 | 壳监督进程防双开补丁 | `cp ~/.local/state/backups/.local/share/omarchy/bin/omarchy-launch-shell.bak-20260930 ~/.local/share/omarchy/bin/omarchy-launch-shell`（测试件同理 `…/test/shell.d/launch-shell-test.sh.bak-20260930`；撤掉后引擎 SEGV 又可能双开抢锁＝红屏，链路见 `lock.md` §11.30，见 §8 缺口第 18 项） |
-| CLI `omarchy update` 走垫片（含四段更新流程） | 只撤垫片：`cp ~/.local/state/backups/bin/omarchy-update.bak-20260930 ~/bin/omarchy-update`。**连委派一起撤**：同样还原 `cp ~/.local/state/backups/.local/share/omarchy/bin/omarchy-update.bak-20260930 ~/.local/share/omarchy/bin/omarchy-update`，并把 `bin/omarchy-update` 从 `niri.patch` 路径表删掉后按 §7 限路径重生成（否则下次 repatch 会把委派再打回来；见 §8 缺口第 19 项） |
+| CLI `omarchy update` 走垫片（含系统包更新流程） | 只撤垫片：`cp ~/.local/state/backups/bin/omarchy-update.bak-20260930 ~/bin/omarchy-update`。**连委派一起撤**：同样还原 `cp ~/.local/state/backups/.local/share/omarchy/bin/omarchy-update.bak-20260930 ~/.local/share/omarchy/bin/omarchy-update`，并把 `bin/omarchy-update` 从 `niri.patch` 路径表删掉后按 §7 限路径重生成（否则下次 repatch 会把委派再打回来；见 §8 缺口第 19 项） |

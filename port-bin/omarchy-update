@@ -11,8 +11,9 @@
 #   * CLI `omarchy update` —— dispatcher 走绝对路径 $OMARCHY_PATH/bin/omarchy-update，
 #     那份文件顶部有三行委派（见 docs/local-overrides.md §8 第 19 项）
 #
-# 本垫片 = 四段：pacman -Syu → AUR（优先 paru，`-Sua` 只做 AUR）→ omarchy plugin update → mise up。
-# `omarchy-update aur` 只跑 AUR 那一段（菜单 Update → AUR Packages 走的也是这条）。
+# 本垫片默认只做系统包：`sudo pacman -Syu`。
+# 其余分开：`omarchy-update aur`（AUR）、`omarchy-update mise`（mise 工具）；
+# Omarchy 插件走 `omarchy plugin update`（菜单 Update → Plugins）。
 # 想跑上游那套（代码 FF、migrate、snapshot、prune、孤儿包清理、keyring）：--upstream。
 #
 # 回退：rm ~/bin/omarchy-update；CLI 那条还要还原 checkout 里那份（见 §9 回退索引）。
@@ -25,8 +26,9 @@ usage() {
   cat <<'EOF'
 omarchy-update（本机垫片）
 
-  omarchy-update              系统包 + AUR + omarchy 插件 + mise 工具
-  omarchy-update aur          只更 AUR 包（= paru -Sua；菜单 Update → AUR Packages 也走这条）
+  omarchy-update              只更系统包（sudo pacman -Syu）
+  omarchy-update aur          只更 AUR 包（= paru -Sua）
+  omarchy-update mise         只更 mise 管理的工具（= mise up）
   omarchy-update --upstream   跑上游 omarchy-update 真身（代码 FF、迁移、keyring 那套）
   omarchy-update -h|--help    这份说明
 
@@ -35,7 +37,7 @@ omarchy-update（本机垫片）
 EOF
 }
 
-aur_only=0
+mode=system
 case "${1:-}" in
 -h | --help)
   usage
@@ -47,10 +49,19 @@ case "${1:-}" in
   ;;
 aur)
   # CLI `omarchy update aur` = 只更 AUR（dispatcher 只匹配到 update，把 aur 当残留参数传进来）。
-  aur_only=1
+  mode=aur
   ref=${2:-}
   if [[ -n $ref ]]; then
     echo "omarchy-update: aur 后面不接参数（收到 '$ref'）" >&2
+    exit 2
+  fi
+  ;;
+mise)
+  # CLI `omarchy update mise` = 只更 mise 管理的工具。
+  mode=mise
+  ref=${2:-}
+  if [[ -n $ref ]]; then
+    echo "omarchy-update: mise 后面不接参数（收到 '$ref'）" >&2
     exit 2
   fi
   ;;
@@ -82,22 +93,23 @@ aur_segment() {
   return 1
 }
 
-if [[ $aur_only == 1 ]]; then
+if [[ $mode == aur ]]; then
   aur_segment || exit 1
   exit 0
 fi
 
+if [[ $mode == mise ]]; then
+  if command -v mise >/dev/null 2>&1; then
+    echo -e "\e[32m\nmise tools\e[0m"
+    MISE_MINIMUM_RELEASE_AGE=0 mise up
+  else
+    echo -e "\e[33m\n没找到 mise，跳过\e[0m"
+    exit 1
+  fi
+  exit 0
+fi
+
+# 系统更新只碰 repo 包：AUR 走 `omarchy-update aur`，插件走 `omarchy plugin update`，
+# mise 工具走 `omarchy-update mise`。
 echo -e "\e[32m\nSystem packages (pacman -Syu)\e[0m"
 sudo pacman -Syu
-
-aur_segment || true
-
-if [[ -x $omarchy_path/bin/omarchy ]]; then
-  echo -e "\e[32m\nOmarchy plugins\e[0m"
-  "$omarchy_path/bin/omarchy" plugin update
-fi
-
-if command -v mise >/dev/null 2>&1; then
-  echo -e "\e[32m\nmise tools\e[0m"
-  MISE_MINIMUM_RELEASE_AGE=0 mise up
-fi

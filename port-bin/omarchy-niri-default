@@ -1,0 +1,290 @@
+#!/bin/bash
+# omarchy-niri-default — save/reset the modular niri config. 正本：port-bin/omarchy-niri-default
+#
+# The machine's niri config is seven files under ~/.config/niri:
+#   config input monitor layout window-rules effects binds
+# "Save" snapshots the current set as the default template; "reset" puts that
+# template back.  Everything is user-owned: no sudo, no pkexec, no root helper.
+#
+# A reset always archives the live seven files first:
+#   ~/.local/state/backups/niri-config-<timestamp>.tar.gz
+# The archive path is printed before anything is written, and again on success.
+#
+# The template is validated in a temp dir before the live files are touched, and
+# the live tree is validated again after the swap.  If either check fails, the
+# archive is restored automatically and the live config is left consistent.
+#
+# Tests: port-bin/tests/test-niri-default.sh
+
+set -euo pipefail
+
+CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}
+STATE_HOME=${XDG_STATE_HOME:-$HOME/.local/state}
+NIRI_DIR=${NIRI_CONFIG_DIR:-$CONFIG_HOME/niri}
+TEMPLATE_DIR=${NIRI_TEMPLATE_DIR:-$STATE_HOME/omarchy/niri-default}
+BACKUP_DIR=${NIRI_BACKUP_DIR:-$STATE_HOME/backups}
+FILES=(config input monitor layout window-rules effects binds)
+
+usage() {
+  cat <<'EOF'
+omarchy-niri-default（本机 niri 配置模板）
+
+  omarchy-niri-default save     把当前七份 kdl 快照成默认模板
+  omarchy-niri-default reset    从默认模板重置 live 配置（两道确认 + 输入 DEFAULT）
+  omarchy-niri-default status   对比 live 与默认模板
+  omarchy-niri-default -h       这份说明
+
+reset 会先把当前七份 kdl 打包到：
+  ~/.local/state/backups/niri-config-<时间戳>.tar.gz
+全程只写用户目录，不需要 sudo，也不调用 pkexec。
+EOF
+}
+
+die() {
+  echo -e "\e[31momarchy-niri-default: $*\e[0m" >&2
+  exit 1
+}
+
+notify() { # title body
+  if command -v omarchy-notification-send >/dev/null 2>&1; then
+    omarchy-notification-send "$1" "$2" >/dev/null 2>&1 || true
+  fi
+}
+
+ask_confirm() { # prompt
+  if command -v gum >/dev/null 2>&1 && [[ -t 0 && -t 1 ]]; then
+    gum confirm --default=false "$1"
+    return
+  fi
+  local answer
+  read -r -p "$1 [y/N] " answer || return 1
+  [[ $answer == [yY]* ]]
+}
+
+ask_keyword() { # prompt keyword
+  local entered
+  if command -v gum >/dev/null 2>&1 && [[ -t 0 && -t 1 ]]; then
+    entered=$(gum input --header "$1" --placeholder "$2") || return 1
+  else
+    read -r -p "$1: " entered || return 1
+  fi
+  [[ $entered == "$2" ]]
+}
+
+validate_dir() { # dir
+  local dir=$1 output
+  if output=$(niri validate -c "$dir/config.kdl" 2>&1); then
+    return 0
+  fi
+  printf '%s\n' "$output" >&2
+  return 1
+}
+
+require_niri() {
+  command -v niri >/dev/null 2>&1 || die "niri is not on PATH"
+}
+
+require_template() {
+  [[ -d $TEMPLATE_DIR ]] || die "no saved default template at $TEMPLATE_DIR (run: omarchy-niri-default save)"
+  local f
+  for f in "${FILES[@]}"; do
+    [[ -f $TEMPLATE_DIR/$f.kdl ]] || die "template is incomplete: missing $f.kdl"
+  done
+}
+
+template_names() {
+  local f
+  for f in "${FILES[@]}"; do printf '%s.kdl\n' "$f"; done
+}
+
+save_default() {
+  require_niri
+  local f missing=()
+  for f in "${FILES[@]}"; do
+    [[ -f $NIRI_DIR/$f.kdl ]] || missing+=("$f.kdl")
+  done
+  ((${#missing[@]} == 0)) || die "live config is incomplete: missing ${missing[*]}"
+
+  local tmp
+  tmp=$(mktemp -d)
+  for f in "${FILES[@]}"; do cp -p "$NIRI_DIR/$f.kdl" "$tmp/"; done
+  if ! validate_dir "$tmp"; then
+    rm -rf "$tmp"
+    die "the live config does not validate; template NOT saved"
+  fi
+
+  if [[ -d $TEMPLATE_DIR ]]; then
+    mkdir -p "$BACKUP_DIR"
+    local old_archive="$BACKUP_DIR/niri-default-template-$(date +%Y%m%d-%H%M%S).tar.gz"
+    [[ -e $old_archive ]] && old_archive="${old_archive%.tar.gz}-$$.tar.gz"
+    (umask 077; tar -czf "$old_archive" -C "$TEMPLATE_DIR" .)
+    chmod 600 "$old_archive"
+    echo "Previous template archived: $old_archive"
+  fi
+
+  mkdir -p "$(dirname "$TEMPLATE_DIR")"
+  rm -rf "$TEMPLATE_DIR"
+  mv "$tmp" "$TEMPLATE_DIR"
+  date -Is > "$TEMPLATE_DIR/.saved-at"
+
+  echo "Saved niri default template: $TEMPLATE_DIR"
+  notify "Niri default saved" "Template: $TEMPLATE_DIR"
+}
+
+create_archive() {
+  mkdir -p "$BACKUP_DIR"
+  local stamp archive names=()
+  stamp=$(date +%Y%m%d-%H%M%S)
+  archive="$BACKUP_DIR/niri-config-$stamp.tar.gz"
+  [[ -e $archive ]] && archive="${archive%.tar.gz}-$$.tar.gz"
+  for f in "${FILES[@]}"; do names+=("$f.kdl"); done
+  (umask 077; tar -czf "$archive" -C "$NIRI_DIR" "${names[@]}")
+  tar -tzf "$archive" >/dev/null 2>&1 || die "backup archive is unreadable: $archive"
+  chmod 600 "$archive"
+  printf '%s\n' "$archive"
+}
+
+restore_archive() { # archive
+  local archive=$1 dir f
+  dir=$(mktemp -d)
+  tar -xzf "$archive" -C "$dir"
+  for f in "${FILES[@]}"; do
+    if [[ -f $dir/$f.kdl ]]; then
+      cp -p "$dir/$f.kdl" "$NIRI_DIR/$f.kdl"
+    fi
+  done
+  rm -rf "$dir"
+}
+
+show_warning() {
+  local backup_hint="$BACKUP_DIR/niri-config-<timestamp>.tar.gz"
+  if command -v gum >/dev/null 2>&1 && [[ -t 0 && -t 1 ]]; then
+    gum style --border normal --padding "1 2" \
+      "NIRI CONFIG — RESET TO DEFAULT" \
+      "" \
+      "This will replace all seven niri config files with the saved default:" \
+      "config.kdl  input.kdl  monitor.kdl  layout.kdl" \
+      "window-rules.kdl  effects.kdl  binds.kdl" \
+      "" \
+      "Your current files are archived first:" \
+      "$backup_hint" \
+      "" \
+      "The template is validated before anything is written." \
+      "If validation fails, the live config is left untouched." \
+      "niri reloads afterwards; runtime-only display overrides may reset."
+    echo
+  else
+    cat <<EOF
+NIRI CONFIG — RESET TO DEFAULT
+
+This will replace all seven niri config files with the saved default:
+config.kdl  input.kdl  monitor.kdl  layout.kdl
+window-rules.kdl  effects.kdl  binds.kdl
+
+Your current files are archived first:
+$backup_hint
+
+The template is validated before anything is written.
+If validation fails, the live config is left untouched.
+niri reloads afterwards; runtime-only display overrides may reset.
+EOF
+    echo
+  fi
+}
+
+reset_default() {
+  require_niri
+  require_template
+
+  # Validate the template before asking for confirmation: never prompt the user
+  # to approve a reset that cannot be applied.
+  local tmp
+  tmp=$(mktemp -d)
+  local f
+  for f in "${FILES[@]}"; do cp -p "$TEMPLATE_DIR/$f.kdl" "$tmp/"; done
+  if ! validate_dir "$tmp"; then
+    rm -rf "$tmp"
+    die "the saved template does not validate; nothing was changed"
+  fi
+  rm -rf "$tmp"
+
+  show_warning
+  ask_confirm "Reset niri config to the saved default?" || {
+    echo "Cancelled. Nothing was changed."
+    exit 1
+  }
+  ask_confirm "This is the destructive step: all seven live files will be replaced now. Continue?" || {
+    echo "Cancelled. Nothing was changed."
+    exit 1
+  }
+  ask_keyword "Type DEFAULT to confirm" DEFAULT || {
+    echo "Cancelled. Nothing was changed."
+    exit 1
+  }
+
+  local archive
+  archive=$(create_archive)
+  echo "Backed up current niri config to: $archive"
+
+  local copy_failed=0
+  for f in "${FILES[@]}"; do
+    cp -p "$TEMPLATE_DIR/$f.kdl" "$NIRI_DIR/$f.kdl" || {
+      copy_failed=1
+      break
+    }
+  done
+  if ((copy_failed)); then
+    restore_archive "$archive"
+    die "could not write the live config; previous config restored from $archive"
+  fi
+
+  if ! validate_dir "$NIRI_DIR"; then
+    restore_archive "$archive"
+    if [[ -n ${NIRI_SOCKET:-} ]]; then
+      niri msg action load-config-file >/dev/null 2>&1 || true
+    fi
+    die "new config failed validation; previous config restored from $archive"
+  fi
+
+  if [[ -n ${NIRI_SOCKET:-} ]] && ! niri msg action load-config-file; then
+    restore_archive "$archive"
+    niri msg action load-config-file >/dev/null 2>&1 || true
+    die "niri refused to reload; previous config restored from $archive"
+  fi
+
+  if [[ -z ${NIRI_SOCKET:-} ]]; then
+    echo "NIRI_SOCKET is not set; run 'niri msg action load-config-file' to apply."
+  fi
+
+  echo "Niri config reset to the saved default."
+  echo "Backup: $archive"
+  notify "Niri config reset" "Backup: $archive"
+}
+
+status() {
+  require_template
+  local f rc=0
+  for f in "${FILES[@]}"; do
+    if [[ ! -f $NIRI_DIR/$f.kdl ]]; then
+      echo "missing $f.kdl"
+      rc=1
+    elif cmp -s "$TEMPLATE_DIR/$f.kdl" "$NIRI_DIR/$f.kdl"; then
+      echo "same    $f.kdl"
+    else
+      echo "changed $f.kdl"
+      rc=1
+    fi
+  done
+  return "$rc"
+}
+
+case "${1:-}" in
+save) save_default ;;
+reset) reset_default ;;
+status) status ;;
+-h | --help | "") usage ;;
+*)
+  echo "omarchy-niri-default: unknown command '$1' (see -h)" >&2
+  exit 2
+  ;;
+esac

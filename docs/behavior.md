@@ -261,8 +261,8 @@
 27. **菜单屏蔽 5 项：`style.unlock` / `install.webapp` / `install.preinstalls` / `update.channel` / `update.config.{plymouth,shell}`（2026-09-22，用户要求）**：
     用户点名"style unlock 屏蔽、install 屏蔽 web app + pre-installs、update 屏蔽 channel + config"。评估后**只屏坏掉的**：
     前四条屏蔽是因为**本机要么没有对应功能、要么动作链在本机必失败**（不是审美取舍）；`update.config` 只屏
-    `plymouth`（必失败）与 `shell`（会盖掉本机调优版），**保留还在用的 `update.config.hyprland`（"Niri Theme" →
-    `omarchy-niri-apply-theme`，见 §8.6）和 `tmux`**。逐条根因：
+    `plymouth`（必失败）与 `shell`（会盖掉本机调优版），**保留还在用的 `update.config.hyprland`（现名 **Niri** →
+    `omarchy-niri-default reset`，重置前先归档当前七份 kdl，见 §8.6）；`tmux` 2026-11-20 起按用户要求隐藏**。逐条根因：
     - `style.unlock`：本机**没有 LUKS**（`lsblk -o NAME,TYPE,FSTYPE,MOUNTPOINT` 无 `crypt`、`/etc/crypttab` 空）
       ⇒ 它主题化的是不存在的磁盘解锁屏；且 `omarchy-plymouth-set-by-theme` → `omarchy-plymouth-set` 的 root 事务
       要求 `$OMARCHY_PATH` 归 root 或由 `/etc/omarchy.conf`（dev-link 授权）指定，而本机 `OMARCHY_PATH=~/.local/share/omarchy`
@@ -332,7 +332,7 @@
       **`iconFont` 显式清空**。清它是有原因的：`mergeMenuSources` 是**逐字段覆盖**，不清就继续拿默认项的
       `iconFont:"omarchy"` 去渲染这枚普通 Nerd Font 字形；置空后 `Menu.qml` 的
       `font.family: row.iconFont.length > 0 ? row.iconFont : root.fontFamily` 回落到菜单字体。
-      **动作保持原样**（`omarchy-launch-floating-terminal-with-presentation omarchy-update`）。2026-09-27 时垫片仅运行 `sudo pacman -Syu`；现行仓库 `port-bin/omarchy-update` 已改为四段：系统包、AUR、插件、mise，详见 `local-overrides.md` §8 第 19 项。
+      **动作保持原样**（`omarchy-launch-floating-terminal-with-presentation omarchy-update`）。2026-09-27 时垫片仅运行 `sudo pacman -Syu`；现行仓库 `port-bin/omarchy-update` 默认同样只跑系统包，AUR / 插件 / mise 已拆成独立入口（`update.aur` / `update.plugins` / `update.mise`），详见 `local-overrides.md` §8 第 19 项。
     - `update.aur`：`omarchy-launch-floating-terminal-with-presentation 'paru -Sua'`（本机 paru v2.1.0 在位；
       AUR 另有 `~/bin/yay` 垫片，此处按用户要求用 paru）。
     - `update.plugins`：`omarchy-launch-floating-terminal-with-presentation 'omarchy plugin update'`（= `bin/omarchy-plugin-update`）。
@@ -343,8 +343,13 @@
       `git merge --ff-only` 会报 "you have local changes" 并跳过、**不会**自动重放 patch，需要手工处理；更新成功后会
       `omarchy-shell shell rescanPlugins`。它拒绝非交互运行（无 TTY 时报 "refusing to continue without confirmation"），
       所以必须走终端——这条正是。
+    - `update.mise`：`omarchy-launch-floating-terminal-with-presentation 'omarchy-update mise'`，
+      `when: omarchy-cmd-present mise`；只动 mise 管理的工具（`MISE_MINIMUM_RELEASE_AGE=0 mise up`）。
+      mise 是工具版本管理器，与 `~/.config/omarchy/plugins/` 下的 QML 插件不是一回事。
+    - 2026-11-20 验证：`node scripts/menu-model-render.js update` ⇒ 11 行
+      （System / Config / Process / Hardware / Firmware / Password / Timezone / Time / AUR Packages / Plugins / Mise Tools）。
     - **顺序限制（实测）**：新增 id 按 `mergeMenuSources` 规则**追加在 Update 子菜单末尾**（"Time" 之后），
-      override 改不了位置；要把它俩挪到 Pacman 下面只能改默认文件（走 `niri.patch`）。
+      override 改不了位置；要把这三条挪到 Pacman 下面只能改默认文件（走 `niri.patch`）。
     - 演示终端链路实测（2026-09-22）：`omarchy-launch-floating-terminal-with-presentation 'sleep 6'` 起出窗口
       （`niri msg windows` 见 Title `Omarchy`、App ID `org.omarchy.terminal`）；在窗口里 `: <>/dev/tty` 成功、`tty` = `/dev/pts/2`、
       `sudo -n true` 报 "a password is required" ⇒ **有控制终端、sudo 能弹密码框**（`sudo pacman -Syu` / `paru -Sua` 能正常要密码）。
@@ -377,6 +382,7 @@
       `style` 6 行（无 Unlock/Screensaver）、`install` 12 行（无 Web App/Preinstalls）、`install.preinstalls` 0 行、
       `system` 5 行（无 Screensaver）。**A/B 也用它做**：`--default-only`（假装没有 override）时 `update.password` 立刻变回
       **2 行（Drive Encryption + User）**，这就是"隐藏确实由这份 override 驱动"的干净证据（无需改动文件）。
+      （2026-11-20 现状：`update` 11 行 —— 新增 Mise Tools；`update.config` 1 行 —— Niri，Tmux 已隐藏。）
       注意 `childCount` **不过滤隐藏项**，要对"看得见的子项数"得自己按 `isVisible` 数（探针里已这么写）。
       ⚠ 抓图路线的坑：菜单是图层表面、会盖住终端，但**子菜单面板小、位置不固定**，OCR 很容易把终端里的文字当成菜单内容
       （本轮就误读过一次）；要抓图就得先把终端窗口挪走，而"挪窗口/切空 workspace"在本机 dynamic workspace 下也不可靠。
@@ -478,7 +484,7 @@ Omarchy 有两层配置，只有层1在 niri 上真正生效：
 | `setup.keybindings`（移除 hypr 文件存在守卫）| `bindings.lua` → `binds.kdl` |
 | `setup.input`（移除守卫）| `input.lua` → `input.kdl` |
 | `setup.config.hyprland`（label 改 "Niri"）| `hyprland.lua` → `config.kdl` |
-| `update.config.hyprland`（label 改 "Niri Theme"）| `omarchy-refresh-hyprland` → `omarchy-niri-apply-theme` |
+| `update.config.hyprland`（label 改 "Niri"）| `omarchy-refresh-hyprland` → `omarchy-niri-default reset`（先归档当前七份 kdl，两道确认 + 输入 `DEFAULT`）|
 | 三个 `*hyprsunset*` 项 | 加 `"when":"false"` 隐藏（niri 无 hyprsunset）|
 
 - **模块化注意（2026-08-27 修正）**：niri 配置已拆成 `include` 模块化
