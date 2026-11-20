@@ -27,7 +27,11 @@ export STUB_COUNTER=$tmp/stub.counter
 mkdir -p "$NIRI_CONFIG_DIR" "$NIRI_BACKUP_DIR" "$tmp/bin"
 
 for f in config input monitor layout window-rules effects binds; do
-  printf 'live-%s\n' "$f" >"$NIRI_CONFIG_DIR/$f.kdl"
+  if [[ $f == layout ]]; then
+    printf 'live-layout\nfocus-ring {\n    width 2\n    active-color "#aaaaaaff"\n}\n' >"$NIRI_CONFIG_DIR/$f.kdl"
+  else
+    printf 'live-%s\n' "$f" >"$NIRI_CONFIG_DIR/$f.kdl"
+  fi
 done
 
 cat >"$tmp/bin/niri" <<'SH'
@@ -48,7 +52,12 @@ cat >"$tmp/bin/omarchy-notification-send" <<'SH'
 #!/bin/bash
 printf 'notify %s | %s\n' "$1" "$2" >>"$STUB_LOG"
 SH
-chmod +x "$tmp/bin/niri" "$tmp/bin/omarchy-notification-send"
+cat >"$tmp/bin/omarchy-niri-apply-theme" <<'SH'
+#!/bin/bash
+printf 'apply-theme\n' >>"$STUB_LOG"
+sed -i 's/^[[:space:]]*active-color .*/    active-color "#123456ff"/' "$NIRI_CONFIG_DIR/layout.kdl"
+SH
+chmod +x "$tmp/bin/niri" "$tmp/bin/omarchy-notification-send" "$tmp/bin/omarchy-niri-apply-theme"
 export PATH="$tmp/bin:/usr/bin:/bin"
 
 checks=0
@@ -65,7 +74,8 @@ check() { # name got want
 
 "$SCRIPT" save >"$tmp/save.out" 2>&1
 check "save exits 0" "$?" "0"
-check "save writes live layout" "$(cat "$NIRI_TEMPLATE_DIR/layout.kdl")" "live-layout"
+grep -q '^live-layout$' "$NIRI_TEMPLATE_DIR/layout.kdl"
+check "save writes live layout" "$?" "0"
 if grep -q 'optional include not found' "$tmp/save.out"; then leaked=yes; else leaked=no; fi
 check "save hides niri validation warnings" "$leaked" "no"
 
@@ -74,11 +84,29 @@ check "status exits 0 when identical" "$?" "0"
 grep -q 'same    layout.kdl' "$tmp/status.out"
 check "status reports layout same" "$?" "0"
 
+sed -i 's/#aaaaaaff/#ccccccff/' "$NIRI_CONFIG_DIR/layout.kdl"
+"$SCRIPT" status >"$tmp/theme.out" 2>&1
+check "status ignores theme colour changes" "$?" "0"
+grep -q 'same    layout.kdl (theme colours ignored)' "$tmp/theme.out"
+check "status labels theme colours ignored" "$?" "0"
+
+sed -i 's/width 2/width 3/' "$NIRI_CONFIG_DIR/layout.kdl"
+"$SCRIPT" status >/dev/null 2>&1
+check "status still detects structural changes" "$?" "1"
+sed -i 's/width 3/width 2/' "$NIRI_CONFIG_DIR/layout.kdl"
+
 printf 'changed-layout\n' >"$NIRI_CONFIG_DIR/layout.kdl"
 before=$(find "$NIRI_BACKUP_DIR" -maxdepth 1 -name 'niri-config-*.tar.gz' 2>/dev/null | wc -l)
 printf 'y\ny\nDEFAULT\n' | "$SCRIPT" reset >"$tmp/reset.out" 2>&1
 check "reset exits 0 after confirmations" "$?" "0"
-check "reset restores the saved layout" "$(cat "$NIRI_CONFIG_DIR/layout.kdl")" "live-layout"
+grep -q '^live-layout$' "$NIRI_CONFIG_DIR/layout.kdl"
+check "reset restores the saved layout" "$?" "0"
+grep -q '#123456ff' "$NIRI_CONFIG_DIR/layout.kdl"
+check "reset refreshes theme colours" "$?" "0"
+grep -q '^apply-theme$' "$STUB_LOG"
+check "reset calls the theme applier" "$?" "0"
+"$SCRIPT" status >/dev/null 2>&1
+check "status is clean after theme refresh" "$?" "0"
 after=$(find "$NIRI_BACKUP_DIR" -maxdepth 1 -name 'niri-config-*.tar.gz' 2>/dev/null | wc -l)
 check "reset creates one archive" "$((after - before))" "1"
 archive=$(find "$NIRI_BACKUP_DIR" -maxdepth 1 -name 'niri-config-*.tar.gz' | head -1)

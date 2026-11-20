@@ -14,6 +14,9 @@
 # the live tree is validated again after the swap.  If either check fails, the
 # archive is restored automatically and the live config is left consistent.
 #
+# layout.kdl's focus-ring/border colours are theme-generated: status ignores those
+# lines, and reset refreshes them from the current theme via omarchy-niri-apply-theme.
+#
 # Tests: port-bin/tests/test-niri-default.sh
 
 set -euo pipefail
@@ -78,6 +81,20 @@ validate_dir() { # dir
   fi
   printf '%s\n' "$output" >&2
   return 1
+}
+
+# layout.kdl carries two kinds of lines: the layout structure (owned by this
+# template) and the focus-ring/border colours that omarchy-niri-apply-theme
+# regenerates on every theme or wallpaper change.  Compare the structure only;
+# the generated lines are expected to differ and are refreshed after a reset.
+normalize_layout() { # file
+  awk '
+    /^[[:space:]]*(active|inactive)-(color|gradient)([[:space:]]|$)/ { next }
+    /^[[:space:]]*border[[:space:]]*\{/ { inborder = 1; print; next }
+    inborder && /^[[:space:]]*\}/ { inborder = 0; print; next }
+    inborder && /^[[:space:]]*(on|off)[[:space:]]*$/ { next }
+    { print }
+  ' "$1"
 }
 
 require_niri() {
@@ -171,6 +188,7 @@ show_warning() {
       "" \
       "The template is validated before anything is written." \
       "If validation fails, the live config is left untouched." \
+      "layout.kdl colours are refreshed from the current theme after the reset." \
       "niri reloads afterwards; runtime-only display overrides may reset."
     echo
   else
@@ -186,6 +204,7 @@ $backup_hint
 
 The template is validated before anything is written.
 If validation fails, the live config is left untouched.
+layout.kdl colours are refreshed from the current theme after the reset.
 niri reloads afterwards; runtime-only display overrides may reset.
 EOF
     echo
@@ -238,6 +257,11 @@ reset_default() {
     die "could not write the live config; previous config restored from $archive"
   fi
 
+  if command -v omarchy-niri-apply-theme >/dev/null 2>&1; then
+    echo "Refreshing layout.kdl colours from the current theme..."
+    omarchy-niri-apply-theme || echo "warning: could not refresh layout.kdl colours; run omarchy-niri-apply-theme" >&2
+  fi
+
   if ! validate_dir "$NIRI_DIR"; then
     restore_archive "$archive"
     if [[ -n ${NIRI_SOCKET:-} ]]; then
@@ -268,6 +292,17 @@ status() {
     if [[ ! -f $NIRI_DIR/$f.kdl ]]; then
       echo "missing $f.kdl"
       rc=1
+    elif [[ $f == layout ]]; then
+      if cmp -s <(normalize_layout "$TEMPLATE_DIR/$f.kdl") <(normalize_layout "$NIRI_DIR/$f.kdl"); then
+        if cmp -s "$TEMPLATE_DIR/$f.kdl" "$NIRI_DIR/$f.kdl"; then
+          echo "same    $f.kdl"
+        else
+          echo "same    $f.kdl (theme colours ignored)"
+        fi
+      else
+        echo "changed $f.kdl"
+        rc=1
+      fi
     elif cmp -s "$TEMPLATE_DIR/$f.kdl" "$NIRI_DIR/$f.kdl"; then
       echo "same    $f.kdl"
     else

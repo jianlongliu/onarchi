@@ -63,6 +63,8 @@ niri validate                                      # 必须通过；见下面的
 
 `omarchy-niri-default save` 把当前七份快照成默认模板；`omarchy-niri-default reset` 恢复它。reset 前会把 live 七份打包到 `~/.local/state/backups/niri-config-<时间戳>.tar.gz`，并要求两道确认 + 输入 `DEFAULT`；`niri validate` 失败会自动从归档恢复。`status` 只读对比 live 与模板。全程用户权限，不需要 sudo。
 
+`layout.kdl` 的 `active/inactive-color|gradient` 与 `border` 的裸 `on/off` 是主题/壁纸生成的：`status` 会忽略这些行，`reset` 后用当前主题重刷颜色，所以换主题不会让模板“过期”。
+
 ## 两份怎么保持同步
 
 机器上的 `~/.config/niri/*.kdl` 是**权威版**（家目录是真路径），本目录是**占位符版**。两者之间

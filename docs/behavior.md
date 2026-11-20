@@ -484,7 +484,7 @@ Omarchy 有两层配置，只有层1在 niri 上真正生效：
 | `setup.keybindings`（移除 hypr 文件存在守卫）| `bindings.lua` → `binds.kdl` |
 | `setup.input`（移除守卫）| `input.lua` → `input.kdl` |
 | `setup.config.hyprland`（label 改 "Niri"）| `hyprland.lua` → `config.kdl` |
-| `update.config.hyprland`（label 改 "Niri"）| `omarchy-refresh-hyprland` → `omarchy-niri-default reset`（先归档当前七份 kdl，两道确认 + 输入 `DEFAULT`）|
+| `update.config.hyprland`（label 改 "Niri"）| `omarchy-refresh-hyprland` → `omarchy-niri-default reset`（先归档当前七份 kdl，两道确认 + 输入 `DEFAULT`；`layout.kdl` 主题色在 reset 后按当前主题重刷）|
 | 三个 `*hyprsunset*` 项 | 加 `"when":"false"` 隐藏（niri 无 hyprsunset）|
 
 - **模块化注意（2026-08-27 修正）**：niri 配置已拆成 `include` 模块化
