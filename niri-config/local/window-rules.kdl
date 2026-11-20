@@ -154,6 +154,29 @@ window-rule {
     }
 }
 
+// QQ (linuxqq-nt-bwrap, Electron): the login window is an ordinary toplevel that
+// asks for a compact size of its own. The global `open-maximized true` above turned
+// it into a full-height workspace column and stretched the login page across the
+// screen, so QQ is opted out of the global maximize and opens floating instead --
+// the client's own geometry wins, like floating dialogs did on Hyprland.
+// The main window shares app-id "QQ", so it opens floating too; press Mod+F to
+// maximize it, or drop `open-floating` if QQ should tile like WeChat.
+// Frosted glass: same mechanism as WeChat/ChatGPT/Discord below -- QQ paints an
+// opaque surface, so `opacity` is what lets the live background blur show through,
+// and draw-border-with-background false keeps the focus ring from showing through
+// the translucent window.
+window-rule {
+    match app-id=r#"^QQ$"#
+    open-floating true
+    open-maximized false
+    opacity 0.85
+    draw-border-with-background false
+    background-effect {
+        xray false
+        blur true
+    }
+}
+
 // ChatGPT desktop (chatgpt-bin) and Discord: both Electron windows that paint an
 // opaque surface, and Discord usually lands on Xwayland. Same mechanism as the
 // WeChat rule above -- a background effect only shows through a semitransparent
@@ -182,6 +205,39 @@ window-rule {
     // Only works when the client asks during its initial configure; a client that
     // asks for maximize after mapping bypasses this rule (see the wiki).
     open-maximized-to-edges false
+    background-effect {
+        xray false
+        blur true
+    }
+}
+
+// Ely Office (ElyDoc / ElyTable) and the Herdr desktop app: same frosted-glass
+// mechanism as the rules above -- they paint opaque surfaces, so `opacity` is what
+// lets the live blur behind show through, and draw-border-with-background false
+// keeps the focus ring from bleeding through the translucent window.
+// The Herdr TUI is deliberately not matched here: it runs inside Ghostty
+// (app-id com.mitchellh.ghostty), which already has its own frosted rule above.
+window-rule {
+    match app-id=r#"^ely-doc$"#
+    match app-id=r#"^ely-table$"#
+    match app-id=r#"^herdr-app$"#
+    opacity 0.85
+    draw-border-with-background false
+    background-effect {
+        xray false
+        blur true
+    }
+}
+
+// The portal file chooser is its own process, so the per-app rules above never
+// reach it: Qt (WeChat) and rfd (ElyOffice) both open their "Open File"/"Open
+// Folder" dialogs through org.freedesktop.portal.FileChooser, which
+// xdg-desktop-portal-gtk renders. Same frosted treatment so the picker matches the
+// app that spawned it. This also covers every other portal file picker on the box.
+window-rule {
+    match app-id=r#"^xdg-desktop-portal-gtk$"#
+    opacity 0.85
+    draw-border-with-background false
     background-effect {
         xray false
         blur true
