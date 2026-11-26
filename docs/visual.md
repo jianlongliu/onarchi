@@ -178,6 +178,9 @@ niri 26.04 的 `background-effect` + Quickshell 的 `ext_background_effect` 形�
   `BackgroundEffect.blurRegion: Region { item: card; radius: Style.cornerRadius }`。**所有 bar 弹窗面板**
   （audio/bluetooth/clock/dropbox/monitor/network/power/tailscale/weather + agent 面板）都复用
   `KeyboardPanel`，所以这一处改动统一磨砂了它们全部（一次覆盖 9+ 面板）。
+- `shell/plugins/clipboard/Clipboard.qml`：同上，`OverlayWindow` 挂
+  `BackgroundEffect.blurRegion: Region { item: card; radius: Math.max(0, root.cornerRadius - 2) }`；
+  卡片区域就是唯一磨砂范围，全屏 scrim 不会整面霜化。
 - `shell/plugins/osd/Osd.qml`（2026-08-31 新增）：**OSD 不用 blurRegion，改用"卡片大小 surface"**。
   官方版是全屏透明 `PanelWindow`（`anchors` 四边铺满），niri 的 layer-rule blur 会把它整面霜化
   （表现为"OSD 弹出时全屏变糊"）；且 Quickshell 的 `blurRegion` 在 niri 上 region 几何跟踪异常
@@ -214,6 +217,9 @@ niri 26.04 的 `background-effect` + Quickshell 的 `ext_background_effect` 形�
     改前（无此规则 ⇒ niri 默认 `xray true` = 只磨壁纸）与改后实测：菜单区域平均差 **7.63**、最大 **80**
     （2560×1600 实拍）。**对照**：bar 那条改 `xray` 的同类实测均值只有 **0.4% 像素、最大 12** —— 差额的
     原因见下一条，也正是"bar 可以省、菜单不能省"的由来。
+  - `^omarchy-clipboard$` → `background-effect { xray false }`（**只设 xray，不设 `blur true`**）：
+    与菜单同构，`Clipboard.qml` 的 `OverlayWindow` 发卡片区域的 `BackgroundEffect.blurRegion`，
+    全屏 scrim 不会整面霜化。
   - `^omarchy-bar$` → `background-effect { xray false }`（**只设 xray**；2026-10-04 用户要求「关掉 xray 效果好很多」，
     此前 2026-09-21–10-04 为 `true`）。⚠ **这次改动的干净 A/B 说明它与 `true` 量不出差别**：只切 `xray`
     （false → true → false + 每次重启壳层），bar 横带均色 `#97928E` / `#98938E` / `#97928E`，false vs true

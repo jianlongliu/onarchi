@@ -353,7 +353,11 @@ Item {
           // rounded like the card, only when the theme rounds at all.
           readonly property bool rounded: thumb.photo && Style.cornerRadius > 0
           opacity: thumb.mono ? 0.85 : 1
-          layer.enabled: visible && (thumb.mono || rounded)
+          // A DPR change reloads the image asynchronously. Keep the effect
+          // alive while Loading: Qt may still be walking this sibling in the
+          // same device-pixel-ratio walk.
+          // Temporary port workaround: omacom/omarchy#17015 (fixes #16937).
+          layer.enabled: thumb.mono || rounded
           layer.effect: MultiEffect {
             maskEnabled: picture.rounded
             maskSource: mask

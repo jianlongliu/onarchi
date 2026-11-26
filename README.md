@@ -217,8 +217,8 @@ The overview backdrop needs no adjustment: niri draws that layer itself, so the 
 The port currently tracks upstream `quattro` at **`723072a55`** (2026-11-14), fast-forwarded from
 `6194f4606` on 2026-11-14 — 248 commits, 1163 files, +48176/−28306. The `v4.5.0` tag itself sits
 on the `v4-5-0` release branch, not on `quattro`, and this port follows `quattro` only.
-The current `niri.patch` has **49 files / 135 hunks / 3340 lines**, md5
-`79060b759dd8846baa17e7ec7515618d` (untracked overlay files are separate). This sync
+The current `niri.patch` has **51 files / 138 hunks / 3385 lines**, md5
+`adce67e86e8ccc33676805be0a338113` (untracked overlay files are separate). This sync
 updated the running tree and the overlay patch; the repository's vendored
 `bin/`/`shell/` source snapshot remains at `bc220e70` until the next full source sync.
 

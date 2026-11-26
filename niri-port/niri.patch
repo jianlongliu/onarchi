@@ -2355,6 +2355,34 @@ index 0166c4292..10a3c64cd 100644
          required property int index
  
          // A gap sets visiting workspaces apart from the monitor's own.
+diff --git a/shell/plugins/clipboard/Clipboard.qml b/shell/plugins/clipboard/Clipboard.qml
+index bb2b4c0fd..93fb71c2e 100644
+--- a/shell/plugins/clipboard/Clipboard.qml
++++ b/shell/plugins/clipboard/Clipboard.qml
+@@ -1,6 +1,7 @@
+ import Quickshell
+ import Quickshell.Io
+ import Quickshell.Wayland
++import Quickshell.Wayland._BackgroundEffect
+ import QtQuick
+ import qs.Commons
+ import qs.Commons as Commons
+@@ -324,6 +325,15 @@ Item {
+     shown: root.opened
+     WlrLayershell.namespace: "omarchy-clipboard"
+ 
++    // niri port: the overlay spans the screen, and niri has no Hyprland
++    // `ignore_alpha` to keep its clear expanse out of the blur. Hand over the
++    // card's own rounded rect so effects.kdl's `xray false` frosts only behind
++    // the card instead of the whole display.
++    BackgroundEffect.blurRegion: Region {
++      item: card
++      radius: Math.max(0, root.cornerRadius - 2)
++    }
++
+     Rectangle {
+       anchors.fill: parent
+       color: root.scrim
 diff --git a/shell/plugins/dock/AppGrid.qml b/shell/plugins/dock/AppGrid.qml
 index ed7164c1a..223c16491 100644
 --- a/shell/plugins/dock/AppGrid.qml
@@ -2607,6 +2635,23 @@ index 0800e4cc5..9a02680c7 100644
    var hints = n.hints || {}
    var raw = { app: Security.bounded(n.appName, Security.MAX_APP_NAME), summary: Security.bounded(n.summary, Security.MAX_SUMMARY),
                body: Security.bounded(n.body, Security.MAX_BODY) }
+diff --git a/shell/plugins/notifications/Toast.qml b/shell/plugins/notifications/Toast.qml
+index 025f99d90..f2a25daa0 100644
+--- a/shell/plugins/notifications/Toast.qml
++++ b/shell/plugins/notifications/Toast.qml
+@@ -353,7 +353,11 @@ Item {
+           // rounded like the card, only when the theme rounds at all.
+           readonly property bool rounded: thumb.photo && Style.cornerRadius > 0
+           opacity: thumb.mono ? 0.85 : 1
+-          layer.enabled: visible && (thumb.mono || rounded)
++          // A DPR change reloads the image asynchronously. Keep the effect
++          // alive while Loading: Qt may still be walking this sibling in the
++          // same device-pixel-ratio walk.
++          // Temporary port workaround: omacom/omarchy#17015 (fixes #16937).
++          layer.enabled: thumb.mono || rounded
+           layer.effect: MultiEffect {
+             maskEnabled: picture.rounded
+             maskSource: mask
 diff --git a/shell/plugins/osd/Osd.qml b/shell/plugins/osd/Osd.qml
 index c80c2e5c4..bab163517 100644
 --- a/shell/plugins/osd/Osd.qml

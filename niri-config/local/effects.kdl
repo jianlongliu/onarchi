@@ -31,11 +31,10 @@ blur {
 // niri has no `ignore_alpha`, so that client region is the only thing keeping a
 // full-screen surface's blur off the rest of the display.
 //
-// The full-screen scrim overlays (menu, clipboard, emojis, image-picker, and
-// every status-bar panel: audio/bluetooth/network/power/clock/monitor/
-// tailscale/weather/dropbox/wifiqr/speedtest/...) plus the wallpaper and lock
-// preview are deliberately NOT matched, so a niri-side blur never frosts the
-// entire display.
+// The full-screen scrim overlays that never hand over a shaped region — emojis,
+// image-picker, reminders, speed test, polkit, and lock preview — plus the
+// wallpaper/background surfaces are deliberately NOT matched, so a niri-side
+// blur never frosts the entire display.
 // (2026-09-21) omarchy-boot-banner is the floating bar plugin's "Thinking…"
 // card, shown while the shell boots. It borrows this rule so it is frosted
 // exactly like the osd card it copies; its surface is card-sized for the same
@@ -108,6 +107,16 @@ layer-rule {
 // client's region stays the sole blur area.
 layer-rule {
     match namespace="^omarchy-menu$"
+    background-effect {
+        xray false
+    }
+}
+
+// Clipboard history (2026-11-25): a full-screen transparent overlay like the
+// menu. The plugin sends the card's rounded rect as the blur region, so only
+// `xray false` is set here and that region stays the sole blur area.
+layer-rule {
+    match namespace="^omarchy-clipboard$"
     background-effect {
         xray false
     }
