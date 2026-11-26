@@ -24,7 +24,7 @@
 - 23. **screensaver 关掉并屏蔽（2026-09-20，用户要求「很烦，屏蔽和禁用他」）**：本机
 - 27. **菜单屏蔽 5 项（unlock / web app / preinstalls / channel / config.plymouth+shell）（2026-09-22，用户要求）**：这 6 个 id
 - 28. **Update 菜单改造：`update.omarchy` → "System"（2026-09-22 起叫过 "Pacman"，2026-09-27 按 `docs/menu.md` schema 重写文案），新增 `update.aur` / `update.plugins`**：同一份 override
-- 8.17 输入源徽章（`ronald.input-sources`）+ fcitx5 双源前提（2026-09-19）
+- 8.17 输入源徽章（`ronald.input-sources`）+ fcitx5 双源前提（2026-09-19；2026-11-26 补中英切换键位）
 - 12. **Super+K 键位菜单只剩 2 条（第二次复发，2026-08-25 晚已修）**：同日早些时候修过一次
 - 8.6 A 层：菜单指向 niri 真配置，Hyprland 层降级
 - 8.14 菜单空白（"Nothing here yet"）的成因与自愈（2026-09-19）
@@ -447,6 +447,31 @@ A/B 实测：摘掉后 bar 只有逻辑 x 706..742（宽 36）这一块像素变
 `Model.js` 顶部 `var badgeOverrides = { rime: "拼" }`，`badgeText()` 开头按 IM id 查表（id 就是 fcitx D-Bus 里的 `rime`）。
 补丁存档 `~/.config/omarchy/niri-port/plugin-patches/ronald.input-sources.patch`（基线 = 插件 git HEAD，`patch -p1 --dry-run` 验证可从 HEAD
 干净重放；`omarchy plugin update` 覆盖工作树后要重打）。插件只有一份副本，就在 `~/.config/omarchy/plugins/ronald.input-sources/`。
+
+**中英切换键位（2026-11-26）**：
+
+- **Ctrl+Space = fcitx5 输入源**：`~/.config/fcitx5/config` 的
+  `[Hotkey/EnumerateForwardKeys] 0=Control+space`，在 `rime ⇄ keyboard-us` 间枚举。
+  必须写成列表段；`[Hotkey]` 下的 `EnumerateForwardKeys=` 标量不生效。Rime 侧原来的
+  `Control+space -> toggle: ascii_mode` 已从 `wanxiang.custom.yaml` 移除。
+- **Shift / Ctrl+Shift 轻点 = Rime 内部 `ascii_mode`**：`Shift` 走 librime
+  `ascii_composer` 的修饰键轻点（500ms 内松开、期间无普通键；`default.yaml` 的
+  `Shift_L/R: commit_code` 已生效），所以 fcitx5 的 `TriggerKeys` 里**不能**放
+  `Shift_L/R`。`Ctrl+Shift` 纯组合会被 librime 的“多修饰键保护”取消，改用
+  `~/.local/share/fcitx5/rime/lua/wanxiang/terminal_literal.lua` 里的 1 秒状态机
+  （任何普通键按下取消）；`wanxiang.custom.yaml` 用
+  `engine/processors/@before 0: lua_processor@*wanxiang.terminal_literal` 挂载。
+- **终端/TUI**：`fcitx5.yaml` 的 app_options 里普通终端（`com.mitchellh.ghostty` /
+  `org.omarchy.terminal`）只留 `ascii_punct` + `terminal_mode`，不设 `ascii_mode`
+  （选 rime 即中文）；浮动 TUI（`org.omarchy.float-tui`）保留 `ascii_mode: true`，
+  避免 btop/yazi 里 `q` 被拼音吃掉。`config_version: "0.25"`，改后需重启 fcitx5
+  用户服务（`fcitx5-remote -r` 不重新部署）。
+- **已知问题**：终端中文态 `/` 仍可能被万象符号菜单吞掉；`terminal_literal.lua` 的
+  `/` 分支目前没有稳定接管，彻底解决要关掉 `punctuator/symbols`（代价是 `/sym`、
+  `/fh`、`/rq` 等快捷输入失效），尚未采用。
+- **bar 徽章延迟**：`ronald.input-sources` 的 `input-source-watch` 按 `pollInterval`
+  （默认 0.5s）轮询；fcitx5 切源没有 D-Bus 信号，点徽章还有 `input-source-set` 的
+  `8 × 0.15s` 重试。所以 Ctrl+Space 的实际切换比徽章反馈快。
 
 **验证**：IPC `open` 后 OCR 到 `Rime` / `Show Emoji & Symbols` / `Show Input Source Name` /
 `Open Keyboard Settings…`；`omarchy-shell -q ronald.input-sources next` 在 `rime ⇄ keyboard-us` 间来回切

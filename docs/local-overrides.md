@@ -154,6 +154,30 @@
 
 ---
 
+## 3.1 输入法（fcitx5 + Rime，2026-11-26）
+
+本机输入法不在仓库里；换机要手工重建。键位分工与实测见 `docs/behavior.md` §8.17。
+下表 `.../` = `~/.local/state/backups/fcitx5-rime-20261126/`。
+
+| 文件 | 关键内容 | 回退 |
+|---|---|---|
+| `~/.config/fcitx5/config` | `[Hotkey/EnumerateForwardKeys] 0=Control+space`（Ctrl+Space 切 `rime`/`keyboard-us`）；`TriggerKeys` 只留 `Zenkaku_Hankaku`/`Hangul`，**不要放 Shift/Ctrl+Shift**（Shift 交给 Rime）；`[Behavior] ShareInputState=All` | `cp .../fcitx5-config.before-cs-im ~/.config/fcitx5/config && fcitx5-remote -r` |
+| `~/.config/fcitx5/profile` | group `Default` = `rime` + `keyboard-us`；`DefaultIM=keyboard-us` 由 fcitx5 自己钉住（手改会被覆盖，§8.17） | `cp .../profile.before-defaultim-rime ~/.config/fcitx5/profile`（改 DefaultIM 前的快照；本机实际仍 keyboard-us） |
+| `~/.local/share/fcitx5/rime/wanxiang.custom.yaml` | `engine/processors/@before 0: lua_processor@*wanxiang.terminal_literal`；移除 `Control+space -> toggle: ascii_mode`；`switches/@0/reset: 0`（新窗口中文）、`@1/reset: 1`（英文标点） | `cp .../wanxiang.custom.yaml.before-cs-im ~/.local/share/fcitx5/rime/wanxiang.custom.yaml`，再重启 fcitx5 用户服务 |
+| `~/.local/share/fcitx5/rime/fcitx5.yaml` | 普通终端 `com.mitchellh.ghostty` / `org.omarchy.terminal`：`ascii_punct` + `terminal_mode`，不设 `ascii_mode`；`org.omarchy.float-tui` 保留 `ascii_mode: true`；`config_version: "0.25"` | `cp .../fcitx5.yaml.before-cs-im ~/.local/share/fcitx5/rime/fcitx5.yaml`，再重启 fcitx5 用户服务 |
+| `~/.local/share/fcitx5/rime/lua/wanxiang/terminal_literal.lua` | Ctrl+Shift 轻点 1s 状态机（普通键取消）+ 终端 `/` 直通尝试；万象升级可能覆盖 `lua/wanxiang/` | `cp .../terminal_literal.lua.ctrlshift ~/.local/share/fcitx5/rime/lua/wanxiang/terminal_literal.lua`，再重启 |
+| `~/.zshrc` | `btop`/`yazi` 包装 `_omarchy_tui_ascii`：运行期间 `SetAsciiMode true`，退出且窗口仍聚焦时恢复 | `cp ~/.local/state/backups/.zshrc.bak-20261126-tui ~/.zshrc` |
+
+**已知问题**：终端中文态 `/` 仍可能弹万象符号菜单；`terminal_literal.lua` 的 `/` 分支
+没有稳定接管。彻底解决要关掉 `punctuator/symbols`，代价是 `/sym`、`/fh`、`/rq` 等
+快捷输入失效，尚未采用。
+
+**验证**：`fcitx5-remote -n` 看 `rime`/`keyboard-us`；
+`busctl --user call org.fcitx.Fcitx5 /rime org.fcitx.Fcitx.Rime1 IsAsciiMode`
+看 Rime 内部中英；Shift / Ctrl+Shift 各按两次应 true/false 往返；`zsh -n ~/.zshrc`。
+
+---
+
 ## 4. niri 配置（`~/.config/niri/`）
 
 - 文件：`config.kdl`（只留 include 与会话级设置）、`binds.kdl`、`layout.kdl`、`window-rules.kdl`、
@@ -699,6 +723,7 @@ pkexec pacman -S --needed omarchy-speedtest   # 2.75 MiB → /usr/lib/omarchy/sp
 | 想撤销 | 命令 |
 |---|---|
 | 通用剪贴板（`Super+C/V/X`）与终端复制卡片 | 只想关卡片：删 `~/bin/omarchy-universal-clipboard` 里弹 `omarchy-osd` 那几行（注入照常，`~/bin` 与 `port-bin/` 两份都要删）。整套换回旧方案：`cp ~/.local/state/backups/.config/niri/binds.kdl.bak-20260927 ~/.config/niri/binds.kdl && cp ~/.local/state/backups/.config/ghostty/config.bak-20260927 ~/.config/ghostty/config`（回到"niri 不占键、ghostty 自己绑 `super+c/v/x`"那版），再 `rm ~/bin/omarchy-sendkeys ~/bin/omarchy-universal-clipboard`（ghostty 侧的 `app-notifications` 全程都是 `no-clipboard-copy`，不用动） |
+| 输入法键位（Ctrl+Space / Shift / Ctrl+Shift）改坏 | `cp ~/.local/state/backups/fcitx5-rime-20261126/fcitx5-config.before-cs-im ~/.config/fcitx5/config && cp ~/.local/state/backups/fcitx5-rime-20261126/wanxiang.custom.yaml.before-cs-im ~/.local/share/fcitx5/rime/wanxiang.custom.yaml && cp ~/.local/state/backups/fcitx5-rime-20261126/fcitx5.yaml.before-cs-im ~/.local/share/fcitx5/rime/fcitx5.yaml && systemctl --user restart app-org.fcitx.Fcitx5@autostart.service`；Ctrl+Shift 的 Lua 另从 `~/.local/state/backups/fcitx5-rime-20261126/terminal_literal.lua.ctrlshift` 恢复（万象升级覆盖 `lua/wanxiang/` 后也这样补） |
 | 某个 `~/bin` 垫片 | `rm ~/bin/<名字>` |
 | 覆盖层（回到上游 omarchy） | 在 `$OMARCHY_PATH` 里 `git apply -R ~/.config/omarchy/niri-port/niri.patch`（`omarchy-niri-repatch` **没有**反向开关，反向只能手动 `git apply -R`） |
 | 用户级 shell 配置 | 从备份根覆盖回去：`cp ~/.local/state/backups/.config/omarchy/<文件>.bak-* ~/.config/omarchy/<文件>`（热生效，存盘即回） |

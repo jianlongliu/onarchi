@@ -662,7 +662,7 @@ false` 让 niri 把焦点环画在窗口**周围**而非背后，问题解决（
 | `§8.14` | 菜单空白 | `docs/behavior.md` |
 | `§8.15` | overview 模糊壁纸延迟 | `docs/visual.md` |
 | `§8.16` | overview 背板与窗口动画错位 | `docs/visual.md` |
-| `§8.17` | 输入源徽章 | `docs/behavior.md` |
+| `§8.17` | 输入源徽章 + 中英切换键位 | `docs/behavior.md` |
 | `§8.18` | 锁屏"不能锁" | `docs/lock.md` |
 | `§8.19` | 全桌面字号 / DPI 一致性 | `docs/visual.md` |
 | `§8.20` | 上游 sudo 安全机制（代码已合入、2026-11-19 本机启用） | `docs/upstream.md` |
