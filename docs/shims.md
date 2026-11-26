@@ -446,7 +446,14 @@ niri 的 bind 只有 `spawn`，没有等价能力 ⇒ 用 uinput 垫片 `omarchy
    —— 注入本身 ~0.25 s 起步，轻点 `Super+C` 不受影响。补发一个合成的 `super` 松开事件**不能**清掉
    它（niri 的修饰键状态按设备算、客户端看并集，实测无效）。
 
-**成本**：每次按键 wall ≈ 0.45 s，其中 CPU 仅 36 ms（`python3 -c pass` 启动 29 ms，峰值 RSS 11 MB）；
+**无焦点窗口与 Super 松开**：输入法候选框、启动器这类 layer-shell 拿到键盘焦点时，
+`niri msg --json windows` 里没有任何 toplevel 是 `is_focused`。垫片回退到
+`focus_timestamp` 最新的窗口，避免把终端误判成非终端（非终端分支注入 `Ctrl+C`，
+在终端里等于 SIGINT）。非终端分支注入前还会等 `CLIPBOARD_SETTLE` 秒（默认 0.2）
+让物理 Super 松开；终端分支靠 ghostty 的 `super+ctrl+insert` 兜底，不额外延迟。
+
+**成本**：终端分支每次按键 wall ≈ 0.45 s；非终端默认再加 0.2 s（`CLIPBOARD_SETTLE`），
+其中 CPU 仅 36 ms（`python3 -c pass` 启动 29 ms，峰值 RSS 11 MB）；
 余下 0.40 s 是 `UIKEY_WAIT`(0.25) + `UIKEY_TAIL`(0.15) 两个刻意 sleep，等 libinput / 合成器把新设备
 枚举进来。**这段是内核/netlink 侧开销，换 C 重写省不掉**（ydotool 快是因为它常驻、设备只建一次）。
 要毫秒级就得常驻；两个变量都可用环境变量覆盖，便于往下压阈值。

@@ -14,12 +14,17 @@ default/hypr/apps/terminals.lua。见 docs/shims.md。
 终端里的复制/剪切顺带给一次视觉反馈：壳层 OSD 卡片（`omarchy-osd`，就是关机/重启
 那种卡片），不是 ghostty 的 libnotify 吐司（本机看不到）。只对写剪贴板的动作弹，
 且只弹终端分支 —— 浏览器里频繁复制不该被打扰。
+
+焦点在 layer-shell（输入法候选框、启动器）上时没有 toplevel 是 focused，这里回退到
+最近一次获得焦点的窗口，避免把终端误判成非终端。非终端分支注入前还会等
+CLIPBOARD_SETTLE 秒（默认 0.2），给物理 Super 松开的时间。
 """
 import json
 import os
 import re
 import subprocess
 import sys
+import time
 
 TERMINAL_RE = re.compile(
     r"^(Alacritty|kitty|com\.mitchellh\.ghostty|foot|wezterm|org\.omarchy\..*|TUI\..*)$"
@@ -39,6 +44,14 @@ OSD_ICON = "\U000f018f"  # nf-md-content_copy（双层方框；F0190=剪刀、F0
 OSD_MESSAGE = "Copied"
 OSD_DURATION_MS = "1200"
 
+# 非终端分支多等一会儿再注入，给物理 Super 松开的时间。注入键盘的修饰键和物理
+# 键盘按设备算、客户端看并集：Super 还按着时 Ctrl+C 会变成 Super+Ctrl+C。
+# 终端分支有 ghostty 的 super+ctrl+insert 兜底，不需要这段延迟。
+try:
+    SETTLE_SECONDS = max(0.0, float(os.environ.get("CLIPBOARD_SETTLE", "0.2")))
+except ValueError:
+    SETTLE_SECONDS = 0.2
+
 
 def focused_app_id():
     try:
@@ -51,7 +64,20 @@ def focused_app_id():
     for window in windows:
         if window.get("is_focused"):
             return window.get("app_id") or ""
-    return ""  # 焦点在 layer-shell 面板上时没有焦点窗口 ⇒ 走非终端分支
+
+    # 焦点在 layer-shell（输入法候选框、启动器）上时没有任何 toplevel 是 focused。
+    # 用最近一次获得焦点的窗口，避免把终端误判成非终端而注入 Ctrl+C（= SIGINT）。
+    def focus_time(window):
+        ts = window.get("focus_timestamp") or {}
+        if not isinstance(ts, dict):
+            return (0, 0)
+        return (ts.get("secs") or 0, ts.get("nanos") or 0)
+
+    if windows:
+        recent = max(windows, key=focus_time)
+        if focus_time(recent) != (0, 0):
+            return recent.get("app_id") or ""
+    return ""
 
 
 def main(argv):
@@ -71,6 +97,10 @@ def main(argv):
     if "--dry-run" in argv:
         print(f"{action}: app_id={app_id or '(无焦点窗口)'} terminal={is_terminal} -> {chord}")
         return 0
+
+    # 非终端没有 Super 兜底键位：先等物理 Super 松开，再注入。
+    if not is_terminal:
+        time.sleep(SETTLE_SECONDS)
 
     # 终端里的复制：注入完（剪贴板真写了）再弹 OSD 卡片，卡片本身不挡任何事。
     # 用户若一直按住 Super，注入的和弦会带上 Super（终端侧靠 ghostty 的
