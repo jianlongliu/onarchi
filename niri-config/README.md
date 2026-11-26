@@ -68,19 +68,23 @@ niri validate                                      # 必须通过；见下面的
 ## 两份怎么保持同步
 
 机器上的 `~/.config/niri/*.kdl` 是**权威版**（家目录是真路径），本目录是**占位符版**。两者之间
-**只差家目录那一处**（`scripts/kdl-sync.sh` 就是按这个不变量对账的）—— **`layout.kdl` 是唯一例外**：
-它的 `active-color` / `active-gradient` / `inactive-color` / `inactive-gradient` 以及 `border` 的裸
-`on`/`off` 是 `omarchy-niri-apply-theme` 从当前主题**生成**的，换主题**或换壁纸**（matugen 重推调色板 →
-`theme-set.d/20-materal` 重套主题 → `10-niri-border` 重写这几行）都会变，所以对账脚本会把这几行从两边
-一起剔掉再比；`layout.kdl` 其余部分仍是逐字节比，手工改到别处照样报错。改完本机配置、`niri validate`
-通过后同步过来：
+**只差家目录那一处**（`scripts/kdl-sync.sh` 就是按这个不变量对账的）。例外有两个：
+`layout.kdl` 的 `active-color` / `active-gradient` / `inactive-color` / `inactive-gradient` 以及
+`border` 的裸 `on`/`off` 是 `omarchy-niri-apply-theme` 从当前主题**生成**的，换主题**或换壁纸**
+（matugen 重推调色板 → `theme-set.d/20-materal` 重套主题 → `10-niri-border` 重写这几行）都会变，
+所以对账脚本会把这几行从两边一起剔掉再比；`layout.kdl` 其余部分仍是逐字节比。
+`input.kdl` 的 `trackpoint { accel-speed 0.6 }` 是这台 ThinkPad 的单机手感调参，仓库版故意不带；
+`kdl-sync.sh` 只从**机器侧**剔掉 `trackpoint` 块里那两行再比，仓库侧仍逐字节比——把它同步进仓库会被判 DIFF。
+改完本机配置、`niri validate` 通过后同步过来：
 
 ```bash
 cd ~/Projects/onarchi
-for f in config input monitor layout window-rules effects binds; do
+for f in config monitor layout window-rules effects binds; do
   sed "s|$HOME|/home/<user>|g" ~/.config/niri/$f.kdl > niri-config/local/$f.kdl
 done
-./scripts/kdl-sync.sh          # 七份逐字节对账（把本机版换成占位符后比较；layout.kdl 剔掉生成行）
+# input.kdl 的其余改动手工同步：先 sed，再删掉 trackpoint 里的 accel-speed 0.6 和它的注释；
+# 仓库版不应带这两行（scripts/kdl-sync.sh 按这个例外对账）。
+./scripts/kdl-sync.sh          # 七份逐字节对账（machine 侧 input 剔掉 trackpoint 单机行；layout 剔掉生成行）
 niri validate -c niri-config/local/config.kdl
 git diff --stat niri-config/local/
 ```
@@ -88,5 +92,6 @@ git diff --stat niri-config/local/
 仓库里 `layout.kdl` 存的那几个颜色值只是"最后一次同步时的样子"，**不要**拿它当当前主题的参照 ——
 要看现在的值就看机器上那份（或跑 `niri msg action load-config-file` 后看窗口环）。
 
-**本机专有一律不进这两份文件**：仓库里不写「换机」注释、不写"这是占位符"提示 —— 那些话在这份 README 里
-（上面两节），否则同步时会被 `sed` 冲掉、对账出现假差异。
+**本机专有一律不进仓库副本**：仓库里不写「换机」注释、不写"这是占位符"提示 —— 那些话在这份 README 里
+（上面两节），否则同步时会被 `sed` 冲掉、对账出现假差异；`input.kdl` 的 trackpoint `accel-speed 0.6`
+就是例子。

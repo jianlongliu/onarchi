@@ -1,7 +1,7 @@
 #!/bin/sh
 # The seven niri configs are authored on the machine (~/.config/niri/*.kdl, home directory as a real
 # path) and collected in niri-config/local/ with the home directory replaced by /home/<user>, because
-# niri does not expand $HOME. That substitution is the ONLY difference for six of the seven, so this
+# niri does not expand $HOME. For most files that substitution is the only difference, so this
 # transforms the machine copies the same way and compares byte for byte.
 #
 # layout.kdl is the exception: omarchy-niri-apply-theme rewrites its focus-ring / border colours from
@@ -9,6 +9,11 @@
 # on every theme *or* wallpaper switch -- matugen re-derives the palette and the hook re-applies it.
 # They are dropped from both sides before the compare; everything else in layout.kdl is still compared
 # byte for byte, so a hand edit anywhere outside that block still fails the check.
+#
+# input.kdl is the second exception: this machine's ThinkPad trackpoint needs
+# `trackpoint { accel-speed 0.6 }`, a machine-only tuning that the repo copy
+# deliberately omits. The machine side drops that block's two lines before the
+# compare; the repo side is compared as-is, so committing the tweak still fails.
 #
 # Skipped on a machine without ~/.config/niri (a fresh checkout). Override the machine directory with
 # NIRI_CONFIG_DIR=/path and the placeholder with PLACEHOLDER=/home/you.
@@ -42,6 +47,20 @@ normalise() { # <file name without .kdl>
   fi
 }
 
+normalise_machine() { # <file name without .kdl>
+  if [ "$1" = input ]; then
+    awk '
+      /^[[:space:]]*trackpoint[[:space:]]*\{/ { intp = 1; print; next }
+      intp && /^[[:space:]]*\}/                 { intp = 0; print; next }
+      intp && /2026-11-08 试调：轻微加速/      { next }
+      intp && /^[[:space:]]*accel-speed[[:space:]]+0\.6[[:space:]]*$/ { next }
+      { print }
+    '
+  else
+    normalise "$1"
+  fi
+}
+
 for f in config input monitor layout window-rules effects binds; do
   src=$NIRI/$f.kdl
   dst=$ROOT/niri-config/local/$f.kdl
@@ -54,7 +73,7 @@ for f in config input monitor layout window-rules effects binds; do
     fail=1
     continue
   fi
-  sed "s|$HOME|$PLACEHOLDER|g" "$src" | normalise "$f" > "$tmp"
+  sed "s|$HOME|$PLACEHOLDER|g" "$src" | normalise_machine "$f" > "$tmp"
   normalise "$f" < "$dst" > "$tmp2"
   if cmp -s "$tmp" "$tmp2"; then
     echo "ok    $f.kdl"

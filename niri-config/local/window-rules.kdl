@@ -368,3 +368,20 @@ window-rule {
         blur true
     }
 }
+
+// VNC clients (2026-11-25): Ventox (GPUI) and RealVNC Connect (Flutter/GTK3).
+// Both paint opaque surfaces on native Wayland, so `opacity` is what lets the
+// live blur behind show through -- the same mechanism as WeChat/QQ above.
+// App-ids measured on this box, not guessed from desktop files: Ventox reports
+// dev.ventox.Ventox; RealVNC's desktop entry has no StartupWMClass and its
+// Flutter shell reports plain `rvncconnect`.
+window-rule {
+    match app-id=r#"^dev\.ventox\.Ventox$"#
+    match app-id=r#"^rvncconnect$"#
+    opacity 0.85
+    draw-border-with-background false
+    background-effect {
+        xray false
+        blur true
+    }
+}

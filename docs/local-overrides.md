@@ -275,6 +275,13 @@
     4K@60 的 595.2 MHz 在链路上 10bpc 要 ≈22.3 Gbps，超 4-lane HBR2 的 21.6 Gbps；8bpc 只要 17.9 Gbps。
     1600p 模式下 10bpc 才 ≈10.1 Gbps ⇒ 花屏是"4K + 10bpc"的组合问题。**别碰 EDID 的位深字段，也别去掉那份覆盖件**
     （它是承重墙：四条自定义模式能不能上屏靠它，细节见 §5 那行）。
+- **2026-11-25（VNC 客户端窗口规则，已同步进仓库）**：`window-rules.kdl` 给 Ventox
+  （`dev.ventox.Ventox`）和 RealVNC（`rvncconnect`）加 `opacity 0.85` + `background-effect
+  { xray false; blur true }`——两者原生 Wayland 画不透明表面，靠 `opacity` 让 live blur 透出，
+  和微信/QQ 同款。已同步到 `niri-config/local/window-rules.kdl`，`scripts/kdl-sync.sh` 通过。
+- **2026-11-08 试调（TrackPoint，单机，不进仓库）**：`input.kdl` 的 `trackpoint` 块加
+  `accel-speed 0.6`——这台 ThinkPad 的 trackpoint 在 Linux 下手感/漂移问题明显。仓库版故意不带；
+  `scripts/kdl-sync.sh` 只从机器侧剔掉那两行再对账，仓库侧仍逐字节比。
 
 ---
 
