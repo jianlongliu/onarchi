@@ -164,7 +164,7 @@
 | `~/.config/fcitx5/config` | `[Hotkey/EnumerateForwardKeys] 0=Control+space`（Ctrl+Space 切 `rime`/`keyboard-us`）；`TriggerKeys` 只留 `Zenkaku_Hankaku`/`Hangul`，**不要放 Shift/Ctrl+Shift**（Shift 交给 Rime）；`[Behavior] ShareInputState=All` | `cp .../fcitx5-config.before-cs-im ~/.config/fcitx5/config && fcitx5-remote -r` |
 | `~/.config/fcitx5/profile` | group `Default` = `rime` + `keyboard-us`；`DefaultIM=keyboard-us` 由 fcitx5 自己钉住（手改会被覆盖，§8.17） | `cp .../profile.before-defaultim-rime ~/.config/fcitx5/profile`（改 DefaultIM 前的快照；本机实际仍 keyboard-us） |
 | `~/.local/share/fcitx5/rime/wanxiang.custom.yaml` | `engine/processors/@before 0: lua_processor@*wanxiang.terminal_literal`；移除 `Control+space -> toggle: ascii_mode`；`switches/@0/reset: 0`（新窗口中文）、`@1/reset: 1`（英文标点） | `cp .../wanxiang.custom.yaml.before-cs-im ~/.local/share/fcitx5/rime/wanxiang.custom.yaml`，再重启 fcitx5 用户服务 |
-| `~/.local/share/fcitx5/rime/fcitx5.yaml` | 普通终端 `com.mitchellh.ghostty` / `org.omarchy.terminal`：`ascii_punct` + `terminal_mode`，不设 `ascii_mode`；`org.omarchy.float-tui` 保留 `ascii_mode: true`；`config_version: "0.25"` | `cp .../fcitx5.yaml.before-cs-im ~/.local/share/fcitx5/rime/fcitx5.yaml`，再重启 fcitx5 用户服务 |
+| `~/.local/share/fcitx5/rime/fcitx5.yaml` | 普通终端 `com.mitchellh.ghostty` / `org.omarchy.terminal` 和浮动 TUI `org.omarchy.float-tui` 都设 `ascii_mode: true`（终端默认英文）；其他程序跟随 `switches/@0/reset: 0`（中文）；`config_version: "0.26"` | `cp .../fcitx5.yaml.before-terminal-english ~/.local/share/fcitx5/rime/fcitx5.yaml`（回到 0.25），再重启 fcitx5 用户服务 |
 | `~/.local/share/fcitx5/rime/lua/wanxiang/terminal_literal.lua` | Ctrl+Shift 轻点 1s 状态机（普通键取消）+ 终端 `/` 直通尝试；万象升级可能覆盖 `lua/wanxiang/` | `cp .../terminal_literal.lua.ctrlshift ~/.local/share/fcitx5/rime/lua/wanxiang/terminal_literal.lua`，再重启 |
 | `~/.zshrc` | `btop`/`yazi` 包装 `_omarchy_tui_ascii`：运行期间 `SetAsciiMode true`，退出且窗口仍聚焦时恢复 | `cp ~/.local/state/backups/.zshrc.bak-20261126-tui ~/.zshrc` |
 
@@ -174,7 +174,7 @@
 
 **验证**：`fcitx5-remote -n` 看 `rime`/`keyboard-us`；
 `busctl --user call org.fcitx.Fcitx5 /rime org.fcitx.Fcitx.Rime1 IsAsciiMode`
-看 Rime 内部中英；Shift / Ctrl+Shift 各按两次应 true/false 往返；`zsh -n ~/.zshrc`。
+看 Rime 内部中英；Shift / Ctrl+Shift 各按两次应 true/false 往返；`zsh -n ~/.zshrc`；新开终端并切到 rime 时 `IsAsciiMode` 应为 true，普通程序新窗口为 false（中文）。
 
 ---
 

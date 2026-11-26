@@ -462,10 +462,11 @@ A/B 实测：摘掉后 bar 只有逻辑 x 706..742（宽 36）这一块像素变
   （任何普通键按下取消）；`wanxiang.custom.yaml` 用
   `engine/processors/@before 0: lua_processor@*wanxiang.terminal_literal` 挂载。
 - **终端/TUI**：`fcitx5.yaml` 的 app_options 里普通终端（`com.mitchellh.ghostty` /
-  `org.omarchy.terminal`）只留 `ascii_punct` + `terminal_mode`，不设 `ascii_mode`
-  （选 rime 即中文）；浮动 TUI（`org.omarchy.float-tui`）保留 `ascii_mode: true`，
-  避免 btop/yazi 里 `q` 被拼音吃掉。`config_version: "0.25"`，改后需重启 fcitx5
-  用户服务（`fcitx5-remote -r` 不重新部署）。
+  `org.omarchy.terminal`）和浮动 TUI（`org.omarchy.float-tui`）都设
+  `ascii_mode: true`，终端新会话默认英文（避免命令变拼音）；其他程序跟随 Rime
+  的 `switches/@0/reset: 0`（新窗口默认中文）。三处都保留 `ascii_punct` +
+  `terminal_mode`。`config_version: "0.26"`，改后需重启 fcitx5 用户服务
+  （`fcitx5-remote -r` 不重新部署）。
 - **已知问题**：终端中文态 `/` 仍可能被万象符号菜单吞掉；`terminal_literal.lua` 的
   `/` 分支目前没有稳定接管，彻底解决要关掉 `punctuator/symbols`（代价是 `/sym`、
   `/fh`、`/rq` 等快捷输入失效），尚未采用。
@@ -475,7 +476,7 @@ A/B 实测：摘掉后 bar 只有逻辑 x 706..742（宽 36）这一块像素变
 
 **验证**：IPC `open` 后 OCR 到 `Rime` / `Show Emoji & Symbols` / `Show Input Source Name` /
 `Open Keyboard Settings…`；`omarchy-shell -q ronald.input-sources next` 在 `rime ⇄ keyboard-us` 间来回切
-（`fcitx5-remote -n` 核对）；壳层日志无 QML 报错。可用 IPC：`toggle` / `open` / `close` / `next` / `prev`。
+（`fcitx5-remote -n` 核对）；壳层日志无 QML 报错。可用 IPC：`toggle` / `open` / `close` / `next` / `prev`。新开终端并切到 rime 时 `IsAsciiMode` 应为 true；普通程序新窗口为 false（中文）。
 若要绑快捷键，`Mod+Space`（Omarchy 菜单）与 `Mod+D`（Apps 菜单）已占用（§5.3；`Mod+Alt+Space` 那个重复键
 2026-09-19 已释放，见 §8 第 24 条），需另挑。
 fcitx5 自身由 `/etc/xdg/autostart/org.fcitx.Fcitx5.desktop` 在登录时拉起（非 systemd 用户单元）。
