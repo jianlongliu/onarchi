@@ -10,7 +10,6 @@
 |---|---|---|---|
 | `GDK_SCALE` 未验收 | GTK 应用（nautilus 等）可能仍按 1× 渲染 | `~/.config/niri/config.kdl` 已设 `GDK_SCALE "2"`，必须重启会话；效果未验收，别再加 `GDK_DPI_SCALE` | [README Open items](../README.md) · [todo](todo.md) #9 |
 | WPS 缩放与剪贴板未验收 | XWayland 下 DPI 与跨端剪贴板可能异常 | WPS 未设 `QT_QPA_PLATFORM`；`Xft.dpi` 读 192，但 WPS 是否认它未测 | [README Open items](../README.md) · [todo](todo.md) #10 |
-| 通知 / 面板被浮栏压住 8px | toast 与键盘面板和浮动 bar 重叠 | 需改 `niri.patch` 里的 `barThickness` / `deckMargins`，做不成垫片 | [todo](todo.md) #3 · [behavior 覆盖账](behavior.md) |
 | quickshell DPR 崩溃（通知带图触发） | 缩放 / 全屏时 `physicalDpiChanged` 递归踩已释放 item，壳层 SIGABRT/SIGSEGV | 已临时绕过：`Toast.qml` 的 `layer.enabled` 去掉 `visible &&`（上游 PR #17015，修 #16937）；只削通知带图链，全屏等其它 layer teardown 仍可能触发 | [upstream §8.27](upstream.md) |
 | 内置 `omarchy.workspaces` 不可通用 | 内置部件的点击 / 滚轮不发 niri action，工作区事件仍走 Hyprland 模型 | 当前桌面用 `jianlongliu.workspaces`；「看起来能用」不代表内置部件可用 | [README](../README.md) |
 | 单窗口方形比例 | 只能定宽，做不到 1:1 | niri 没有 aspect 约束；要先定口径 | [todo](todo.md) #4 · [behavior 覆盖账](behavior.md) |

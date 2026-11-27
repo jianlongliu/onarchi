@@ -212,7 +212,8 @@ niri 没有运行时 IPC 能改这些，所以三层都要接：
 - **flag 文件**：`~/.local/state/omarchy/toggles/hypr/window-no-gaps.lua`（源在时逐字拷上游内容，170B）。
 - **壳层哪几处跟着塌**：`Style.cornerRadius`（读到 12 → 0）与 `Style.gapsOut`（`int 8` → `0`，
   垫片给的 8 除以 2）⇒ `Ui/PopupCard.qml`（`margin: Style.gapsOut` / `radius: Style.cornerRadius`）、
-  `notifications/Service.qml` 的 `barClearance = liveBarSize + Style.gapsOut`、`Ui/KeyboardPanel.qml` 的 `gap`。
+  `notifications/Service.qml` 的 `Delivery.deckMargins`、`Ui/KeyboardPanel.qml` 的 `gap`。
+  4.6 起 `Style.qml` 还通过 `hyprctl -j --batch` 一次读这三项（见 §4 的 `--batch`）。
 - **验证（2026-09-24，程序侧 + 视觉）**：`niri validate` 干净；开/关两侧 `hyprctl -j getoption` 输出
   12/8 → 0/0；菜单卡片同一角落 A/B 截图（`grim -o eDP-1 -t ppm`）**圆角 12 → 直角**，像素级成立；
   用插桩过的 `hyprctl` 记调用，确认 flag **新建与删除都会**让壳层重跑那两个 `getoption`。

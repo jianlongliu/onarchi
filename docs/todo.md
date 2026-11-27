@@ -24,7 +24,6 @@
 | # | 事 | 要动什么 | 备注 |
 |---|---|---|---|
 | 2 | **窗口缝隙垫片的 niri 侧待重验** | `~/.config/niri/layout.kdl`（仓库副本 `niri-config/local/layout.kdl`）那条 `include optional=true "layout-no-gaps.kdl"` 从**尾部挪到顶部**，再量窗边像素 | 不挪大概率一直是空转（niri 同名键只认第一次定义）；**壳层那半是真的**（`getoption` 是垫片写死的映射）；依据与两份反证见 `docs/shims.md` §4 的「更正」 |
-| 3 | **弹窗让位浮栏**（toast / 面板被浮动 bar 压住 `floatGap` 8） | 进 `niri.patch` 改 `shell/plugins/notifications/Delivery.js` 的 `barThickness`（只返回 bar 高度，**不含 `floatGap`**，而 `deckMargins` 只拿它 + `Style.gapsOut` 算边距）；`shell/Ui/KeyboardPanel.qml` 的 `gap` 同理 | **2026-10-30 复校**：`barClearance` 这个字段上游重构后已不存在，落点换成 `barThickness`/`deckMargins`，问题依旧成立（浮栏浮起时通知会盖住那 8px）。**做不成垫片**（`readonly` 计算值，外部无从覆盖）；按插件 README 用 root 手改会在 `omarchy update` 后静默丢掉 |
 | 4 | **单窗口方形比例** | niri **没有 aspect 约束**，最近的是列宽（`default-column-width` / window-rule 定宽）⇒ 效果是"定宽" | 动手前先定口径：要**正方**，还是只要"别太宽" |
 | 5 | **夜灯 / 色温：等 niri 修 gamma** | 等 niri 上游支持可用的 `zwlr_gamma_control_v1` 实现；本地不做软件暖色遮罩 | **2026-11-19 实测**：niri 26.04 的 gamma-control 在 eDP-1 上直接 `failed()`；`wlsunset -t 4000 -T 4001` 起得来但报 `gamma control of output eDP-1 failed`，不生效。`gammastep` 未装；拍板等 niri 修 gamma，软件遮罩会污染截图且不是真色温 |
 | 7 | **把三条自定义时序塞进注入 EDID**（让它们成为内核原生模式，少依赖自定义 modeline） | 改 `/usr/lib/firmware/edid/CSO1411.bin`（先备份）→ `pkexec mkinitcpio -P` → 重启；试件已备好（`~/.local/state/omarchy/edid-trial/trial-2.bin` = 合法重排 + 三条 CTA DTD，本地校验通过） | 起因：用户以为"四档分辨率就在注入件里"，2026-09-26 复核**不成立**（件里只有 DTD1 4K + 一条被内核丢弃的 DTD2）。**收益有限** —— 档位靠 modeline 注入已经能上屏；且 EDID 是承重墙、验证必须走重启。`debugfs edid_override` 热验**不通**（eDP 不重探测，试完）。见 `local-overrides.md` §5 第 16 条 |

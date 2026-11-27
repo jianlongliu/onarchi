@@ -598,12 +598,13 @@ monospace 补回 `SFMono Nerd Font`（Nerd 图标）与 `Noto Sans Mono CJK SC`�
 
 ---
 
-18. **弹窗未给浮栏让位（TODO，下次修）**：toast（`shell/plugins/notifications/Service.qml` 的
-    `barClearance`）与 `KeyboardPanel` 家族面板（`shell/Ui/KeyboardPanel.qml` 的 `gap`）按固定 bar
+18. **弹窗给浮栏让位（2026-11-27 已修）**：toast（`shell/plugins/notifications/Service.qml` +
+    `Delivery.deckMargins`）与 `KeyboardPanel` 家族面板（`shell/Ui/KeyboardPanel.qml`）此前按固定 bar
     高度算边距、**不计入 `floatGap`**，浮栏（§8.11）启用后这些弹窗的顶边会压住 bar 底缘约 8px。
-    首选修法：在这两处各加一个 `barEdgeMargin` 项（`KeyboardPanel.qml` 已在 `niri.patch` 内，
-    会让 patch 从 19 个文件涨到 21 个）。零仓库改动的替代：让垫片把 `Style.gapsOut` 报得更大，
-    代价是面板间距一起变大。验证：打开托盘面板，量顶边是否 ≥ bar 底缘（物理 y ≈ 80）。
+    现在两处都读 `bar.floatGap` 加进 `barEdgeMargin`；`Delivery.deckMargins` 新增第四个参数，
+    `KeyboardPanel` 的 `cardOrigin` / `availableCard*` 一起计入。补丁因此新增
+    `shell/plugins/notifications/Delivery.js`，见 `docs/upstream.md` §8.28。验证：时钟面板与
+    通知 toast 的顶边都落在 bar 底缘下方。
 
 ---
 

@@ -218,8 +218,8 @@ The port currently tracks upstream `quattro` at **`2ebf5971a`** (2026-11-27, the
 `v4.6.0-rc1` line plus three commits), fast-forwarded from `723072a55` on
 2026-11-27 — 593 commits, 3830 files, +167695/−106276. `v4.6.0-rc1` is a tag on
 `quattro` itself, not a separate release branch. The current `niri.patch` has
-**50 files / 128 hunks / 3013 lines**, md5
-`1c55f97bec93081f1d4633b717ba6e1c` (untracked overlay files are separate). This
+**51 files / 135 hunks / 3124 lines**, md5
+`60392071b6f7c90b4f516fcc1bdee9fb` (untracked overlay files are separate). This
 sync updated the running tree and the overlay patch; the repository's vendored
 `bin/`/`shell/` source snapshot remains at `bc220e70` until the next full source sync.
 

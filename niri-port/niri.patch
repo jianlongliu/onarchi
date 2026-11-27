@@ -1105,7 +1105,7 @@ index 8516395fd..0a43c0c0e 100644
      // the press scale here too.
      scale: root.pressScale
 diff --git a/shell/Ui/KeyboardPanel.qml b/shell/Ui/KeyboardPanel.qml
-index 3e99da1bb..291a272d6 100644
+index 3e99da1bb..3eb6f68a2 100644
 --- a/shell/Ui/KeyboardPanel.qml
 +++ b/shell/Ui/KeyboardPanel.qml
 @@ -1,6 +1,8 @@
@@ -1117,7 +1117,19 @@ index 3e99da1bb..291a272d6 100644
  import qs.Commons
  import qs.Commons as Commons
  
-@@ -141,6 +143,13 @@ PanelWindow {
+@@ -70,6 +72,11 @@ PanelWindow {
+   property bool centerOnBar: false
+   property bool open: false
+   property int gap: Style.gapsOut  // distance between bar edge and panel
++  // The bar floats off the screen edge by `floatGap`; a panel hangs from the
++  // strip's inner edge, so every perpendicular offset has to clear that gap
++  // too. Third-party bars without the property keep the flush behaviour.
++  readonly property real barEdgeMargin: bar && bar.floatGap !== undefined
++    ? Math.max(0, Number(bar.floatGap) || 0) : 0
+   property bool popoutSwitching: false
+   property bool popoutSwitchClosing: false
+   property bool focusPrimed: false
+@@ -141,6 +148,13 @@ PanelWindow {
    color: "transparent"
    exclusionMode: ExclusionMode.Ignore
  
@@ -1131,7 +1143,58 @@ index 3e99da1bb..291a272d6 100644
    WlrLayershell.namespace: "omarchy-keyboard-panel"
    WlrLayershell.layer: WlrLayer.Overlay
    // Keyboard focus follows `open` (NOT `visible`). The window remains
-@@ -519,6 +528,90 @@ PanelWindow {
+@@ -176,7 +190,7 @@ PanelWindow {
+   // forwarded to registered bar buttons so switching between panel icons
+   // works in one click even when the overlay surface is above the bar.
+   // Yielding, only the card is: the rest reaches the windows beneath.
+-  readonly property real _barStripSize: bar ? barThickness + gap : 0
++  readonly property real _barStripSize: bar ? barEdgeMargin + barThickness + gap : 0
+   mask: Region {
+     item: root.yielding ? card : null
+     width: root.screenW
+@@ -208,10 +222,10 @@ PanelWindow {
+   readonly property real screenW: screen ? screen.width : 0
+   readonly property real screenH: screen ? screen.height : 0
+   readonly property real availableCardWidth: screenW > 0
+-    ? Math.max(120, screenW - ((barPos === "left" || barPos === "right") ? barThickness + gap + margin : margin * 2))
++    ? Math.max(120, screenW - ((barPos === "left" || barPos === "right") ? barEdgeMargin + barThickness + gap + margin : margin * 2))
+     : 0
+   readonly property real availableCardHeight: screenH > 0
+-    ? Math.max(120, screenH - ((barPos === "top" || barPos === "bottom") ? barThickness + gap + margin : margin * 2))
++    ? Math.max(120, screenH - ((barPos === "top" || barPos === "bottom") ? barEdgeMargin + barThickness + gap + margin : margin * 2))
+     : 0
+   readonly property real verticalContentInset: padding * 2 + Border.top(borderSpec) + Border.bottom(borderSpec)
+ 
+@@ -259,22 +273,22 @@ PanelWindow {
+     var x = 0, y = 0
+     if (centerOnBar && (barPos === "top" || barPos === "bottom")) {
+       x = screenW / 2 - contentWidth / 2
+-      y = barPos === "bottom" ? screenH - barThickness - drawnHeight - gap : barThickness + gap
++      y = barPos === "bottom" ? screenH - barEdgeMargin - barThickness - drawnHeight - gap : barEdgeMargin + barThickness + gap
+     } else if (centerOnBar) {
+-      x = barPos === "left" ? barThickness + gap : screenW - barThickness - contentWidth - gap
++      x = barPos === "left" ? barEdgeMargin + barThickness + gap : screenW - barEdgeMargin - barThickness - contentWidth - gap
+       y = screenH / 2 - drawnHeight / 2
+     } else if (barPos === "bottom") {
+       x = anchorScreenPos.x + anchorW / 2 - contentWidth / 2
+-      y = screenH - barThickness - drawnHeight - gap
++      y = screenH - barEdgeMargin - barThickness - drawnHeight - gap
+     } else if (barPos === "left") {
+-      x = barThickness + gap
++      x = barEdgeMargin + barThickness + gap
+       y = anchorScreenPos.y + anchorH / 2 - drawnHeight / 2
+     } else if (barPos === "right") {
+-      x = screenW - barThickness - contentWidth - gap
++      x = screenW - barEdgeMargin - barThickness - contentWidth - gap
+       y = anchorScreenPos.y + anchorH / 2 - drawnHeight / 2
+     } else { // "top" (default)
+       x = anchorScreenPos.x + anchorW / 2 - contentWidth / 2
+-      y = barThickness + gap
++      y = barEdgeMargin + barThickness + gap
+     }
+     x = Math.max(margin, Math.min(x, screenW - contentWidth - margin))
+     y = Math.max(margin, Math.min(y, screenH - drawnHeight - margin))
+@@ -519,6 +533,90 @@ PanelWindow {
  
    // --- card ----------------------------------------------------------------
  
@@ -2235,8 +2298,35 @@ index 0e609882a..45238a2d4 100644
      BorderSurface {
        id: card
        width: root.cardWidth
+diff --git a/shell/plugins/notifications/Delivery.js b/shell/plugins/notifications/Delivery.js
+index 185a9fc67..85f344fd3 100644
+--- a/shell/plugins/notifications/Delivery.js
++++ b/shell/plugins/notifications/Delivery.js
+@@ -84,15 +84,18 @@ function barThickness(bar, screenName, defaultBarSize) {
+ }
+ 
+ // The deck hangs from the top-right corner, so it clears the bar only on the
+-// two edges it touches.
+-function deckMargins(barPosition, thickness, gap) {
++// two edges it touches. `barMargin` is how far the bar itself floats off the
++// screen edge, which the deck has to clear as well.
++function deckMargins(barPosition, thickness, gap, barMargin) {
+   var position = String(barPosition || "top")
+   var edge = Number(gap)
+   if (!isFinite(edge)) edge = 0
+   var bar = Number(thickness)
+   if (!isFinite(bar)) bar = 0
++  var margin = Number(barMargin)
++  if (!isFinite(margin)) margin = 0
+   return {
+-    top: (position === "top" ? bar : 0) + edge,
+-    right: (position === "right" ? bar : 0) + edge
++    top: (position === "top" ? bar + margin : 0) + edge,
++    right: (position === "right" ? bar + margin : 0) + edge
+   }
+ }
 diff --git a/shell/plugins/notifications/Service.qml b/shell/plugins/notifications/Service.qml
-index f5476b5b6..d915df08c 100644
+index f5476b5b6..908a5b577 100644
 --- a/shell/plugins/notifications/Service.qml
 +++ b/shell/plugins/notifications/Service.qml
 @@ -8,6 +8,7 @@ import QtQuick
@@ -2256,7 +2346,18 @@ index f5476b5b6..d915df08c 100644
      return displayNames.indexOf(name) >= 0 ? name : (displayNames[0] || "")
    }
    readonly property string targetDisplayName: displayNames.indexOf(deckDisplayName) >= 0 ? deckDisplayName : focusedDisplayName
-@@ -102,7 +103,11 @@ Item {
+@@ -72,7 +73,9 @@ Item {
+   readonly property bool barVertical: barPosition === "left" || barPosition === "right"
+   readonly property int defaultBarSize: barVertical ? Style.bar.sizeVertical : Style.bar.sizeHorizontal
+   function marginsFor(screenName) {
+-    return Delivery.deckMargins(barPosition, Delivery.barThickness(barRef, screenName, defaultBarSize), Style.gapsOut)
++    var barEdgeMargin = barRef && barRef.floatGap !== undefined
++      ? Math.max(0, Number(barRef.floatGap) || 0) : 0
++    return Delivery.deckMargins(barPosition, Delivery.barThickness(barRef, screenName, defaultBarSize), Style.gapsOut, barEdgeMargin)
+   }
+   readonly property int notificationWidth: Style.space(380)
+ 
+@@ -102,7 +105,11 @@ Item {
      var screen = null
      for (var s = 0; s < Quickshell.screens.length; s++)
        if (String(Quickshell.screens[s].name) === name) screen = Quickshell.screens[s]
@@ -2269,7 +2370,7 @@ index f5476b5b6..d915df08c 100644
      var workspace = monitor ? monitor.activeWorkspace : null
      if (!workspace || !workspace.hasFullscreen) return false
      var windows = workspace.toplevels ? workspace.toplevels.values : []
-@@ -129,7 +134,7 @@ Item {
+@@ -129,7 +136,7 @@ Item {
    Timer {
      id: hyprRefresh
      interval: 100
@@ -2278,7 +2379,7 @@ index f5476b5b6..d915df08c 100644
    }
    Timer {
      id: hyprSettle
-@@ -970,7 +975,7 @@ Item {
+@@ -970,7 +977,7 @@ Item {
    }
  
    function openWindows() {
@@ -2287,7 +2388,7 @@ index f5476b5b6..d915df08c 100644
      var out = []
      for (var i = 0; i < list.length; i++) {
        var ipc = list[i].lastIpcObject
-@@ -1084,7 +1089,7 @@ Item {
+@@ -1084,7 +1091,7 @@ Item {
    function focusWindow(win) {
      if (!win) return
      if (!/^0x[0-9a-f]+$/i.test(String(win.address || ""))) return
@@ -2296,7 +2397,7 @@ index f5476b5b6..d915df08c 100644
    }
  
    // A click: Omarchy's own --exec command first, then the sender's default
-@@ -1531,11 +1536,26 @@ Item {
+@@ -1531,11 +1538,26 @@ Item {
        readonly property var margins: service.marginsFor(String(modelData.name))
        readonly property bool stepAside: service.fullscreenOn(String(modelData.name))
        readonly property bool hasSomethingToShow: showingNotifications && toasts.count > 0
@@ -2897,7 +2998,7 @@ index f9ccaa291..491f31407 100755
 +flock -u 8
 +exec 8>&-
 diff --git a/test/shell.d/notifications/logic.cjs b/test/shell.d/notifications/logic.cjs
-index 79e5fc08a..4ffbc12c0 100644
+index 79e5fc08a..01a2c113b 100644
 --- a/test/shell.d/notifications/logic.cjs
 +++ b/test/shell.d/notifications/logic.cjs
 @@ -125,6 +125,18 @@ for (let i = 0; i < 1000; i++) {
@@ -2919,7 +3020,17 @@ index 79e5fc08a..4ffbc12c0 100644
  // ---------------------------------------------------------- store transforms
  for (const body of ['Your verification code is 938271', 'Your code is 938 271', 'Your code is 938-271', 'Your code is &#57;38271',
                      'Your code is A9F3K2']) {
-@@ -324,7 +336,15 @@ function fn(name, code = source) {
+@@ -306,6 +318,9 @@ for (const body of ['Your verification code is 938271', 'Your code is 938 271',
+   assert.equal(Delivery.barThickness(null, 'plain', 28), 28)
+   for (const [position, thickness, top, right] of [['top', 26, 36, 10], ['right', 40, 10, 50], ['bottom', 26, 10, 10], ['left', 26, 10, 10]])
+     assert.deepEqual({ ...Delivery.deckMargins(position, thickness, 10) }, { top, right }, position)
++  // A floating bar adds its own gap on top of the strip thickness.
++  assert.deepEqual({ ...Delivery.deckMargins('top', 26, 10, 8) }, { top: 44, right: 10 }, 'top floating bar')
++  assert.deepEqual({ ...Delivery.deckMargins('right', 40, 10, 8) }, { top: 10, right: 58 }, 'right floating bar')
+ }
+ 
+ // --------------------------------------------------- Service.qml functions
+@@ -324,7 +339,15 @@ function fn(name, code = source) {
    }
    return text.replace(/^( *function \w+\([^)]*\))\s*:\s*\w+/, '$1')
  }
