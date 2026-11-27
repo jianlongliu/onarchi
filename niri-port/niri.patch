@@ -966,7 +966,7 @@ index c0b62b700..9ba4e6390 100644
      "label": "Input Methods"
    },
 diff --git a/default/i18n/en/shell.json b/default/i18n/en/shell.json
-index 944df0a4e..a7c2a55db 100644
+index 944df0a4e..72809017e 100644
 --- a/default/i18n/en/shell.json
 +++ b/default/i18n/en/shell.json
 @@ -9,6 +9,8 @@
@@ -986,6 +986,14 @@ index 944df0a4e..a7c2a55db 100644
    "power.charging": "Charging",
    "power.chargingPhrase1": "Pumping power",
    "power.chargingPhrase2": "Injecting electrons",
+@@ -694,5 +697,6 @@
+   "camera.title": "Camera",
+   "camera.tooltipActive": "Camera active — click to tune image",
+   "camera.warmth": "Warmth",
+-  "wifiqr.showPassword": "Show password"
++  "wifiqr.showPassword": "Show password",
++  "agents.defaultAgent": "Default agent"
+ }
 diff --git a/default/omarchy/omarchy-menu.jsonc b/default/omarchy/omarchy-menu.jsonc
 index a214c6bf9..c6aafc98d 100644
 --- a/default/omarchy/omarchy-menu.jsonc
@@ -1365,10 +1373,96 @@ index e0b3c322b..ded86cfa3 100644
    Connections {
      target: Quickshell
 diff --git a/shell/plugins/agents/Panel.qml b/shell/plugins/agents/Panel.qml
-index cad89a17f..79ae9c5b6 100644
+index cad89a17f..caea136e1 100644
 --- a/shell/plugins/agents/Panel.qml
 +++ b/shell/plugins/agents/Panel.qml
-@@ -1678,6 +1678,15 @@ Panel {
+@@ -144,6 +144,8 @@ Panel {
+   // panel keeps telling the truth while it sits open.
+   property double nowMs: Date.now()
+ 
++  Component.onCompleted: installedHarnessesProc.running = true
++
+ 
+   // The keyboard walks everything on the page that does something, in
+   // reading order, one row at a time: the hero's button, then each line's
+@@ -171,6 +173,11 @@ Panel {
+       if (pasteLinkShown) rows.push([{ kind: "pasteCode", index: 0 }])
+       if (addUrl !== "" && !addCheckingCode) rows.push([{ kind: "reopenSignIn", index: 0 }])
+     } else if (addStage === "") {
++      if (indexShown && defaultHarnesses.length > 0) {
++        rows.push([{ kind: "defaultAgentToggle", index: 0 }])
++        if (harnessPickerOpen)
++          rows.push(defaultHarnesses.map(function(harness, i) { return { kind: "defaultHarness", index: i } }))
++      }
+       for (var p = 0; p < providers.length; p++) {
+         // Every line is a stop, so Ctrl+Up/Down can move it: its terminal
+         // button when it has a harness of its own, else its mark. One that
+@@ -1271,6 +1278,11 @@ Panel {
+     else if (target.kind === "reopenSignIn") reopenSignIn()
+     else if (target.kind === "providerLaunch") runLine(providers[target.index])
+     else if (target.kind === "providerStar") makeDefault(providers[target.index], providers[target.index].account || null)
++    else if (target.kind === "defaultAgentToggle") harnessPickerOpen = !harnessPickerOpen
++    else if (target.kind === "defaultHarness") {
++      selectDefaultHarness(defaultHarnesses[target.index].id)
++      harnessPickerOpen = false
++    }
+     else if (target.kind === "makeToggle") openMakes(target.index)
+     else if (target.kind === "providerDesktop") launchDesktop(providers[target.index])
+     else if (target.kind.indexOf("make:") === 0) runLine(providers[target.index], target.kind.slice(5))
+@@ -1407,6 +1419,31 @@ Panel {
+     qwen: "qwen"
+   })
+ 
++  // Harnesses with no usage provider of their own. The panel is account-first,
++  // so these get a small standalone selector above the subscription rows. The
++  // list is every installed harness, refreshed when the panel opens.
++  property var installedHarnessIds: []
++  property bool harnessPickerOpen: false
++  readonly property var harnessLabels: ({
++    pi: "Pi", omp: "Oh My Pi", opencode: "OpenCode", ori: "Ori",
++    claude: "Claude Code", codex: "Codex", grok: "Grok", openclaw: "OpenClaw",
++    agy: "Antigravity", hermes: "Hermes", copilot: "GitHub Copilot",
++    crush: "Crush", "cursor-agent": "Cursor CLI", muse: "Muse Code",
++    kimi: "Kimi", qwen: "Qwen Code", dsh: "DeepSeek Harness",
++    mcode: "MiniMax Code", freebuff: "Freebuff", kilo: "Kilo",
++    devin: "Devin CLI", amp: "Amp", commandcode: "Command Code",
++    ante: "Ante", antex: "Antex"
++  })
++  readonly property var defaultHarnesses: installedHarnessIds.map(function(id) {
++    return { id: id, label: harnessLabels[id] || id }
++  })
++
++  function setInstalledHarnesses(raw) {
++    var ids = String(raw || "").split("\n").map(function(line) { return line.trim() })
++      .filter(function(line) { return line !== "" })
++    installedHarnessIds = ids
++  }
++
+   function harnessFor(provider) {
+     return provider && harnesses[provider.providerId] ? harnesses[provider.providerId] : ""
+   }
+@@ -1460,6 +1497,20 @@ Panel {
+     selectDefault.running = true
+   }
+ 
++  // The standalone harness selector: same write the provider star uses.
++  function defaultHarnessLabel() {
++    for (var i = 0; i < defaultHarnesses.length; i++)
++      if (defaultHarnesses[i].id === usage.defaultAgent) return defaultHarnesses[i].label
++    return usage.defaultAgent || "—"
++  }
++
++  function selectDefaultHarness(id) {
++    if (!id || usage.defaultAgent === id) return
++    usage.defaultAgent = id
++    selectDefault.command = ["omarchy-default-agent", "--select", id]
++    selectDefault.running = true
++  }
++
+   // Filled on the default agent, and with several accounts on the one in use.
+   function starred(provider, account) {
+     if (provider && provider.localModel) return isDefault(provider) && provider.localModel.target === localDefaultTarget
+@@ -1678,6 +1729,15 @@ Panel {
      return currencyPrefix(currency) + Commons.I18n.formatNumber(amount, 2)
    }
  
@@ -1384,7 +1478,117 @@ index cad89a17f..79ae9c5b6 100644
    // A balance or spend row's amount is as wide as a limit row's time left
    // ("19h 40m"), so every line ends where the limit meters do.
    TextMetrics {
-@@ -3425,46 +3434,78 @@ Panel {
+@@ -1908,7 +1968,9 @@ Panel {
+   onOpenedChanged: if (!opened) {
+     resetProviderDrag()
+     makesOpenIndex = -1
++    harnessPickerOpen = false
+   } else {
++    if (!installedHarnessesProc.running) installedHarnessesProc.running = true
+     deleteTarget = null
+     if (addStage !== "running") {
+       addStage = ""
+@@ -1939,6 +2001,17 @@ Panel {
+     onTriggered: root.localModelsService.refreshNetwork()
+   }
+ 
++  // The selector lists harnesses actually installed here, including ones with
++  // no usage provider (Ante/Antex). --installed is the launcher's own check.
++  Process {
++    id: installedHarnessesProc
++    command: ["bash", "-c", "for a in pi omp opencode ori claude codex grok openclaw agy hermes copilot crush cursor-agent muse kimi qwen dsh mcode freebuff kilo devin amp commandcode ante antex; do omarchy-default-agent --installed \"$a\" >/dev/null 2>&1 && printf '%s\\n' \"$a\"; done"]
++    stdout: StdioCollector {
++      waitForEnd: true
++      onStreamFinished: root.setInstalledHarnesses(text)
++    }
++  }
++
+   // Choosing a default from a star. The star fills at once, and once the
+   // choice is saved the default is read back, so one the command refused
+   // (an agent whose CLI isn't installed here) doesn't stay starred.
+@@ -2232,6 +2305,81 @@ Panel {
+             width: column.width
+           }
+ 
++          // ---------- Default agent (harnesses without a usage provider) ----------
++          Column {
++            visible: root.indexShown && root.defaultHarnesses.length > 0
++            width: parent.width
++            spacing: Style.space(8)
++
++            BorderSurface {
++              id: harnessPicker
++              width: parent.width
++              height: Style.space(42)
++              radius: Style.cornerRadius
++              property bool hasCursor: root.hasKey("defaultAgentToggle", 0)
++              readonly property bool hot: harnessPickerMouse.containsMouse || hasCursor
++              color: hot ? root.alpha(Commons.Color.accent, 0.12) : root.alpha(root.foreground, 0.04)
++              borderSpec: hot ? Border.controlSpec("hover-cursor", Commons.Color.accent, Commons.Color.accent) : Border.none()
++              onHasCursorChanged: if (hasCursor) root.revealItem(harnessPicker)
++
++              Text {
++                anchors.left: parent.left
++                anchors.leftMargin: Style.space(12)
++                anchors.verticalCenter: parent.verticalCenter
++                textFormat: Text.PlainText
++                text: Commons.I18n.t("agents.defaultAgent")
++                color: root.foreground
++                opacity: 0.7
++                font.family: root.fontFamily
++                font.pixelSize: Style.font.bodySmall
++              }
++
++              Text {
++                anchors.right: parent.right
++                anchors.rightMargin: Style.space(12)
++                anchors.verticalCenter: parent.verticalCenter
++                textFormat: Text.PlainText
++                text: root.defaultHarnessLabel() + "  " + (root.harnessPickerOpen ? "▴" : "▾")
++                color: root.harnessPickerOpen || harnessPicker.hot ? Commons.Color.accent : root.foreground
++                font.family: root.fontFamily
++                font.pixelSize: Style.font.bodySmall
++                font.bold: true
++              }
++
++              MouseArea {
++                id: harnessPickerMouse
++                anchors.fill: parent
++                hoverEnabled: true
++                cursorShape: Qt.PointingHandCursor
++                onClicked: root.harnessPickerOpen = !root.harnessPickerOpen
++              }
++            }
++
++            Column {
++              visible: root.harnessPickerOpen
++              width: parent.width
++              spacing: Style.space(6)
++
++              Repeater {
++                model: root.defaultHarnesses
++
++                DefaultHarnessChip {
++                  required property var modelData
++                  required property int index
++                  width: parent.width
++                  agentId: modelData.id
++                  label: modelData.label
++                  hasCursor: root.hasKey("defaultHarness", index)
++                  onHovered: root.hoverAt("defaultHarness", index)
++                  onClicked: {
++                    root.selectDefaultHarness(modelData.id)
++                    root.harnessPickerOpen = false
++                  }
++                }
++              }
++            }
++          }
++
+           Repeater {
+             id: providerSections
+             model: root.indexShown ? root.providers : []
+@@ -3425,46 +3573,78 @@ Panel {
        }
      }
  
@@ -1494,7 +1698,70 @@ index cad89a17f..79ae9c5b6 100644
        }
      }
  
-@@ -3824,17 +3865,18 @@ Panel {
+@@ -3598,6 +3778,62 @@ Panel {
+ 
+   // A starter: its glyph and what it makes, on a soft tile that warms to the
+   // accent on hover.
++  component DefaultHarnessChip: BorderSurface {
++    id: chip
++    property string agentId: ""
++    property string label: ""
++    property bool hasCursor: false
++    readonly property bool current: usage.defaultAgent === agentId
++    readonly property bool hot: hasCursor || chipMouse.containsMouse
++    signal clicked()
++    signal hovered()
++    implicitWidth: chipRow.implicitWidth + Style.space(26)
++    implicitHeight: chipRow.implicitHeight + Style.space(16)
++    height: implicitHeight
++    radius: Style.cornerRadius
++    color: hot ? root.alpha(Commons.Color.accent, 0.14)
++      : current ? root.alpha(Commons.Color.accent, 0.08)
++      : root.alpha(root.foreground, 0.05)
++    borderSpec: current ? Border.controlSpec("selected", Commons.Color.accent, Commons.Color.accent) : Border.none()
++    onHasCursorChanged: if (hasCursor) root.revealItem(chip)
++
++    Row {
++      id: chipRow
++      anchors.centerIn: parent
++      spacing: Style.space(8)
++
++      Text {
++        anchors.verticalCenter: parent.verticalCenter
++        textFormat: Text.PlainText
++        text: chip.current ? "󰓎" : "󰓒"
++        color: chip.current || chip.hot ? Commons.Color.accent : root.foreground
++        font.family: root.fontFamily
++        font.pixelSize: Style.font.bodySmall
++      }
++
++      Text {
++        anchors.verticalCenter: parent.verticalCenter
++        width: Math.max(0, chip.width - Style.space(20) - Style.font.bodySmall * 1.2 - Style.space(8))
++        textFormat: Text.PlainText
++        text: chip.label
++        color: chip.current || chip.hot ? Commons.Color.accent : root.foreground
++        font.family: root.fontFamily
++        font.pixelSize: Style.font.bodySmall
++        font.bold: chip.current
++        elide: Text.ElideRight
++      }
++    }
++
++    MouseArea {
++      id: chipMouse
++      anchors.fill: parent
++      hoverEnabled: true
++      cursorShape: Qt.PointingHandCursor
++      onEntered: chip.hovered()
++      onClicked: chip.clicked()
++    }
++  }
++
+   component StarterTile: Rectangle {
+     id: tile
+     signal clicked()
+@@ -3824,17 +4060,18 @@ Panel {
        markers: compact.scoped
      }
  
@@ -1518,7 +1785,7 @@ index cad89a17f..79ae9c5b6 100644
      Text {
        id: compactValue
        width: Math.ceil(compactValueMetrics.advanceWidth)
-@@ -3842,8 +3884,12 @@ Panel {
+@@ -3842,8 +4079,12 @@ Panel {
        anchors.verticalCenter: parent.verticalCenter
        textFormat: Text.PlainText
        horizontalAlignment: Text.AlignRight

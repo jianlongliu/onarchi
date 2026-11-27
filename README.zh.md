@@ -199,8 +199,8 @@ cd onarchi
 
 本移植当前跟到上游 `quattro` 的 **`2ebf5971a`**（2026-11-27，`v4.6.0-rc1` 线再加 3 个提交）——
 2026-11-27 从 `723072a55` 快进，共 593 个提交、3830 个文件、+167695/−106276。`v4.6.0-rc1`
-是打在 `quattro` 上的 tag，不是单独的发布分支。当前 `niri.patch` 为 **51 文件 / 139 hunk / 3189 行**，md5
-`e2e6ad8ae06e1ad37b3198e27256b1f6`（未跟踪的覆盖层文件另计）。本轮同步了运行树与覆盖层补丁；
+是打在 `quattro` 上的 tag，不是单独的发布分支。当前 `niri.patch` 为 **51 文件 / 149 hunk / 3456 行**，md5
+`0098080224830c0b7061e092a61f64a6`（未跟踪的覆盖层文件另计）。本轮同步了运行树与覆盖层补丁；
 仓库里 vendored 的 `bin/`/`shell/` 源码快照仍停在 `bc220e70`，等下一次全量源码同步。
 
 上游**仍然没有 niri 支持**：`2ebf5971a` 上仍是 Hyprland 耦合。下面每一条都是这个前提的产物。
@@ -214,7 +214,7 @@ cd onarchi
 | 电池充电阈值（sysfs 优先） | 保留，并吸收上游改进：电池路径由 UPower 解析，不再用 `BAT*` 通配 |
 | `Niri.qml` 合成器垫片 | 当前 456 行：`monitors`、`monitorFor`、`toplevels`、`refresh*`、`dispatch`，以及 `fullscreenOn` —— 后者因为 `niri msg windows` 不报告全屏标志，改为拿窗口的 `tile_size` 与输出的逻辑尺寸比对（全屏时两者恰好相等） |
 | `OverlayWindow.qml` | 上游文件，菜单、剪贴板与图片选择器走它。它读 `Hyprland.monitors`，在 niri 上恒为空 ⇒ `contentReady` 永远为假 ⇒ **每个面板都以 opacity 0 渲染**。已改指 `Niri`。OSD 不再走它：移植保留卡片大小的 `PanelWindow`，避免合成器侧模糊糊满整屏 |
-| Default Harness 菜单 | 上游 4.6 删掉了 `agent.harness.*` 菜单与 avatar 行。现在选默认 harness 走 Agents 面板的星标（`omarchy-default-agent --select`）；移植层继续在 `omarchy-default-agent` 与面板里保留 Ante/Antex/commandcode |
+| Default agent 选择器 | 上游 4.6 删掉 Agent 菜单、面板改成 account-first；没有 usage provider 的 harness 没有行可挂星标。移植层在面板顶部加折叠式 **Default agent**：用 `omarchy-default-agent --installed` 枚举已安装 harness，选择后走 `--select`。当前列表：Pi、OpenCode、Grok、DeepSeek Harness、Ante、Antex；commandcode 没装，不显示 |
 | 通知霜化 | 上游把通知表面改窄并丢了客户端区域，layer 规则只剩 `xray` ⇒ 完全无霜化。恢复为客户端 `Region` + 规则里 `blur true` |
 | Apps 网格霜化 | 上游新增的 `omarchy.dock` 网格铺满屏幕、在 Hyprland 上靠 `ignore_alpha`。补了客户端区域 + `omarchy-dock-apps` 的 layer 规则。**dock 本体已禁用**（`disabledPlugins`）：上游画的 dock 完全没有背景板（`color: "transparent"`，图标后面没有任何 `Rectangle`），默认 pinned 的应用本机又基本没装 |
 | bar 图标居中 | `OpticalGlyph` 报的是**旋转前**的墨迹中心，pocket 的标记展开时转 90° ⇒ 按没转的位置摆。另外 `BarIconButton` 新增 `contentOffsetY`，给墨迹远矮于行盒的字形用 |
