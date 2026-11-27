@@ -2230,6 +2230,27 @@ index 91f713bfe..b25714f95 100644
        }
  
        Loader {
+diff --git a/shell/plugins/bar/README.md b/shell/plugins/bar/README.md
+index 41eb5f7a3..7f117720d 100644
+--- a/shell/plugins/bar/README.md
++++ b/shell/plugins/bar/README.md
+@@ -12,6 +12,16 @@ the shell for its whole session.
+ - The bar receives its config from the host shell as a `barConfig` property; the host loads it from `~/.config/omarchy/shell.json` (or `config/omarchy/shell.json` when the user has no file).
+ - `omarchy bar position` updates only the user shell.json file.
+ 
++## Floating bar (niri port)
++
++This port floats the strip off the screen edge instead of drawing it flush:
++
++- `bar.floatGap` (defaults to the compositor's outer gap, currently 8) and `bar.cornerRadius` in `shell.json`; `noRoundedOnNoGaps` squares the strip when the gap is zero.
++- The layer surface is sized `thickness + floatGap`. Sizing it to `thickness` alone clips the strip's bottom edge and leaves an empty band under it; `exclusiveZone` uses the same combined size.
++- There is no compositor shadow on `^omarchy-bar$`. The strip's own 1px top highlight and bottom shade carry the edge; a 30px soft shadow read as an extra background band around the floating strip.
++- Bar-widget popups (`KeyboardPanel`) and the notification deck add `bar.floatGap` to their bar-edge offset, so they clear the floating strip instead of overlapping it by the gap.
++- `BackgroundEffect.blurRegion` must use an explicit `x/y/width/height` rect plus `radius`. Quickshell ignores `Region.radius` when the region is bound with `item`, and niri then frosts the card's square bounding box.
++
+ ## Customizing
+ 
+ The bar config lives under the `bar:` key of [`~/.config/omarchy/shell.json`](../../../docs/omarchy-shell.md#shelljson). Out of the box the shell uses [`config/omarchy/shell.json`](../../../config/omarchy/shell.json). Once you customize anything via the bar gestures, `omarchy bar ...`, or by editing shell.json directly, your file is canonical — there is no deep-merge.
 diff --git a/shell/plugins/bar/widgets/ActiveWindow.qml b/shell/plugins/bar/widgets/ActiveWindow.qml
 index b803e7f4b..02fc7a4f5 100644
 --- a/shell/plugins/bar/widgets/ActiveWindow.qml

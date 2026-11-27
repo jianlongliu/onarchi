@@ -218,8 +218,8 @@ The port currently tracks upstream `quattro` at **`2ebf5971a`** (2026-11-27, the
 `v4.6.0-rc1` line plus three commits), fast-forwarded from `723072a55` on
 2026-11-27 — 593 commits, 3830 files, +167695/−106276. `v4.6.0-rc1` is a tag on
 `quattro` itself, not a separate release branch. The current `niri.patch` has
-**51 files / 149 hunks / 3456 lines**, md5
-`b78df1453b2811ad4af196cc957a7867` (untracked overlay files are separate). This
+**52 files / 150 hunks / 3477 lines**, md5
+`7c0c8c821196f117803abf3232d89f1c` (untracked overlay files are separate). This
 sync updated the running tree and the overlay patch; the repository's vendored
 `bin/`/`shell/` source snapshot remains at `bc220e70` until the next full source sync.
 
@@ -297,10 +297,10 @@ Qt 6.12 is un-pinned and verified on the live session; the earlier black-bar rep
 
 > Consolidated index: [docs/known-issues.md](docs/known-issues.md).
 
-- **91 migrations pending** out of 211. 33 need root and are machine-specific (N1x / ASUS ProArt /
-  aarch64 / Limine); 42 touch Hyprland or uwsm. Six user-facing ones have been run (bar layout split,
-  wallpaper renumbering, Fcitx theming, Chromium overlay scrollbars). The rest are tracked in
-  `docs/upstream.md` §8.23.
+- **208 migrations pending** after the 4.6 merge (226 originally; 18 no-impact state/no-op/launcher/skill
+  ones have been run). Rough split: 134 package/hardware, 34 root/system, 10 theme, 9 Hyprland/uwsm,
+  9 desktop/UI, 8 other/state, 4 agent/launcher. Package, root, Hyprland and theme migrations are
+  deliberately not run yet; see `docs/upstream.md` §8.28.
 - **`GDK_SCALE` effect is unverified.** `omarchy-hyprland-monitor-scaling` is what sets it upstream, and
   that script only runs under Hyprland. Without it, GTK apps (nautilus) would render at 1× against a 2.0
   output. `~/.config/niri/config.kdl` now carries `GDK_SCALE "2"` in its `environment {}` block —

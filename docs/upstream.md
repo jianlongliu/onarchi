@@ -1,6 +1,6 @@
 # 上游跟进 — Omarchy on niri 卷（upstream）
 
-> **2026-11-27 当前状态与勘误**：运行树已 FF 到 `4.6.0-rc1` 线（`2ebf5971a`）；仓库源码快照仍停在 `bc220e70`，`omarchy-migrate --pending` 有 226 条，见 [已知问题](known-issues.md)。本卷下方保留各阶段历史快照，不应把旧记录当作当前验收结果。
+> **2026-11-27 当前状态与勘误**：运行树已 FF 到 `4.6.0-rc1` 线（`2ebf5971a`）；仓库源码快照仍停在 `bc220e70`，`omarchy-migrate --pending` 有 208 条（已跑 18 条无影响项），见 [已知问题](known-issues.md)。本卷下方保留各阶段历史快照，不应把旧记录当作当前验收结果。
 
 > 文档只有一份：本文件（`docs/upstream.md`）。
 > 本卷 2026-09-20 从 `docs/omarchy-on-niri-port.md` 抽出（模块化拆分），**编号一律沿用原号** ——
@@ -50,7 +50,7 @@
   与两个新文件 `LICENSE`、`UPSTREAM.md`，共 +6 文件；`shell/plugins/bar/widgets/Workspaces.qml` 的 niri 适配（`Hyprland.*`→`Niri.*`）
   仍在这份补丁里（合并时该文件一度被插件那份覆盖回上游写法、与基线逐字节相同，2026-10-04 当天恢复，见 `docs/omarchy-on-niri-port.md` §3.2）
   —— 上面起步名单里那两个 bar 文件同属 `shell/plugins/bar/`。
-  ——这 40 个文件正是 `niri.patch` 的起点；**当前（2026-11-27）为 51 文件 / 149 hunk / 3456 行、md5 `b78df1453b2811ad4af196cc957a7867`**，见 §8.28。2026-11-27 Default agent 选择器初版为 51 文件 / 149 hunk / 3456 行、md5 `0098080224830c0b7061e092a61f64a6`；此前为 51 文件 / 139 hunk / 3189 行、md5 `e2e6ad8ae06e1ad37b3198e27256b1f6`；同日菜单去方角版为 51 文件 / 139 hunk / 3186 行、md5 `0c90cb43eba9791ded1af818ca8e25f6`；同日浮栏 surface/投影修复版为 51 文件 / 138 hunk / 3164 行、md5 `13351e044870155bcd1bd54abb0a2d1e`；同日浮栏面板修复版为 51 文件 / 135 hunk / 3124 行、md5 `60392071b6f7c90b4f516fcc1bdee9fb`；同日 4.6 合并版为 50 文件 / 128 hunk / 3013 行、md5 `1c55f97bec93081f1d4633b717ba6e1c`；2026-11-25 那版为 51 文件 / 138 hunk / 3385 行、md5 `adce67e86e8ccc33676805be0a338113`；2026-11-19 那版为 49 文件 / 135 hunk / 3340 行、md5 `79060b759dd8846baa17e7ec7515618d`；2026-11-15 那版为 48 文件 / 133 hunk / 3276 行、md5 `15f3e9533b92eb5be00c133af9d1e40f`；2026-11-04 那版为 40 文件 / 131 hunk / 3412 行、md5 `b7d3f453e99631823bd76b0d2f477f25`（同日重导出：通知霜化那行在补丁里写成 `service.cornerRadius`，而该文件没有这个属性、根对象是裸 `Item`，重放会把圆角变成 0；工作树本来是对的 `Style.cornerRadius`，只补丁陈旧 ⇒ 行数/hunk 不变、md5 由 `a9f9e107…` 变为此值）；2026-10-05 那版为 33 文件 / 106 hunk / 3098 行、md5 `f6ef5a467795e2bd6f1ccf14161b185e`；同日前一版 3088 行 / md5 `423813f5…` = 弹层投影；3022 行 / md5 `bcb5aca36ace33d829c6773da7026801` 为当天早些的 menu 投影版；105 hunk / 2956 行那版为 md5 `2cea1e9517bd498df185e02414595bc8`（2026-10-04 合并浮空 bar）；
+  ——这 40 个文件正是 `niri.patch` 的起点；**当前（2026-11-27）为 52 文件 / 150 hunk / 3477 行、md5 `7c0c8c821196f117803abf3232d89f1c`**，见 §8.28。2026-11-27 bar README 之前为 51 文件 / 149 hunk / 3456 行、md5 `b78df1453b2811ad4af196cc957a7867`；Default agent 选择器初版为 51 文件 / 149 hunk / 3456 行、md5 `0098080224830c0b7061e092a61f64a6`；此前为 51 文件 / 139 hunk / 3189 行、md5 `e2e6ad8ae06e1ad37b3198e27256b1f6`；同日菜单去方角版为 51 文件 / 139 hunk / 3186 行、md5 `0c90cb43eba9791ded1af818ca8e25f6`；同日浮栏 surface/投影修复版为 51 文件 / 138 hunk / 3164 行、md5 `13351e044870155bcd1bd54abb0a2d1e`；同日浮栏面板修复版为 51 文件 / 135 hunk / 3124 行、md5 `60392071b6f7c90b4f516fcc1bdee9fb`；同日 4.6 合并版为 50 文件 / 128 hunk / 3013 行、md5 `1c55f97bec93081f1d4633b717ba6e1c`；2026-11-25 那版为 51 文件 / 138 hunk / 3385 行、md5 `adce67e86e8ccc33676805be0a338113`；2026-11-19 那版为 49 文件 / 135 hunk / 3340 行、md5 `79060b759dd8846baa17e7ec7515618d`；2026-11-15 那版为 48 文件 / 133 hunk / 3276 行、md5 `15f3e9533b92eb5be00c133af9d1e40f`；2026-11-04 那版为 40 文件 / 131 hunk / 3412 行、md5 `b7d3f453e99631823bd76b0d2f477f25`（同日重导出：通知霜化那行在补丁里写成 `service.cornerRadius`，而该文件没有这个属性、根对象是裸 `Item`，重放会把圆角变成 0；工作树本来是对的 `Style.cornerRadius`，只补丁陈旧 ⇒ 行数/hunk 不变、md5 由 `a9f9e107…` 变为此值）；2026-10-05 那版为 33 文件 / 106 hunk / 3098 行、md5 `f6ef5a467795e2bd6f1ccf14161b185e`；同日前一版 3088 行 / md5 `423813f5…` = 弹层投影；3022 行 / md5 `bcb5aca36ace33d829c6773da7026801` 为当天早些的 menu 投影版；105 hunk / 2956 行那版为 md5 `2cea1e9517bd498df185e02414595bc8`（2026-10-04 合并浮空 bar）；
   合并前为 27 个文件 / 82 hunk、md5 `cdc361f9f534e16dd9043ac21c3ce352`；
   2026-09-30 为 27 文件 / 81 hunk、md5 `3c672ab5…`；2026-09-27 为 26 文件 / 77 hunk；
   2026-09-26 为 24 文件 / 72 hunk；
@@ -850,8 +850,10 @@ modeline** 提供，不在 niri 的模式列表里，所以新面板看不到。
 
 **移植层扩展：Agents 面板的 Default agent**。上游 4.6 是 account-first，harness 跟着订阅/账户走；Ante/Antex 没有 usage provider，面板里没有行可以挂星标。面板顶部加了一行折叠式 `Default agent`：打开面板时用 `omarchy-default-agent --installed` 枚举本机已安装的 harness，选择后仍走 `omarchy-default-agent --select`，订阅行完全不动。当前枚举到 OpenCode / Grok / DeepSeek Harness / Ante / Antex；`pi` 与 commandcode 没装，不在列表里。这是 port-specific，不是上游设计。
 
-**补丁**：**51 文件 / 149 hunk / 3456 行、md5 `b78df1453b2811ad4af196cc957a7867`**。`git apply --reverse --check` 与在干净 `2ebf5971a` 上的 `git apply --check` 双过；`omarchy-niri-repatch` 报 `overlay already applied`。相对上一版路径表只新增 `shell/plugins/notifications/Delivery.js`，并移除 `shell/plugins/bar/README.md`（采用上游新版文档，本地那份 third-party floating-bar README 已过时）；`shell/Commons/Niri.qml` 仍是未跟踪文件，`omarchy-niri-repatch` 单独 `cp`，本轮未改（456 行）。
+**补丁**：**52 文件 / 150 hunk / 3477 行、md5 `7c0c8c821196f117803abf3232d89f1c`**。`git apply --reverse --check` 与在干净 `2ebf5971a` 上的 `git apply --check` 双过；`omarchy-niri-repatch` 报 `overlay already applied`。路径表相对 §8.27 新增 `shell/plugins/notifications/Delivery.js` 与 `shell/plugins/bar/README.md`（补浮栏说明）；`shell/Commons/Niri.qml` 仍是未跟踪文件，`omarchy-niri-repatch` 单独 `cp`，本轮未改（456 行）。
 
 **验证**：`default-agent`、`launch-shell`、`system-power`、`overlay-window`、`notifications`、`agents-panel`、`bar`、`menu`、`monitor`、`keyboard-layout`、`dock`、`tray-menu` 全绿；`bar-widget-contract` 通过，`bar-drag` / `bar-startup-budget` 在已运行的 niri 会话里失败（前者需要 Hyprland 图形场景，后者与真实 shell 抢 supervisor 锁），属于夹具限制而不是本轮回归；全部改动脚本 `bash -n` 通过；`test/cli` 仍在「本机删掉 21 个自带主题」处失败（`themes/tokyo-night/colors.toml` 不存在），与补丁无关。重启壳后 `omarchy-shell shell ping` → `ok`，日志只有既有的 `Background.qml[74:3]` batteryService 警告；根菜单、Setup 子菜单（含 Monitors）、Agents 面板、OSD、时钟面板与 toast 均实机截图验收，浮动 bar 无遮挡。
 
-**本轮边界**：与 §8.27 相同——只同步运行树、覆盖层与文档；仓库 vendored 源码快照仍停在 `bc220e70`，未跑 migration（`omarchy-migrate --pending` = 226 条）。
+**迁移盘点（2026-11-27）**：合并后 pending 226；已跑 18 条无影响项（状态清理/ no-op / agent launcher / skill 链接），剩 **208**。按脚本内容粗分：包/硬件 134、root/系统 34、主题 10、Hyprland/uwsm 9、桌面/UI 9、其他/状态 8、agent/launcher 4。包、root、Hyprland、主题几类未跑，需要逐条决定。
+
+**本轮边界**：与 §8.27 相同——只同步运行树、覆盖层与文档；仓库 vendored 源码快照仍停在 `bc220e70`，未跑剩余的 208 条 migration（合并后 226，已跑 18 条无影响项）。

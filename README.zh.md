@@ -199,8 +199,8 @@ cd onarchi
 
 本移植当前跟到上游 `quattro` 的 **`2ebf5971a`**（2026-11-27，`v4.6.0-rc1` 线再加 3 个提交）——
 2026-11-27 从 `723072a55` 快进，共 593 个提交、3830 个文件、+167695/−106276。`v4.6.0-rc1`
-是打在 `quattro` 上的 tag，不是单独的发布分支。当前 `niri.patch` 为 **51 文件 / 149 hunk / 3456 行**，md5
-`b78df1453b2811ad4af196cc957a7867`（未跟踪的覆盖层文件另计）。本轮同步了运行树与覆盖层补丁；
+是打在 `quattro` 上的 tag，不是单独的发布分支。当前 `niri.patch` 为 **52 文件 / 150 hunk / 3477 行**，md5
+`7c0c8c821196f117803abf3232d89f1c`（未跟踪的覆盖层文件另计）。本轮同步了运行树与覆盖层补丁；
 仓库里 vendored 的 `bin/`/`shell/` 源码快照仍停在 `bc220e70`，等下一次全量源码同步。
 
 上游**仍然没有 niri 支持**：`2ebf5971a` 上仍是 Hyprland 耦合。下面每一条都是这个前提的产物。
@@ -240,7 +240,7 @@ Qt 6.12 已解钉并在真实会话验收；此前的黑 bar 报告在受控测�
 
 > 汇总索引：[docs/known-issues.md](docs/known-issues.md)。
 
-- **91 条迁移待跑**（共 211 条）。33 条要 root 且是机型专属（N1x / ASUS ProArt / aarch64 / Limine）；
+- **208 条迁移待跑**（4.6 合并后 226 条，已跑 18 条无影响的状态/no-op/launcher/skill 项）。粗分：包/硬件 134、root/系统 34、主题 10、Hyprland/uwsm 9、桌面/UI 9、其他/状态 8、agent/launcher 4。包、root、Hyprland、主题几类暂不跑；
   42 条动 Hyprland 或 uwsm。已跑 6 条面向用户的（bar 布局拆分、壁纸重编号、Fcitx 主题、Chromium
   覆盖滚动条）。其余在 `docs/upstream.md` §8.23 有分类账。
 - **niri 上 `GDK_SCALE` 的效果未验收**。上游是 `omarchy-hyprland-monitor-scaling` 设的，而那个脚本只在
