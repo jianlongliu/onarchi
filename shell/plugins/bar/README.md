@@ -20,7 +20,7 @@ This port floats the strip off the screen edge instead of drawing it flush:
 - The layer surface is sized `thickness + floatGap`. Sizing it to `thickness` alone clips the strip's bottom edge and leaves an empty band under it; `exclusiveZone` uses the same combined size.
 - There is no compositor shadow on `^omarchy-bar$`. The strip's own 1px top highlight and bottom shade carry the edge; a 30px soft shadow read as an extra background band around the floating strip.
 - Bar-widget popups (`KeyboardPanel`) and the notification deck add `bar.floatGap` to their bar-edge offset, so they clear the floating strip instead of overlapping it by the gap.
-- `BackgroundEffect.blurRegion` must use an explicit `x/y/width/height` rect plus `radius`. Quickshell ignores `Region.radius` when the region is bound with `item`, and niri then frosts the card's square bounding box.
+- The bar keeps its frost. The blur region is an explicit `x/y/width/height` rect aligned with the strip, and the surface extends one corner radius past the strip's inner edge: niri's `ext_background_effect` mask is binary, so a surface flush to the strip clips the bottom half of each rounded end cap into a stepped edge. The pad gives the mask room; no border or rim is drawn. Widget popups use explicit rect + `radius` too; Quickshell ignores `Region.radius` when a region is bound with `item`.
 
 ## Customizing
 

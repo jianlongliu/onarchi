@@ -201,7 +201,10 @@ Item {
     // without this the card is a plain translucent fill and whatever is behind
     // it reads straight through, unimpeded and unblurred.
     BackgroundEffect.blurRegion: Region {
-      item: appGridBlurAnchor
+      x: Math.round(appGridBlurAnchor.x) + 2
+      y: Math.round(appGridBlurAnchor.y) + 2
+      width: Math.max(0, Math.round(appGridBlurAnchor.width) - 4)
+      height: Math.max(0, Math.round(appGridBlurAnchor.height) - 4)
       radius: Math.max(0, Style.cornerRadius - 2)
     }
     Rectangle {

@@ -1761,10 +1761,10 @@ Item {
     // Parked by its whole thickness, so none of it stays on screen however
     // thick a notch floor makes it.
     margins {
-      top: root.barHidden && barWindow.surfaceEdge === "top" ? -barWindow.surfaceCrossSize : 0
-      bottom: root.barHidden && barWindow.surfaceEdge === "bottom" ? -barWindow.surfaceCrossSize : 0
-      left: root.barHidden && barWindow.surfaceEdge === "left" ? -barWindow.surfaceCrossSize : 0
-      right: root.barHidden && barWindow.surfaceEdge === "right" ? -barWindow.surfaceCrossSize : 0
+      top: root.barHidden && barWindow.surfaceEdge === "top" ? -barWindow.surfaceExtent : 0
+      bottom: root.barHidden && barWindow.surfaceEdge === "bottom" ? -barWindow.surfaceExtent : 0
+      left: root.barHidden && barWindow.surfaceEdge === "left" ? -barWindow.surfaceExtent : 0
+      right: root.barHidden && barWindow.surfaceEdge === "right" ? -barWindow.surfaceExtent : 0
     }
 
     anchors {
@@ -1811,9 +1811,13 @@ Item {
     // tall as the strip alone clips the strip's bottom edge and leaves an empty
     // band under it.
     readonly property int surfaceCrossSize: surfaceThickness + root.floatGap
+    // Room past the strip's inner edge for the rounded frost mask: with the
+    // surface flush to the strip, niri clipped the bottom half of each end cap.
+    readonly property int surfacePad: Math.max(2, root.effectiveCornerRadius + 2)
+    readonly property int surfaceExtent: surfaceCrossSize + surfacePad
     readonly property bool surfaceVertical: surfaceEdge === "left" || surfaceEdge === "right"
-    implicitWidth: surfaceVertical ? surfaceCrossSize : 0
-    implicitHeight: surfaceVertical ? 0 : surfaceCrossSize
+    implicitWidth: surfaceVertical ? surfaceExtent : 0
+    implicitHeight: surfaceVertical ? 0 : surfaceExtent
 
     property bool presented: false
     // clearing: waiting on a clear frame before resizing. revealing: waiting
@@ -1858,6 +1862,16 @@ Item {
 
     Component.onCompleted: if (!cutoutPending) cutoutWaitOver = true
     onThicknessChanged: followLater.restart()
+    BackgroundEffect.blurRegion: Region {
+      // Aligned with the strip; niri's mask is binary, so a 1px light rim
+      // below covers the hard edge at the rounded end caps.
+      x: Math.round(barBlurAnchor.x)
+      y: Math.round(barBlurAnchor.y)
+      width: Math.max(0, Math.round(barBlurAnchor.width))
+      height: Math.max(0, Math.round(barBlurAnchor.height))
+      radius: root.effectiveCornerRadius
+    }
+
     Connections {
       target: root
       function onPositionChanged() { followLater.restart() }
@@ -1905,7 +1919,7 @@ Item {
           settleWatchdog.restart()
         } else {
           var span = barWindow.surfaceVertical ? barWindow.width : barWindow.height
-          if (span === barWindow.surfaceCrossSize && barWindow.settleFrames >= 1) {
+          if (span === barWindow.surfaceExtent && barWindow.settleFrames >= 1) {
             barWindow.finishSettle()
             return
           }
@@ -1938,12 +1952,9 @@ Item {
     // would smear its fill out through the transparent corners, hence the
     // radius; the 2px inset keeps the compositor's hard-edged mask inside the
     // fill's own antialiased silhouette.
-    BackgroundEffect.blurRegion: Region {
-      // Inset by 2px so the compositor's hard-edged mask lands inside the fill's
-      // own antialiased rounded silhouette rather than outlining it.
-      item: barBlurAnchor
-      radius: Math.max(0, root.effectiveCornerRadius - 2)
-    }
+    // niri's ext_background_effect mask has no antialiasing; at the rounded
+    // end caps it leaves a stepped edge over the strip's translucent fill.
+    // The bar's own gradient and 1px edge profile carry it instead.
 
     Connections {
       target: barWindow.screen

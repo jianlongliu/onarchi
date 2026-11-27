@@ -405,7 +405,10 @@ Item {
     // card's own rounded rect so effects.kdl's `xray false` frosts only behind
     // the card instead of the whole display.
     BackgroundEffect.blurRegion: Region {
-      item: card
+      x: Math.round(card.x) + 2
+      y: Math.round(card.y) + 2
+      width: Math.max(0, Math.round(card.width) - 4)
+      height: Math.max(0, Math.round(card.height) - 4)
       radius: Math.max(0, root.cornerRadius - 2)
     }
 

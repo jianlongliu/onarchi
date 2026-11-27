@@ -153,7 +153,13 @@ PanelWindow {
   // blurs just behind `card`. Every bar-widget popup (audio/bluetooth/
   // network/power/clock/monitor/tailscale/weather/dropbox) and the agent
   // panel reuse this surface, so this one attachment frosts them all.
-  BackgroundEffect.blurRegion: Region { item: card; radius: Style.cornerRadius }
+  BackgroundEffect.blurRegion: Region {
+    x: Math.round(card.x) + 2
+    y: Math.round(card.y) + 2
+    width: Math.max(0, Math.round(card.width) - 4)
+    height: Math.max(0, Math.round(card.height) - 4)
+    radius: Math.max(0, Style.cornerRadius - 2)
+  }
 
   WlrLayershell.namespace: "omarchy-keyboard-panel"
   WlrLayershell.layer: WlrLayer.Overlay
