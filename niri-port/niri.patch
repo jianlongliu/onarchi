@@ -2239,10 +2239,18 @@ index c81ac8ae1..063dbdfa3 100644
        id: card
        width: root.cardWidth
 diff --git a/shell/plugins/menu/Menu.qml b/shell/plugins/menu/Menu.qml
-index 0e609882a..5b6e9ae95 100644
+index 0e609882a..db0209746 100644
 --- a/shell/plugins/menu/Menu.qml
 +++ b/shell/plugins/menu/Menu.qml
-@@ -97,6 +97,28 @@ Item {
+@@ -2,6 +2,7 @@ import Quickshell
+ import Quickshell.Hyprland
+ import Quickshell.Io
+ import Quickshell.Wayland
++import Quickshell.Wayland._BackgroundEffect
+ import QtQuick
+ import qs.Commons
+ import qs.Commons as Commons
+@@ -97,6 +98,28 @@ Item {
    property int dmenuMaxHeight: 0
    property bool requestActive: false
    property bool rowsLoaded: false
@@ -2271,7 +2279,7 @@ index 0e609882a..5b6e9ae95 100644
    property string activeMenu: "root"
    property string filterText: ""
    // Resets of filterText reach the search line; its edits come back through setFilter.
-@@ -330,6 +352,14 @@ Item {
+@@ -330,6 +353,14 @@ Item {
      root.items = mergedMenu.items
      root.itemOrder = mergedMenu.itemOrder
      root.rowsLoaded = true
@@ -2286,18 +2294,22 @@ index 0e609882a..5b6e9ae95 100644
      if (!skipGuards && root.defaultMenuSettled && root.userMenuSettled) root.evaluateGuards()
      if (root.opened) {
        root.rebuildDisplay()
-@@ -1463,6 +1493,10 @@ Item {
+@@ -1463,6 +1494,14 @@ Item {
      shown: root.opened && root.rowsLoaded
      WlrLayershell.namespace: "omarchy-menu"
  
-+    // niri port: no client blur region. niri's ext_background_effect mask is
-+    // square at the card corners, so a frosted block leaks outside the rounded
-+    // card; the card fill is opaque enough to stand on its own instead.
++    BackgroundEffect.blurRegion: Region {
++      x: Math.round(card.x) + 2
++      y: Math.round(card.y) + 2
++      width: Math.max(0, Math.round(card.width) - 4)
++      height: Math.max(0, Math.round(card.height) - 4)
++      radius: Math.max(0, root.cornerRadius - 2)
++    }
 +
      // The card opens centered exactly as always. The first search keystroke
      // or submenu move freezes the top line where it currently sits — from
      // then on the card grows and shrinks downward instead of re-centering
-@@ -1493,6 +1527,10 @@ Item {
+@@ -1493,6 +1532,10 @@ Item {
        onClicked: root.cancel()
      }
  
@@ -2308,16 +2320,7 @@ index 0e609882a..5b6e9ae95 100644
      BorderSurface {
        id: card
        width: root.cardWidth
-@@ -1500,7 +1538,7 @@ Item {
-       radius: root.cornerRadius
-       anchors.horizontalCenter: parent.horizontalCenter
-       y: panel.effectiveCardTop
--      color: root.background
-+      color: Util.alpha(root.background, 0.94)
-       borderSpec: root.borderSpec
-       padding: root.contentMargin
- 
-@@ -1833,42 +1871,6 @@ Item {
+@@ -1833,42 +1876,6 @@ Item {
              }
            }
  
