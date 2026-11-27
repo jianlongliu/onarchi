@@ -14,9 +14,12 @@ sensible default so scripts and the shell never break.
 Deliberately jq-free: uses only the stdlib so it runs without installing jq.
 """
 
+import contextlib
+import io
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import time
@@ -490,6 +493,12 @@ def cmd_getoption(opt, json_out):
         val["float"] = float(val["int"])
     if "gaps" in opt:
         val["int"] = 0 if _no_gaps() else 8
+    if "animations" in opt:
+        # Hyprland's animations are on by default; Style.qml now reads this to
+        # decide reduceMotion, so a false default would silently kill every
+        # animation in the shell.
+        val["bool"] = True
+        val["int"] = 1
     return json.dumps(val) if json_out else f"int: {val['int']}"
 
 
@@ -836,6 +845,31 @@ def main(argv):
     if "-j" in argv or "--json" in argv:
         json_out = True
         argv = [a for a in argv if a not in ("-j", "--json")]
+
+    # Hyprland's --batch runs several `hyprctl` forms in one invocation and
+    # separates their output with a blank line. Omarchy 4.6's Style.qml reads
+    # rounding/gaps/animations this way, so a no-op here leaves cornerRadius at
+    # 0 and every card square. Re-enter the dispatcher per command and join the
+    # results the way the caller parses them.
+    if argv and argv[0] == "--batch":
+        payload = " ".join(argv[1:])
+        chunks = []
+        for part in payload.split(";"):
+            part = part.strip()
+            if not part:
+                continue
+            args = shlex.split(part)
+            if json_out:
+                args.append("-j")
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                main(args)
+            out = buf.getvalue().strip()
+            if out:
+                chunks.append(out)
+        if chunks:
+            sys.stdout.write("\n\n".join(chunks) + "\n")
+        return 0
 
     if not argv:
         return 0

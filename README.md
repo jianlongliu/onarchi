@@ -214,15 +214,16 @@ The overview backdrop needs no adjustment: niri draws that layer itself, so the 
 
 ## Upstream sync status
 
-The port currently tracks upstream `quattro` at **`723072a55`** (2026-11-14), fast-forwarded from
-`6194f4606` on 2026-11-14 — 248 commits, 1163 files, +48176/−28306. The `v4.5.0` tag itself sits
-on the `v4-5-0` release branch, not on `quattro`, and this port follows `quattro` only.
-The current `niri.patch` has **51 files / 138 hunks / 3385 lines**, md5
-`adce67e86e8ccc33676805be0a338113` (untracked overlay files are separate). This sync
-updated the running tree and the overlay patch; the repository's vendored
+The port currently tracks upstream `quattro` at **`2ebf5971a`** (2026-11-27, the
+`v4.6.0-rc1` line plus three commits), fast-forwarded from `723072a55` on
+2026-11-27 — 593 commits, 3830 files, +167695/−106276. `v4.6.0-rc1` is a tag on
+`quattro` itself, not a separate release branch. The current `niri.patch` has
+**50 files / 128 hunks / 3013 lines**, md5
+`1c55f97bec93081f1d4633b717ba6e1c` (untracked overlay files are separate). This
+sync updated the running tree and the overlay patch; the repository's vendored
 `bin/`/`shell/` source snapshot remains at `bc220e70` until the next full source sync.
 
-Upstream still has **no niri support** at `723072a55`; Hyprland coupling remains, and everything
+Upstream still has **no niri support** at `2ebf5971a`; Hyprland coupling remains, and everything
 below exists because of that.
 
 ### Carried through the merge
@@ -232,8 +233,9 @@ below exists because of that.
 | Floating bar (float gap, rounded corners, frosted blur) | Grafted onto upstream's new `barStrip`. `exclusiveZone` now includes `floatGap`, so windows no longer sit a band of dead desktop below the strip |
 | Monitor resolution tier slider | **Retired 2026-11-05** at the user's request, ahead of upstream's +1044/−289 rewrite of `panels/monitor/Panel.qml`. The 235-line implementation is archived under `~/.local/state/backups/omarchy-pre-ff-quattro-*/retired-monitor-panel/` with its 14-hunk diff, the `omarchy-niri-monitor-modes` shim, the model test and restore instructions |
 | Battery charge threshold (sysfs-first) | Kept, plus upstream's improvement: it resolves the battery through UPower instead of a `BAT*` glob |
-| `Niri.qml` compositor shim | Currently 453 lines: `monitors`, `monitorFor`, `toplevels`, `refresh*`, `dispatch`, and `fullscreenOn` — the last one because `niri msg windows` carries no fullscreen flag, so it compares a window's `tile_size` against the output's logical size (fullscreen tiles to exactly that) |
-| `OverlayWindow.qml` | New upstream file, all overlay panels (menu, OSD, clipboard, image picker) go through it. It read `Hyprland.monitors`, which is always empty on niri, so `contentReady` never became true and every panel rendered at opacity 0 — patched to `Niri` |
+| `Niri.qml` compositor shim | Currently 456 lines: `monitors`, `monitorFor`, `toplevels`, `refresh*`, `dispatch`, and `fullscreenOn` — the last one because `niri msg windows` carries no fullscreen flag, so it compares a window's `tile_size` against the output's logical size (fullscreen tiles to exactly that) |
+| `OverlayWindow.qml` | Upstream file used by menu, clipboard and image picker. It read `Hyprland.monitors`, which is always empty on niri, so `contentReady` never became true and every panel rendered at opacity 0 — patched to `Niri`. The OSD no longer uses it: the port keeps a card-sized `PanelWindow` so the compositor-side blur cannot frost the whole display |
+| Default harness menu | Upstream 4.6 removed the `agent.harness.*` menu and its avatar rows. The Agents panel's star (`omarchy-default-agent --select`) is now the way to choose a default; the port keeps its Ante/Antex/commandcode entries in `omarchy-default-agent` and the panel |
 | Toast frost | Upstream narrowed the notification surface and dropped the client blur region; the layer rule carried only `xray`, so nothing was frosted. Restored as a client-side `Region` + `blur true` in the rule |
 | Apps grid frost | Upstream's new `omarchy.dock` grid spans the screen and relies on Hyprland's `ignore_alpha`. Given a client region plus an `omarchy-dock-apps` layer rule. **The dock itself is disabled** (`disabledPlugins`): upstream draws it with no backdrop at all (`color: "transparent"`, no `Rectangle` behind the icons), and its default pins are apps this machine does not have |
 | Bar icon centring | `OpticalGlyph` reported the ink centre before rotation, so the pocket's mark (which turns 90° when it opens) was placed as if it had not. `BarIconButton` also gained `contentOffsetY` for glyphs whose ink is far shorter than their line box |

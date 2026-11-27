@@ -1,6 +1,6 @@
 # 上游跟进 — Omarchy on niri 卷（upstream）
 
-> **2026-10-28 当前状态与勘误**：见 [已知问题](known-issues.md)。本卷下方保留各阶段历史快照；通知霜化已补回、官方源已加入、统一 system 入口的 niri 守卫尚缺、迁移完成标记未收口，不应把旧记录当作当前验收结果。
+> **2026-11-27 当前状态与勘误**：运行树已 FF 到 `4.6.0-rc1` 线（`2ebf5971a`）；仓库源码快照仍停在 `bc220e70`，`omarchy-migrate --pending` 有 226 条，见 [已知问题](known-issues.md)。本卷下方保留各阶段历史快照，不应把旧记录当作当前验收结果。
 
 > 文档只有一份：本文件（`docs/upstream.md`）。
 > 本卷 2026-09-20 从 `docs/omarchy-on-niri-port.md` 抽出（模块化拆分），**编号一律沿用原号** ——
@@ -26,6 +26,7 @@
 - 8.25 dock 在 niri 上接通（2026-11-05）：垫片 `o.workspace_mode`、`tiledLayout`、dock 两文件移植
 - 8.26 Display 面板分辨率为空（2026-11-05）：垫片格式 + 子进程 socket
 - 8.27 全量 FF 到 `723072a55`（quattro tip，2026-11-14）：248 提交、4 处冲突、补丁重导出
+- 8.28 全量 FF 到 `2ebf5971a`（quattro tip / 4.6.0-rc1，2026-11-27）：593 提交、14 处冲突、Osd 语义回退修复
 - 16. **GitHub 发布流程（2026-08-25 建立）**：移植差分推到 pub 仓库
 - 8. **A+C 落地 / 更新覆盖层（2026-08-24）**：本节最后两项。
 
@@ -49,7 +50,7 @@
   与两个新文件 `LICENSE`、`UPSTREAM.md`，共 +6 文件；`shell/plugins/bar/widgets/Workspaces.qml` 的 niri 适配（`Hyprland.*`→`Niri.*`）
   仍在这份补丁里（合并时该文件一度被插件那份覆盖回上游写法、与基线逐字节相同，2026-10-04 当天恢复，见 `docs/omarchy-on-niri-port.md` §3.2）
   —— 上面起步名单里那两个 bar 文件同属 `shell/plugins/bar/`。
-  ——这 40 个文件正是 `niri.patch` 的起点；**当前（2026-11-25）为 51 文件 / 138 hunk / 3385 行、md5 `adce67e86e8ccc33676805be0a338113`**，见 §8.27。2026-11-19 那版为 49 文件 / 135 hunk / 3340 行、md5 `79060b759dd8846baa17e7ec7515618d`；2026-11-15 那版为 48 文件 / 133 hunk / 3276 行、md5 `15f3e9533b92eb5be00c133af9d1e40f`；2026-11-04 那版为 40 文件 / 131 hunk / 3412 行、md5 `b7d3f453e99631823bd76b0d2f477f25`（同日重导出：通知霜化那行在补丁里写成 `service.cornerRadius`，而该文件没有这个属性、根对象是裸 `Item`，重放会把圆角变成 0；工作树本来是对的 `Style.cornerRadius`，只补丁陈旧 ⇒ 行数/hunk 不变、md5 由 `a9f9e107…` 变为此值）；2026-10-05 那版为 33 文件 / 106 hunk / 3098 行、md5 `f6ef5a467795e2bd6f1ccf14161b185e`；同日前一版 3088 行 / md5 `423813f5…` = 弹层投影；3022 行 / md5 `bcb5aca36ace33d829c6773da7026801` 为当天早些的 menu 投影版；105 hunk / 2956 行那版为 md5 `2cea1e9517bd498df185e02414595bc8`（2026-10-04 合并浮空 bar）；
+  ——这 40 个文件正是 `niri.patch` 的起点；**当前（2026-11-27）为 50 文件 / 128 hunk / 3013 行、md5 `1c55f97bec93081f1d4633b717ba6e1c`**，见 §8.28。2026-11-25 那版为 51 文件 / 138 hunk / 3385 行、md5 `adce67e86e8ccc33676805be0a338113`；2026-11-19 那版为 49 文件 / 135 hunk / 3340 行、md5 `79060b759dd8846baa17e7ec7515618d`；2026-11-15 那版为 48 文件 / 133 hunk / 3276 行、md5 `15f3e9533b92eb5be00c133af9d1e40f`；2026-11-04 那版为 40 文件 / 131 hunk / 3412 行、md5 `b7d3f453e99631823bd76b0d2f477f25`（同日重导出：通知霜化那行在补丁里写成 `service.cornerRadius`，而该文件没有这个属性、根对象是裸 `Item`，重放会把圆角变成 0；工作树本来是对的 `Style.cornerRadius`，只补丁陈旧 ⇒ 行数/hunk 不变、md5 由 `a9f9e107…` 变为此值）；2026-10-05 那版为 33 文件 / 106 hunk / 3098 行、md5 `f6ef5a467795e2bd6f1ccf14161b185e`；同日前一版 3088 行 / md5 `423813f5…` = 弹层投影；3022 行 / md5 `bcb5aca36ace33d829c6773da7026801` 为当天早些的 menu 投影版；105 hunk / 2956 行那版为 md5 `2cea1e9517bd498df185e02414595bc8`（2026-10-04 合并浮空 bar）；
   合并前为 27 个文件 / 82 hunk、md5 `cdc361f9f534e16dd9043ac21c3ce352`；
   2026-09-30 为 27 文件 / 81 hunk、md5 `3c672ab5…`；2026-09-27 为 26 文件 / 77 hunk；
   2026-09-26 为 24 文件 / 72 hunk；
@@ -811,3 +812,38 @@ modeline** 提供，不在 niri 的模式列表里，所以新面板看不到。
 **视觉验收（2026-11-14 重启壳后）**：`omarchy-shell shell ping` 返回 `ok`；根菜单正常出现新的根级 `Agent`，布局无遮挡；Agents 面板正常显示 commandcode/Antex GOAT 的 5h/weekly/monthly、`$40.02 spent of $70.00 funded` 与 DeepSeek 余额，无裁切；Apps 网格正常打开，聚焦项显示版本号（ChatGPT `26.1021.22027`），图标扫描与主题图标生效。`omarchy-theme-set-icons` 生成 13 个 icon 并写 `icons.revision`。日志只有一条上游既存警告：`Background.qml[74:3]: Unable to assign [undefined] to bool`，来自 `batteryService.powerSaverOnBattery` 在当前 battery service 里不存在；它把 `powerSaverActive` 保持为 false，不属于本轮补丁引入，也不在本地绕过。
 
 **本轮边界**：只同步运行树 `~/.local/share/omarchy`、覆盖层 `niri.patch` 与文档。仓库里 vendored 的 `bin/`、`shell/`、`default/` 源码快照仍停在 `bc220e70`（上次全量源码同步 `a56b102`），没有随本轮更新；下一次源码快照同步是独立动作。
+
+---
+
+### 8.28 全量 FF 到 `2ebf5971a`（quattro tip / 4.6.0-rc1，2026-11-27）
+
+**版本关系**：`v4.6.0-rc1` tag 就在 `quattro` 线上，比 tip `2ebf5971a` 落后 3 个提交；按既定策略只跟 `quattro`，内容即 rc1 + 3。`version` 文件仍是 `4.0.0.alpha`，版本号只在 tag 里。
+
+**规模**（`723072a55` → `2ebf5971a`，2026-11-14 → 2026-11-27）：593 提交、3830 文件、+167695/−106276。撞 `niri.patch` 路径表的上游改动 32 个文件，其中 14 个需要人工合并。
+
+**快照与回退**：snapper home `1480`、root `2934`；另存 `~/.local/state/backups/omarchy-pre-ff-4.6rc1-20261127/`（1.2 G repo bundle + 15 M `~/.config/omarchy` + `~/bin`）。回退走 `pkexec snapper -c home undochange 1480..0` / `pkexec snapper -c root undochange 2934..0`，或从 bundle 恢复。
+
+**冲突处置**：
+
+| 文件 | 处置 |
+|---|---|
+| `bin/omarchy-agent` / `bin/omarchy-default-agent` | 上游 4.6 把 agent 统一改成 Omarchy 仓库里的包，并删掉 commandcode / kiro-cli。以上游为底，补回 commandcode（不在 curated 仓库，仍用 mise 装 `npm:command-code`）与 Ante/Antex 的 `agent_self_managed` 分支；`--select` 对这三者不再走 `omarchy-install-ai-cli` |
+| `bin/omarchy-launch-shell` | 保留本地 supervisor 加固（`slot_occupied` / `wait_for_slot` / `claim_supervision`、`9>&-`、干净退出时接管外来实例），并入上游新的 crash-handler 注释 |
+| `bin/omarchy-launch-tui` | 保留上游的 `NO_COLOR` 清理与 `basename --` 修正，之后接 niri 的终端回退（`ghostty` → `kitty` → `alacritty` → `foot` → 直接执行） |
+| `default/omarchy/omarchy-menu.jsonc` / `default/i18n/en/menu.json` | 上游删掉整个 Default Harness 与 avatar 菜单，跟随上游删除；保留 niri 的 `config.kdl` / `binds.kdl` / `input.kdl`、新增的 `setup.monitors`、`xdg-terminal-exec` 回退。原菜单里的 `omarchy-launch-config-editor` 早已不存在，改成 `omarchy-launch-editor` |
+| `default/omarchy/launcher.hides` | 上游新增 `mpv`，本地有 `nwg-look`，两者都留 |
+| `shell/plugins/agents/Panel.qml` | 保留本地的 spent 计量、百分比列、`balanceValueMetrics` 与 `balanceDetailText`；上游删掉的 `agents.balanceSpent*` i18n 键补回 `default/i18n/en/shell.json` |
+| `shell/plugins/bar/Bar.qml` | `exclusiveZone` 跟随上游改名成 `surfaceThickness + root.floatGap`；保留 `Niri.fullscreenOn(screen)`、`BackgroundEffect.blurRegion` 与 `stripInputRegion` |
+| `shell/plugins/panels/power/Panel.qml` | 上游重写了 `actionProc.onExited` 的 profile 同步，保留它，并在开头清 `chargePendingIndex`、末尾 `refresh()` |
+| `shell/services/AppLibrary.qml` | 保留 niri 的 `gtk-launch` 回退 |
+| `test/shell.d/launch-shell-test.sh` / `system-power-test.sh` | 跟随上游把环境字段改名为 `crash-handler-off`；`system-power` 同时 mock `niri` 与上游新加的 `omarchy-shell` |
+
+**自动合并的语义回退（重要）**：`shell/plugins/osd/Osd.qml` 的 `OverlayWindow` → 卡片大小 `PanelWindow` 是本地移植，但 stash 把上游 4.6 的 `Commons.I18n.formatNumber`、`Commons.Color` 与 RTL 锚点一起顶掉了。已按上游为底重做：保留卡片大小 `PanelWindow`，恢复上游的数字本地化、颜色别名和进度条 RTL 锚点。`agents/Panel.qml` 的 `balanceDetailText` 函数也在自动合并中丢失，已从 stash 补回。
+
+**合并后修的第三处：`hyprctl` 垫片不认 `--batch`**。上游 4.6 的 `Style.qml` 把 rounding / gaps / animations 改成一次 `hyprctl -j --batch "getoption ... ; ..."` 读取；垫片没有 `--batch`，命令返回空，`cornerRadius` 停在 0，bar 与 menu 的圆角同时消失。`port-bin/hyprctl` 补了 `--batch`（逐条回到主分派、按空行拼接 JSON），并把 `animations:enabled` 的默认从 false 改成 true（否则 `reduceMotion` 被误置，壳层所有动效会被关掉）。垫片测试 53/53；`hyprctl -j --batch` 输出 12 / 8 / true，重启壳后 bar 与菜单圆角恢复。
+
+**补丁**：**50 文件 / 128 hunk / 3013 行、md5 `1c55f97bec93081f1d4633b717ba6e1c`**。`git apply --reverse --check` 与在干净 `2ebf5971a` 上的 `git apply --check` 双过；`omarchy-niri-repatch` 报 `overlay already applied`。相对上一版路径表只移除 `shell/plugins/bar/README.md`（采用上游新版文档，本地那份 third-party floating-bar README 已过时）；`shell/Commons/Niri.qml` 仍是未跟踪文件，`omarchy-niri-repatch` 单独 `cp`，本轮未改（456 行）。
+
+**验证**：`default-agent`、`launch-shell`、`system-power`、`overlay-window`、`notifications`、`agents-panel`、`bar`、`menu`、`monitor`、`keyboard-layout`、`dock`、`tray-menu` 全绿；全部改动脚本 `bash -n` 通过；`test/cli` 仍在「本机删掉 21 个自带主题」处失败（`themes/tokyo-night/colors.toml` 不存在），与补丁无关。重启壳后 `omarchy-shell shell ping` → `ok`，日志只有既有的 `Background.qml[74:3]` batteryService 警告；根菜单、Setup 子菜单（含 Monitors）、Agents 面板与 OSD 均实机截图验收，浮动 bar 布局无遮挡。
+
+**本轮边界**：与 §8.27 相同——只同步运行树、覆盖层与文档；仓库 vendored 源码快照仍停在 `bc220e70`，未跑 migration（`omarchy-migrate --pending` = 226 条）。

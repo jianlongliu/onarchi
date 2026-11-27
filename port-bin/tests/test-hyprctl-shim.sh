@@ -314,5 +314,21 @@ check "no entry is an object" \
   "$(hyprctl monitors -j | jq -r '[[.[] | select(.disabled != true)][0].availableModes[] | type] | unique | join(",")')" string
 
 echo
+echo "== --batch: the one read Style.qml uses for rounding, gaps and animation"
+batch=$(hyprctl -j --batch 'getoption decoration:rounding ; getoption general:gaps_out ; getoption animations:enabled')
+check "three JSON chunks, blank-line separated" \
+  "$(printf '%s' "$batch" | grep -c '^$')" 2
+check "rounding is 12" \
+  "$(printf '%s' "$batch" | jq -s -r '.[0].int')" 12
+check "the outer gap is 8" \
+  "$(printf '%s' "$batch" | jq -s -r '.[1].int')" 8
+check "animations are reported as an enabled boolean" \
+  "$(printf '%s' "$batch" | jq -s -r '.[2].bool')" true
+mkdir -p "$tmp/home/.local/state/omarchy/toggles/hypr"
+touch "$tmp/home/.local/state/omarchy/toggles/hypr/window-no-gaps.lua"
+check "the no-gaps toggle zeroes rounding" \
+  "$(HOME=$tmp/home hyprctl -j --batch 'getoption decoration:rounding' | jq -r '.int')" 0
+
+echo
 echo "checks=$checks failures=$failures"
 [[ $failures -eq 0 ]] || exit 1

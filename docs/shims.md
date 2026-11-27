@@ -54,6 +54,9 @@
 
 ### 已映射的查询（可 `-j` 出 JSON，Hyprland schema）
 - `clients`, `monitors`, `activewindow`, `activeworkspace`, `devices`, `binds`, `getoption`, `cursorpos`
+- `--batch "cmd ; cmd ; ..."`：逐条回到同一分派，输出用空行分隔。上游 4.6 的 `Style.qml`
+  靠它一次读 `decoration:rounding` / `general:gaps_out` / `animations:enabled`；缺了它
+  `cornerRadius` 会停在 0，bar 与 menu 全变直角。`animations:enabled` 报 `true`。
 - 辅助函数：`_window_to_client()`, `_addr_to_id()`, `cmd_monitors()`, `cmd_clients()`,
   `cmd_activewindow()`, `cmd_activeworkspace()`, `cmd_devices()`, `cmd_getoption()`。
 - **`binds` 的实现**：`cmd_binds` 不读运行时，而是解析 niri 配置生成 Hyprland 格式 bind
