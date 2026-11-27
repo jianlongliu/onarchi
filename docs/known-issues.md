@@ -20,7 +20,7 @@
 
 | 问题 | 影响 | 现状 / 绕过 | 权威记录 |
 |---|---|---|---|
-| 208 个 migration 待处理 | 部分上游功能与修复未落地 | 合并后 226，已跑 18 条无影响项，余 208：包/硬件 134、root 34、主题 10、Hyprland 9、桌面/UI 9、其他/状态 8、agent 4；需逐条分类 | [README Open items](../README.md) · [upstream](upstream.md) |
+| 82 个 migration 待处理 | 部分上游功能与修复未落地 | 合并后 226；已跑 28、跳过 116（机型/Hyprland/bar/特定 app，清单在 `~/.local/state/omarchy/migrations/SKIPPED.md`），余 82：包 59、root 19、桌面/UI 3、其他 1 | [README Open items](../README.md) · [upstream](upstream.md) |
 | 多屏 / 旋转 / 热插拔未验收 | 双屏同号工作区、输出旋转行为未知 | 单屏已验收；双屏与旋转需夹具或真机 | [README](../README.md) |
 | 登录 / 锁屏 / 挂起 / 重启未复验 | 本轮源码同步后没有端到端证据 | 历史验收不能替代本次验收 | [README](../README.md) |
 | 初次安装 / 覆盖层自动检查未闭环 | 干净机器安装可能缺步骤 | 正反向 `git apply --check` 已过，但缺完整安装路径闸门 | [README](../README.md) |

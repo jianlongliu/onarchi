@@ -239,7 +239,7 @@ Qt 6.12 已解钉并在真实会话验收；此前的黑 bar 报告在受控测�
 
 > 汇总索引：[docs/known-issues.md](docs/known-issues.md)。
 
-- **208 条迁移待跑**（4.6 合并后 226 条，已跑 18 条无影响的状态/no-op/launcher/skill 项）。粗分：包/硬件 134、root/系统 34、主题 10、Hyprland/uwsm 9、桌面/UI 9、其他/状态 8、agent/launcher 4。包、root、Hyprland、主题几类暂不跑；
+- **82 条迁移待跑**（4.6 合并后 226 条；已跑 28，跳过 116 条机型/Hyprland/port bar/特定 app）。剩余：包安装 59、root/系统 19、桌面/UI 3、其他 1。跳过清单在 `~/.local/state/omarchy/migrations/SKIPPED.md`；
   42 条动 Hyprland 或 uwsm。已跑 6 条面向用户的（bar 布局拆分、壁纸重编号、Fcitx 主题、Chromium
   覆盖滚动条）。其余在 `docs/upstream.md` §8.23 有分类账。
 - **niri 上 `GDK_SCALE` 的效果未验收**。上游是 `omarchy-hyprland-monitor-scaling` 设的，而那个脚本只在
