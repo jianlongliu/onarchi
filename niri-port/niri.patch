@@ -1926,10 +1926,18 @@ index f1d243d23..7eb983f5b 100644
  
        Image {
 diff --git a/shell/plugins/bar/Bar.qml b/shell/plugins/bar/Bar.qml
-index 91f713bfe..7ec4c84a2 100644
+index 91f713bfe..732d85c35 100644
 --- a/shell/plugins/bar/Bar.qml
 +++ b/shell/plugins/bar/Bar.qml
-@@ -51,6 +51,44 @@ Item {
+@@ -2,6 +2,7 @@ import Quickshell
+ import Quickshell.Hyprland
+ import Quickshell.Io
+ import Quickshell.Wayland
++import Quickshell.Wayland._BackgroundEffect
+ import QtQuick
+ import QtQuick.Effects
+ import QtQuick.Layouts
+@@ -51,6 +52,44 @@ Item {
      layout: { left: [], centerBegin: [], center: [], centerEnd: [], right: [] }
    })
    property var layoutConfig: fallbackBarConfig.layout
@@ -1974,7 +1982,7 @@ index 91f713bfe..7ec4c84a2 100644
    property bool requestedTransparent: false
    property bool useTransparentForeground: false
    property bool transparent: false
-@@ -78,6 +116,21 @@ Item {
+@@ -78,6 +117,21 @@ Item {
    readonly property color glassBackground: Qt.rgba(background.r, background.g, background.b, Math.min(background.a, 0.35))
    property color urgent: Commons.Color.bar.active
  
@@ -1996,7 +2004,7 @@ index 91f713bfe..7ec4c84a2 100644
    // A theme change cross-fades the bar's colors. Cycling the background
    // between opaque, glassy and clear jumps, text color included.
    Behavior on barForeground { enabled: root.foregroundAnimationEnabled; ColorAnimation { duration: Style.duration(250); easing.type: Easing.OutCubic } }
-@@ -733,7 +786,7 @@ Item {
+@@ -733,7 +787,7 @@ Item {
    // The physical mode Hyprland reports for a screen, as hyprctl monitors does.
    // Qt's whole-number devicePixelRatio can't rebuild it at a fractional scale.
    function panelModeFor(screen) {
@@ -2005,7 +2013,7 @@ index 91f713bfe..7ec4c84a2 100644
      return monitor ? ({
        width: monitor.width,
        height: monitor.height,
-@@ -795,6 +848,12 @@ Item {
+@@ -795,6 +849,12 @@ Item {
      // moves and whatever its settings, so a config write builds just the
      // widgets it adds (layoutWidgets).
      layoutConfig = normalizeLayout(config.layout)
@@ -2018,7 +2026,7 @@ index 91f713bfe..7ec4c84a2 100644
      barConfigSerial++
    }
  
-@@ -910,7 +969,7 @@ Item {
+@@ -910,7 +970,7 @@ Item {
    // belongs. Empty until Hyprland reports one, which leaves panel routing on
    // its per-monitor fallback rather than guessing at an output.
    function focusedScreenName() {
@@ -2027,7 +2035,7 @@ index 91f713bfe..7ec4c84a2 100644
      return monitor ? String(monitor.name || "") : ""
    }
  
-@@ -1682,8 +1741,16 @@ Item {
+@@ -1682,8 +1742,16 @@ Item {
      visible: cutoutWaitOver || !cutoutPending
      // An explicit zone instead of Auto, so it moves with the surface's
      // thickness in the same commit (settle below).
@@ -2045,7 +2053,7 @@ index 91f713bfe..7ec4c84a2 100644
  
      // sameWindow, not identity: the drag records the QsWindow interface of
      // the slot's window, which is not this PanelWindow object itself.
-@@ -1693,10 +1760,10 @@ Item {
+@@ -1693,10 +1761,10 @@ Item {
      // Parked by its whole thickness, so none of it stays on screen however
      // thick a notch floor makes it.
      margins {
@@ -2053,14 +2061,14 @@ index 91f713bfe..7ec4c84a2 100644
 -      bottom: root.barHidden && barWindow.surfaceEdge === "bottom" ? -barWindow.surfaceThickness : 0
 -      left: root.barHidden && barWindow.surfaceEdge === "left" ? -barWindow.surfaceThickness : 0
 -      right: root.barHidden && barWindow.surfaceEdge === "right" ? -barWindow.surfaceThickness : 0
-+      top: root.barHidden && barWindow.surfaceEdge === "top" ? -barWindow.surfaceCrossSize : 0
-+      bottom: root.barHidden && barWindow.surfaceEdge === "bottom" ? -barWindow.surfaceCrossSize : 0
-+      left: root.barHidden && barWindow.surfaceEdge === "left" ? -barWindow.surfaceCrossSize : 0
-+      right: root.barHidden && barWindow.surfaceEdge === "right" ? -barWindow.surfaceCrossSize : 0
++      top: root.barHidden && barWindow.surfaceEdge === "top" ? -barWindow.surfaceExtent : 0
++      bottom: root.barHidden && barWindow.surfaceEdge === "bottom" ? -barWindow.surfaceExtent : 0
++      left: root.barHidden && barWindow.surfaceEdge === "left" ? -barWindow.surfaceExtent : 0
++      right: root.barHidden && barWindow.surfaceEdge === "right" ? -barWindow.surfaceExtent : 0
      }
  
      anchors {
-@@ -1739,9 +1806,13 @@ Item {
+@@ -1739,9 +1807,17 @@ Item {
      // bar that waits for its notch floor maps at it.
      property string surfaceEdge: root.position
      property int surfaceThickness: thickness
@@ -2068,24 +2076,45 @@ index 91f713bfe..7ec4c84a2 100644
 +    // tall as the strip alone clips the strip's bottom edge and leaves an empty
 +    // band under it.
 +    readonly property int surfaceCrossSize: surfaceThickness + root.floatGap
++    // Room past the strip's inner edge for the rounded frost mask: with the
++    // surface flush to the strip, niri clipped the bottom half of each end cap.
++    readonly property int surfacePad: Math.max(2, root.effectiveCornerRadius + 2)
++    readonly property int surfaceExtent: surfaceCrossSize + surfacePad
      readonly property bool surfaceVertical: surfaceEdge === "left" || surfaceEdge === "right"
 -    implicitWidth: surfaceVertical ? surfaceThickness : 0
 -    implicitHeight: surfaceVertical ? 0 : surfaceThickness
-+    implicitWidth: surfaceVertical ? surfaceCrossSize : 0
-+    implicitHeight: surfaceVertical ? 0 : surfaceCrossSize
++    implicitWidth: surfaceVertical ? surfaceExtent : 0
++    implicitHeight: surfaceVertical ? 0 : surfaceExtent
  
      property bool presented: false
      // clearing: waiting on a clear frame before resizing. revealing: waiting
-@@ -1833,7 +1904,7 @@ Item {
+@@ -1786,6 +1862,16 @@ Item {
+ 
+     Component.onCompleted: if (!cutoutPending) cutoutWaitOver = true
+     onThicknessChanged: followLater.restart()
++    BackgroundEffect.blurRegion: Region {
++      // Aligned with the strip; niri's mask is binary, so a 1px light rim
++      // below covers the hard edge at the rounded end caps.
++      x: Math.round(barBlurAnchor.x)
++      y: Math.round(barBlurAnchor.y)
++      width: Math.max(0, Math.round(barBlurAnchor.width))
++      height: Math.max(0, Math.round(barBlurAnchor.height))
++      radius: root.effectiveCornerRadius
++    }
++
+     Connections {
+       target: root
+       function onPositionChanged() { followLater.restart() }
+@@ -1833,7 +1919,7 @@ Item {
            settleWatchdog.restart()
          } else {
            var span = barWindow.surfaceVertical ? barWindow.width : barWindow.height
 -          if (span === barWindow.surfaceThickness && barWindow.settleFrames >= 1) {
-+          if (span === barWindow.surfaceCrossSize && barWindow.settleFrames >= 1) {
++          if (span === barWindow.surfaceExtent && barWindow.settleFrames >= 1) {
              barWindow.finishSettle()
              return
            }
-@@ -1847,17 +1918,28 @@ Item {
+@@ -1847,17 +1933,28 @@ Item {
      WlrLayershell.namespace: "omarchy-bar"
      WlrLayershell.layer: WlrLayer.Top
  
@@ -2125,7 +2154,7 @@ index 91f713bfe..7ec4c84a2 100644
  
      Connections {
        target: barWindow.screen
-@@ -1867,31 +1949,89 @@ Item {
+@@ -1867,31 +1964,89 @@ Item {
        }
      }
  
@@ -2144,12 +2173,12 @@ index 91f713bfe..7ec4c84a2 100644
 +    // workspace leaves fullscreen, or the layer remaps. The invisible strip
 +    // would then take the clicks meant for the top of the fullscreen window.
 +    mask: dragActive ? null : (underFullscreen ? noInputRegion : stripInputRegion)
- 
++
 +    Region {
 +      id: stripInputRegion
 +      item: barStrip
 +    }
-+
+ 
 +    // Upstream's empty region for the fullscreen case: it takes every click and
 +    // lets none through, so the faded strip cannot swallow the pointer.
      Region {
@@ -2228,7 +2257,7 @@ index 91f713bfe..7ec4c84a2 100644
  
        Loader {
 diff --git a/shell/plugins/bar/README.md b/shell/plugins/bar/README.md
-index 41eb5f7a3..a7d0d28f1 100644
+index 41eb5f7a3..be23f7882 100644
 --- a/shell/plugins/bar/README.md
 +++ b/shell/plugins/bar/README.md
 @@ -12,6 +12,16 @@ the shell for its whole session.
@@ -2243,7 +2272,7 @@ index 41eb5f7a3..a7d0d28f1 100644
 +- The layer surface is sized `thickness + floatGap`. Sizing it to `thickness` alone clips the strip's bottom edge and leaves an empty band under it; `exclusiveZone` uses the same combined size.
 +- There is no compositor shadow on `^omarchy-bar$`. The strip's own 1px top highlight and bottom shade carry the edge; a 30px soft shadow read as an extra background band around the floating strip.
 +- Bar-widget popups (`KeyboardPanel`) and the notification deck add `bar.floatGap` to their bar-edge offset, so they clear the floating strip instead of overlapping it by the gap.
-+- The bar has no client frost region: niri's `ext_background_effect` mask cannot antialias the rounded end caps, and the stepped edge showed through the translucent fill. The fill gradient and 1px edge profile carry the bar. Widget popups still hand over an explicit `x/y/width/height` rect plus `radius`; Quickshell ignores `Region.radius` when the region is bound with `item`.
++- The bar keeps its frost. The blur region is an explicit `x/y/width/height` rect aligned with the strip, and the surface extends one corner radius past the strip's inner edge: niri's `ext_background_effect` mask is binary, so a surface flush to the strip clips the bottom half of each rounded end cap into a stepped edge. The pad gives the mask room; no border or rim is drawn. Widget popups use explicit rect + `radius` too; Quickshell ignores `Region.radius` when a region is bound with `item`.
 +
  ## Customizing
  
