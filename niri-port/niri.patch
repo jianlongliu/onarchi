@@ -1113,7 +1113,7 @@ index 8516395fd..0a43c0c0e 100644
      // the press scale here too.
      scale: root.pressScale
 diff --git a/shell/Ui/KeyboardPanel.qml b/shell/Ui/KeyboardPanel.qml
-index 3e99da1bb..3eb6f68a2 100644
+index 3e99da1bb..0727a77e3 100644
 --- a/shell/Ui/KeyboardPanel.qml
 +++ b/shell/Ui/KeyboardPanel.qml
 @@ -1,6 +1,8 @@
@@ -1137,7 +1137,7 @@ index 3e99da1bb..3eb6f68a2 100644
    property bool popoutSwitching: false
    property bool popoutSwitchClosing: false
    property bool focusPrimed: false
-@@ -141,6 +148,13 @@ PanelWindow {
+@@ -141,6 +148,19 @@ PanelWindow {
    color: "transparent"
    exclusionMode: ExclusionMode.Ignore
  
@@ -1146,12 +1146,18 @@ index 3e99da1bb..3eb6f68a2 100644
 +  // blurs just behind `card`. Every bar-widget popup (audio/bluetooth/
 +  // network/power/clock/monitor/tailscale/weather/dropbox) and the agent
 +  // panel reuse this surface, so this one attachment frosts them all.
-+  BackgroundEffect.blurRegion: Region { item: card; radius: Style.cornerRadius }
++  BackgroundEffect.blurRegion: Region {
++    x: Math.round(card.x) + 2
++    y: Math.round(card.y) + 2
++    width: Math.max(0, Math.round(card.width) - 4)
++    height: Math.max(0, Math.round(card.height) - 4)
++    radius: Math.max(0, Style.cornerRadius - 2)
++  }
 +
    WlrLayershell.namespace: "omarchy-keyboard-panel"
    WlrLayershell.layer: WlrLayer.Overlay
    // Keyboard focus follows `open` (NOT `visible`). The window remains
-@@ -176,7 +190,7 @@ PanelWindow {
+@@ -176,7 +196,7 @@ PanelWindow {
    // forwarded to registered bar buttons so switching between panel icons
    // works in one click even when the overlay surface is above the bar.
    // Yielding, only the card is: the rest reaches the windows beneath.
@@ -1160,7 +1166,7 @@ index 3e99da1bb..3eb6f68a2 100644
    mask: Region {
      item: root.yielding ? card : null
      width: root.screenW
-@@ -208,10 +222,10 @@ PanelWindow {
+@@ -208,10 +228,10 @@ PanelWindow {
    readonly property real screenW: screen ? screen.width : 0
    readonly property real screenH: screen ? screen.height : 0
    readonly property real availableCardWidth: screenW > 0
@@ -1173,7 +1179,7 @@ index 3e99da1bb..3eb6f68a2 100644
      : 0
    readonly property real verticalContentInset: padding * 2 + Border.top(borderSpec) + Border.bottom(borderSpec)
  
-@@ -259,22 +273,22 @@ PanelWindow {
+@@ -259,22 +279,22 @@ PanelWindow {
      var x = 0, y = 0
      if (centerOnBar && (barPos === "top" || barPos === "bottom")) {
        x = screenW / 2 - contentWidth / 2
@@ -1202,7 +1208,7 @@ index 3e99da1bb..3eb6f68a2 100644
      }
      x = Math.max(margin, Math.min(x, screenW - contentWidth - margin))
      y = Math.max(margin, Math.min(y, screenH - drawnHeight - margin))
-@@ -519,6 +533,90 @@ PanelWindow {
+@@ -519,6 +539,90 @@ PanelWindow {
  
    // --- card ----------------------------------------------------------------
  
@@ -1920,18 +1926,10 @@ index f1d243d23..7eb983f5b 100644
  
        Image {
 diff --git a/shell/plugins/bar/Bar.qml b/shell/plugins/bar/Bar.qml
-index 91f713bfe..b25714f95 100644
+index 91f713bfe..7ec4c84a2 100644
 --- a/shell/plugins/bar/Bar.qml
 +++ b/shell/plugins/bar/Bar.qml
-@@ -2,6 +2,7 @@ import Quickshell
- import Quickshell.Hyprland
- import Quickshell.Io
- import Quickshell.Wayland
-+import Quickshell.Wayland._BackgroundEffect
- import QtQuick
- import QtQuick.Effects
- import QtQuick.Layouts
-@@ -51,6 +52,44 @@ Item {
+@@ -51,6 +51,44 @@ Item {
      layout: { left: [], centerBegin: [], center: [], centerEnd: [], right: [] }
    })
    property var layoutConfig: fallbackBarConfig.layout
@@ -1976,7 +1974,7 @@ index 91f713bfe..b25714f95 100644
    property bool requestedTransparent: false
    property bool useTransparentForeground: false
    property bool transparent: false
-@@ -78,6 +117,21 @@ Item {
+@@ -78,6 +116,21 @@ Item {
    readonly property color glassBackground: Qt.rgba(background.r, background.g, background.b, Math.min(background.a, 0.35))
    property color urgent: Commons.Color.bar.active
  
@@ -1998,7 +1996,7 @@ index 91f713bfe..b25714f95 100644
    // A theme change cross-fades the bar's colors. Cycling the background
    // between opaque, glassy and clear jumps, text color included.
    Behavior on barForeground { enabled: root.foregroundAnimationEnabled; ColorAnimation { duration: Style.duration(250); easing.type: Easing.OutCubic } }
-@@ -733,7 +787,7 @@ Item {
+@@ -733,7 +786,7 @@ Item {
    // The physical mode Hyprland reports for a screen, as hyprctl monitors does.
    // Qt's whole-number devicePixelRatio can't rebuild it at a fractional scale.
    function panelModeFor(screen) {
@@ -2007,7 +2005,7 @@ index 91f713bfe..b25714f95 100644
      return monitor ? ({
        width: monitor.width,
        height: monitor.height,
-@@ -795,6 +849,12 @@ Item {
+@@ -795,6 +848,12 @@ Item {
      // moves and whatever its settings, so a config write builds just the
      // widgets it adds (layoutWidgets).
      layoutConfig = normalizeLayout(config.layout)
@@ -2020,7 +2018,7 @@ index 91f713bfe..b25714f95 100644
      barConfigSerial++
    }
  
-@@ -910,7 +970,7 @@ Item {
+@@ -910,7 +969,7 @@ Item {
    // belongs. Empty until Hyprland reports one, which leaves panel routing on
    // its per-monitor fallback rather than guessing at an output.
    function focusedScreenName() {
@@ -2029,7 +2027,7 @@ index 91f713bfe..b25714f95 100644
      return monitor ? String(monitor.name || "") : ""
    }
  
-@@ -1682,8 +1742,16 @@ Item {
+@@ -1682,8 +1741,16 @@ Item {
      visible: cutoutWaitOver || !cutoutPending
      // An explicit zone instead of Auto, so it moves with the surface's
      // thickness in the same commit (settle below).
@@ -2047,7 +2045,7 @@ index 91f713bfe..b25714f95 100644
  
      // sameWindow, not identity: the drag records the QsWindow interface of
      // the slot's window, which is not this PanelWindow object itself.
-@@ -1693,10 +1761,10 @@ Item {
+@@ -1693,10 +1760,10 @@ Item {
      // Parked by its whole thickness, so none of it stays on screen however
      // thick a notch floor makes it.
      margins {
@@ -2062,7 +2060,7 @@ index 91f713bfe..b25714f95 100644
      }
  
      anchors {
-@@ -1739,9 +1807,13 @@ Item {
+@@ -1739,9 +1806,13 @@ Item {
      // bar that waits for its notch floor maps at it.
      property string surfaceEdge: root.position
      property int surfaceThickness: thickness
@@ -2078,7 +2076,7 @@ index 91f713bfe..b25714f95 100644
  
      property bool presented: false
      // clearing: waiting on a clear frame before resizing. revealing: waiting
-@@ -1833,7 +1905,7 @@ Item {
+@@ -1833,7 +1904,7 @@ Item {
            settleWatchdog.restart()
          } else {
            var span = barWindow.surfaceVertical ? barWindow.width : barWindow.height
@@ -2087,7 +2085,7 @@ index 91f713bfe..b25714f95 100644
              barWindow.finishSettle()
              return
            }
-@@ -1847,16 +1919,30 @@ Item {
+@@ -1847,17 +1918,28 @@ Item {
      WlrLayershell.namespace: "omarchy-bar"
      WlrLayershell.layer: WlrLayer.Top
  
@@ -2101,6 +2099,7 @@ index 91f713bfe..b25714f95 100644
 -      return !!workspace && !!ipc && BarModel.fullscreenOn(Hyprland.toplevels.values,
 -        workspace.id, workspace.hasFullscreen, special ? special.name : null,
 -        { x: ipc.x, y: ipc.y, width: screen.width, height: screen.height })
+-    }
 +    // Whether the active workspace on this screen holds a real fullscreen
 +    // window, which fades the bar out.
 +    //
@@ -2120,15 +2119,13 @@ index 91f713bfe..b25714f95 100644
 +    // would smear its fill out through the transparent corners, hence the
 +    // radius; the 2px inset keeps the compositor's hard-edged mask inside the
 +    // fill's own antialiased silhouette.
-+    BackgroundEffect.blurRegion: Region {
-+      // Inset by 2px so the compositor's hard-edged mask lands inside the fill's
-+      // own antialiased rounded silhouette rather than outlining it.
-+      item: barBlurAnchor
-+      radius: Math.max(0, root.effectiveCornerRadius - 2)
-     }
++    // niri's ext_background_effect mask has no antialiasing; at the rounded
++    // end caps it leaves a stepped edge over the strip's translucent fill.
++    // The bar's own gradient and 1px edge profile carry it instead.
  
      Connections {
-@@ -1867,31 +1953,89 @@ Item {
+       target: barWindow.screen
+@@ -1867,31 +1949,89 @@ Item {
        }
      }
  
@@ -2231,7 +2228,7 @@ index 91f713bfe..b25714f95 100644
  
        Loader {
 diff --git a/shell/plugins/bar/README.md b/shell/plugins/bar/README.md
-index 41eb5f7a3..7f117720d 100644
+index 41eb5f7a3..a7d0d28f1 100644
 --- a/shell/plugins/bar/README.md
 +++ b/shell/plugins/bar/README.md
 @@ -12,6 +12,16 @@ the shell for its whole session.
@@ -2246,7 +2243,7 @@ index 41eb5f7a3..7f117720d 100644
 +- The layer surface is sized `thickness + floatGap`. Sizing it to `thickness` alone clips the strip's bottom edge and leaves an empty band under it; `exclusiveZone` uses the same combined size.
 +- There is no compositor shadow on `^omarchy-bar$`. The strip's own 1px top highlight and bottom shade carry the edge; a 30px soft shadow read as an extra background band around the floating strip.
 +- Bar-widget popups (`KeyboardPanel`) and the notification deck add `bar.floatGap` to their bar-edge offset, so they clear the floating strip instead of overlapping it by the gap.
-+- `BackgroundEffect.blurRegion` must use an explicit `x/y/width/height` rect plus `radius`. Quickshell ignores `Region.radius` when the region is bound with `item`, and niri then frosts the card's square bounding box.
++- The bar has no client frost region: niri's `ext_background_effect` mask cannot antialias the rounded end caps, and the stepped edge showed through the translucent fill. The fill gradient and 1px edge profile carry the bar. Widget popups still hand over an explicit `x/y/width/height` rect plus `radius`; Quickshell ignores `Region.radius` when the region is bound with `item`.
 +
  ## Customizing
  
@@ -2452,7 +2449,7 @@ index a2e7f3571..4d12c8d63 100644
  
          // A gap sets visiting workspaces apart from the monitor's own.
 diff --git a/shell/plugins/clipboard/Clipboard.qml b/shell/plugins/clipboard/Clipboard.qml
-index 3699a93d2..5c85e78e5 100644
+index 3699a93d2..7b2a535c0 100644
 --- a/shell/plugins/clipboard/Clipboard.qml
 +++ b/shell/plugins/clipboard/Clipboard.qml
 @@ -1,6 +1,7 @@
@@ -2463,7 +2460,7 @@ index 3699a93d2..5c85e78e5 100644
  import QtQuick
  import qs.Commons
  import qs.Commons as Commons
-@@ -399,6 +400,15 @@ Item {
+@@ -399,6 +400,18 @@ Item {
      shown: root.opened
      WlrLayershell.namespace: "omarchy-clipboard"
  
@@ -2472,7 +2469,10 @@ index 3699a93d2..5c85e78e5 100644
 +    // card's own rounded rect so effects.kdl's `xray false` frosts only behind
 +    // the card instead of the whole display.
 +    BackgroundEffect.blurRegion: Region {
-+      item: card
++      x: Math.round(card.x) + 2
++      y: Math.round(card.y) + 2
++      width: Math.max(0, Math.round(card.width) - 4)
++      height: Math.max(0, Math.round(card.height) - 4)
 +      radius: Math.max(0, root.cornerRadius - 2)
 +    }
 +
@@ -2480,7 +2480,7 @@ index 3699a93d2..5c85e78e5 100644
        anchors.fill: parent
        color: root.scrim
 diff --git a/shell/plugins/dock/AppGrid.qml b/shell/plugins/dock/AppGrid.qml
-index c81ac8ae1..063dbdfa3 100644
+index c81ac8ae1..8e00c4f59 100644
 --- a/shell/plugins/dock/AppGrid.qml
 +++ b/shell/plugins/dock/AppGrid.qml
 @@ -1,6 +1,7 @@
@@ -2491,7 +2491,7 @@ index c81ac8ae1..063dbdfa3 100644
  import qs.Commons
  import qs.Commons as Commons
  import qs.Ui
-@@ -193,6 +194,16 @@ Item {
+@@ -193,6 +194,19 @@ Item {
      id: panel
      shown: root.opened
      WlrLayershell.namespace: "omarchy-dock-apps"
@@ -2502,13 +2502,16 @@ index c81ac8ae1..063dbdfa3 100644
 +    // without this the card is a plain translucent fill and whatever is behind
 +    // it reads straight through, unimpeded and unblurred.
 +    BackgroundEffect.blurRegion: Region {
-+      item: appGridBlurAnchor
++      x: Math.round(appGridBlurAnchor.x) + 2
++      y: Math.round(appGridBlurAnchor.y) + 2
++      width: Math.max(0, Math.round(appGridBlurAnchor.width) - 4)
++      height: Math.max(0, Math.round(appGridBlurAnchor.height) - 4)
 +      radius: Math.max(0, Style.cornerRadius - 2)
 +    }
      Rectangle {
        anchors.fill: parent
        color: Commons.Color.menu.scrim
-@@ -213,6 +224,17 @@ Item {
+@@ -213,6 +227,17 @@ Item {
        }
      }
  
@@ -2679,7 +2682,7 @@ index 185a9fc67..85f344fd3 100644
    }
  }
 diff --git a/shell/plugins/notifications/Service.qml b/shell/plugins/notifications/Service.qml
-index f5476b5b6..908a5b577 100644
+index f5476b5b6..3110e4d5a 100644
 --- a/shell/plugins/notifications/Service.qml
 +++ b/shell/plugins/notifications/Service.qml
 @@ -8,6 +8,7 @@ import QtQuick
@@ -2750,7 +2753,7 @@ index f5476b5b6..908a5b577 100644
    }
  
    // A click: Omarchy's own --exec command first, then the sender's default
-@@ -1531,11 +1538,26 @@ Item {
+@@ -1531,11 +1538,32 @@ Item {
        readonly property var margins: service.marginsFor(String(modelData.name))
        readonly property bool stepAside: service.fullscreenOn(String(modelData.name))
        readonly property bool hasSomethingToShow: showingNotifications && toasts.count > 0
@@ -2773,7 +2776,13 @@ index f5476b5b6..908a5b577 100644
 +      // the full screen height, so a plain `blur true` frosts a band down the
 +      // whole right edge. Hand over the deck's own rect instead; the layer-rule
 +      // in effects.kdl sets only `xray`, leaving that region the sole blur area.
-+      BackgroundEffect.blurRegion: Region { item: deck; radius: Style.cornerRadius }
++      BackgroundEffect.blurRegion: Region {
++        x: Math.round(clipper.x + deck.x) + 2
++        y: Math.round(clipper.y + deck.y) + 2
++        width: Math.max(0, Math.round(deck.width) - 4)
++        height: Math.max(0, Math.round(deck.height) - 4)
++        radius: Math.max(0, Style.cornerRadius - 2)
++      }
 +
        readonly property bool takesKeyboard: service.keyboardMode && service.targetDisplayName === String(modelData.name)
        WlrLayershell.keyboardFocus: takesKeyboard ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
