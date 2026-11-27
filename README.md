@@ -220,8 +220,8 @@ The port currently tracks upstream `quattro` at **`2ebf5971a`** (2026-11-27, the
 `quattro` itself, not a separate release branch. The current `niri.patch` has
 **52 files / 150 hunks / 3477 lines**, md5
 `7c0c8c821196f117803abf3232d89f1c` (untracked overlay files are separate). This
-sync updated the running tree and the overlay patch; the repository's vendored
-`bin/`/`shell/` source snapshot remains at `bc220e70` until the next full source sync.
+sync updated the running tree, the overlay patch, and the vendored `bin/`/`shell/`
+source snapshot; the snapshot is now `2ebf5971a` as well.
 
 Upstream still has **no niri support** at `2ebf5971a`; Hyprland coupling remains, and everything
 below exists because of that.

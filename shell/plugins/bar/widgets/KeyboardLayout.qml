@@ -133,6 +133,11 @@ BarWidget {
   Process {
     id: queryProc
     command: ["hyprctl", "-j", "devices"]
+    // niri port: the shim answers this from `niri msg`, so a stale
+    // NIRI_SOCKET inherited from before the compositor restarted yields an
+    // empty device list and the bar shows no layout. Niri.qml already probes
+    // for the live socket; use it.
+    environment: Niri.socketEnvironment
     onRunningChanged: {
       if (running) {
         stallTimer.restart()

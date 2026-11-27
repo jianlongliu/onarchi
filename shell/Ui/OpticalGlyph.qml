@@ -13,21 +13,29 @@ Item {
   property bool debugBounds: false
 
   readonly property int renderedFontSize: Math.max(1, Math.round(fontSize))
-  readonly property real tightWidth: Math.max(1, glyphMetrics.tightBoundingRect.width)
-  readonly property real tightHeight: Math.max(1, glyphMetrics.tightBoundingRect.height)
+  // Tight bounds come back in whole pixels, which at bar sizes adds up to a
+  // pixel of ink that isn't there and shifts the glyph's center. Measuring a
+  // hundred times larger keeps them to the outline.
+  readonly property int metricsScale: 100
+  readonly property rect ink: Qt.rect(glyphMetrics.tightBoundingRect.x / metricsScale,
+    glyphMetrics.tightBoundingRect.y / metricsScale,
+    glyphMetrics.tightBoundingRect.width / metricsScale,
+    glyphMetrics.tightBoundingRect.height / metricsScale)
+  readonly property real tightWidth: Math.max(1, root.ink.width)
+  readonly property real tightHeight: Math.max(1, root.ink.height)
   readonly property real paintedScale: paintedSize > 0
     ? Math.min(paintedSize, width, height) / Math.max(tightWidth, tightHeight)
     : 1
   readonly property real paintedWidth: tightWidth * paintedScale
   readonly property real paintedHeight: tightHeight * paintedScale
-  readonly property real horizontalCorrection: glyph.implicitWidth / 2 - (glyphMetrics.tightBoundingRect.x + tightWidth / 2)
+  readonly property real horizontalCorrection: glyph.implicitWidth / 2 - (root.ink.x + tightWidth / 2)
   // The ink centre, in this item's coordinates, *after* the rotation above has
   // been applied. Callers (BarIconButton) use these to line the glyph up on the
   // bar; reporting the unrotated point made a rotated glyph (the pocket's mark
   // turns 90 degrees when it opens) read as off-centre by the offset between
   // the two.
-  readonly property real _inkCenterX: glyph.x + (glyphMetrics.tightBoundingRect.x + tightWidth / 2) * paintedScale
-  readonly property real _inkCenterY: glyph.y + (glyph.baselineOffset + glyphMetrics.tightBoundingRect.y + tightHeight / 2) * paintedScale
+  readonly property real _inkCenterX: glyph.x + (root.ink.x + tightWidth / 2) * paintedScale
+  readonly property real _inkCenterY: glyph.y + (glyph.baselineOffset + root.ink.y + tightHeight / 2) * paintedScale
   readonly property real _rotationRadians: root.rotation * Math.PI / 180
   readonly property real paintedCenterX: {
     if (root.rotation === 0) return _inkCenterX
@@ -50,7 +58,7 @@ Item {
   TextMetrics {
     id: glyphMetrics
     font.family: root.fontFamily
-    font.pixelSize: root.renderedFontSize
+    font.pixelSize: root.renderedFontSize * root.metricsScale
     text: root.text
   }
 
@@ -58,9 +66,9 @@ Item {
     id: glyph
     textFormat: Text.PlainText
     // Bar icons fit their painted bounds. Text labels retain their line box.
-    x: root.width / 2 - (glyphMetrics.tightBoundingRect.x + root.tightWidth / 2) * root.paintedScale
+    x: root.width / 2 - (root.ink.x + root.tightWidth / 2) * root.paintedScale
     y: root.paintedSize > 0
-      ? root.height / 2 - (baselineOffset + glyphMetrics.tightBoundingRect.y + root.tightHeight / 2) * root.paintedScale
+      ? root.height / 2 - (baselineOffset + root.ink.y + root.tightHeight / 2) * root.paintedScale
       : Math.round((root.height - height) / 2)
     text: root.text
     color: root.color
@@ -68,7 +76,10 @@ Item {
     font.pixelSize: root.renderedFontSize
     transformOrigin: Item.TopLeft
     scale: root.paintedScale
-    renderType: root.paintedSize > 0 ? Text.CurveRendering : Text.NativeRendering
+    // Scaled icons use distance fields: at bar sizes the curve renderer's
+    // antialiasing overshoots where a corner meets a straight edge, so the
+    // flat top of a rounded square steps up at its ends.
+    renderType: root.paintedSize > 0 ? Text.QtRendering : Text.NativeRendering
   }
 
   Rectangle {

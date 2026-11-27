@@ -15,23 +15,18 @@
 # against a half-written tree, and that failed reload leaves a second engine
 # generation behind that turns the next restart's IPC kill into a crash.
 #
-# Its crash handler is off for the same reason, and that is the one that has
-# actually bitten: a segfault in a text field made the handler re-exec an engine
-# of its own while this supervisor relaunched the dead one, so two engines ran
-# at once. They fought over the shell's singletons, and both tried to take the
-# session lock the dead shell had left behind -- a second lock surface for one
-# output is a fatal protocol error in the compositor, so the survivor died
-# holding the lock, and the session was left with the theme background over a
-# stranded lock: a solid red screen until the machine was rebooted. One restart
-# authority, and it is this script.
+# Quickshell's crash handler is off too. It opens a report dialog that takes
+# focus after every crash, after the shell is already back, so a key typed at
+# that moment lands on "Open report page". The relaunch below covers what the
+# handler did, and systemd-coredump with omarchy-crash-watch reports the crash.
 #
 # 9>&- keeps the engine out of the supervisor's lock file: a shell holding that
 # descriptor would look like a live supervisor to the next launcher.
 run_shell() {
   local startup_background
   startup_background=$(readlink -f "$HOME/.local/state/omarchy/current/background" 2>/dev/null)
-  OMARCHY_STARTUP_BACKGROUND="$startup_background" QS_DISABLE_FILE_WATCHER=1 QS_NO_RELOAD_POPUP=1 \
-    QS_DISABLE_CRASH_HANDLER=1 \
+  OMARCHY_STARTUP_BACKGROUND="$startup_background" \
+    QS_DISABLE_FILE_WATCHER=1 QS_NO_RELOAD_POPUP=1 QS_DISABLE_CRASH_HANDLER=1 \
     systemd-cat -t omarchy-shell -- quickshell -n -p "$OMARCHY_PATH/shell" 9>&- &
   shell_pid=$!
 
@@ -61,6 +56,12 @@ compositor_alive() {
   return 1
 }
 
+# With its crash handler off, a shell that dies of a signal stays dead, and Qt
+# leaves through _exit() when the Wayland connection fails, raising no signal at
+# all: either way no bar. Supervise those deaths. A clean exit is a deliberate stop
+# (omarchy-restart-shell starts its own replacement); a signal here means the
+# session is going, and has to reach the shell the launcher used to exec.
+#
 # Is the config's single instance slot taken? Quickshell refuses a second engine
 # for one config ("An instance of this configuration is already running."), and
 # that refusal is a clean exit, indistinguishable below from a deliberate stop --
@@ -87,12 +88,6 @@ wait_for_slot() {
   return 0
 }
 
-# Qt leaves through _exit() when the Wayland connection fails, raising no signal:
-# no crash report, no relaunch, no bar. Supervise those deaths. A signal here
-# means the session is going, and has to reach the shell the launcher used to
-# exec; a clean exit is a deliberate stop (omarchy-restart-shell starts its own
-# replacement), and the loop below is left to tell one from an instance this
-# supervisor does not own.
 terminating=0
 shell_pid=""
 

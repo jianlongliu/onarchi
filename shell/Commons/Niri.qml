@@ -84,6 +84,33 @@ QtObject {
         return root.focusedMonitor
     }
 
+    // Whether the active workspace on this screen holds a real fullscreen
+    // window. `niri msg windows` reports no fullscreen flag, so this compares
+    // each window's tile against the output's logical size: a fullscreen window
+    // tiles to exactly that, while a tiled or maximized one stays smaller
+    // (measured on niri 26.04 - 1600x1000 fullscreen against 1584x936 tiled on
+    // a 3200x2000 output at scale 2.0). Windows whose height matches but whose
+    // width does not are a scrolling column, not a fullscreen window.
+    function fullscreenOn(screen) {
+        var monitor = root.monitorFor(screen)
+        if (!monitor) return false
+        var workspace = monitor.activeWorkspace
+        if (!workspace) return false
+        var mode = monitor.lastIpcObject
+        var scale = mode && mode.scale > 0 ? mode.scale : 1
+        var width = mode && mode.width > 0 ? mode.width / scale : monitor.width
+        var height = mode && mode.height > 0 ? mode.height / scale : monitor.height
+        if (!(width > 0) || !(height > 0)) return false
+        var list = root.toplevels && root.toplevels.values ? root.toplevels.values : []
+        for (var i = 0; i < list.length; i++) {
+            var tile = list[i].tileSize
+            if (!tile) continue
+            if (!list[i].workspace || list[i].workspace.id !== workspace.niriId) continue
+            if (Math.abs(tile.width - width) < 1 && Math.abs(tile.height - height) < 1) return true
+        }
+        return false
+    }
+
     // A dispatcher call, in whichever spelling the caller used. The Lua forms
     // are rewritten to `hyprctl dispatch …` payloads for the PATH shim, which
     // already knows how to turn those into `niri msg action …`; the legacy
@@ -174,12 +201,18 @@ QtObject {
                 byId[wid] = (byId[wid] || 0) + 1
                 if (!byWorkspace[wid]) byWorkspace[wid] = []
                 byWorkspace[wid].push(wins[i])
+                var layout = wins[i].layout || {}
+                var tile = layout.tile_size
                 list.push({
                     "address": String(wins[i].id),
                     "title": wins[i].title || "",
                     "class": (wins[i].app_id || ""),
                     "workspace": { "id": wins[i].workspace_id },
-                    "activated": !!wins[i].is_focused
+                    "activated": !!wins[i].is_focused,
+                    // niri has no fullscreen flag on its windows; a fullscreen
+                    // window's tile is exactly the output's logical size, so the
+                    // geometry is what fullscreenOn() compares.
+                    "tileSize": tile ? { "width": tile[0], "height": tile[1] } : null
                 })
             }
         } catch (e) {}
@@ -337,6 +370,9 @@ QtObject {
     property string _socketPath: ""
     readonly property bool ready: root._socketPath.length > 0
     readonly property var _niriEnv: ({ "NIRI_SOCKET": root._socketPath })
+    // Same map, under a name other files may read: anything spawning `niri msg`
+    // or the hyprctl shim must override a stale NIRI_SOCKET it inherited.
+    readonly property var socketEnvironment: root._niriEnv
 
     property Process wsProcess: Process {
         id: wsProcess

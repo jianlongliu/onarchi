@@ -14,7 +14,6 @@ set -euo pipefail
 source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/base-test.sh"
 
 require_quickshell "shell startup budget"
-require_hyprland_layers "shell startup budget"
 require_comparable_speed "shell startup budget"
 
 BUDGET_MS=$(( ${OMARCHY_BAR_STARTUP_BUDGET_MS:-750} * SPEED_PERCENT / 100 ))
@@ -86,6 +85,7 @@ for _ in 1 2 3; do
   if [[ -z $best ]] || (( elapsed < best )); then
     best=$elapsed
   fi
+  (( best <= BUDGET_MS )) && break
 done
 
 (( best <= BUDGET_MS )) || fail "login reaches a drawn bar within ${BUDGET_MS}ms" "Fastest of three cold logins took ${best}ms."

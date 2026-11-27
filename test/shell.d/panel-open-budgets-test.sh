@@ -11,7 +11,6 @@ set -euo pipefail
 source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/base-test.sh"
 
 require_quickshell "panel open budgets"
-require_hyprland_layers "panel open budgets"
 require_comparable_speed "panel open budgets"
 
 FIRST_BUDGET_MS=$(( ${OMARCHY_PANEL_FIRST_OPEN_BUDGET_MS:-400} * SPEED_PERCENT / 100 ))
@@ -75,6 +74,7 @@ for panel in "${panels[@]}"; do
     elapsed=$(open_ms "$panel") || { sed -n '1,120p' "$SCRATCH_LOG" >&2; fail "panel $panel reopen maps its surface"; }
     close_panel "$panel" || fail "panel $panel closes after reopen"
     if [[ -z $reopen ]] || (( elapsed < reopen )); then reopen=$elapsed; fi
+    (( reopen <= REOPEN_BUDGET_MS )) && break
   done
   (( first <= FIRST_BUDGET_MS )) || fail "panel $panel first open within ${FIRST_BUDGET_MS}ms" "First open took ${first}ms."
   (( reopen <= REOPEN_BUDGET_MS )) || fail "panel $panel reopen within ${REOPEN_BUDGET_MS}ms" "Fastest reopen took ${reopen}ms."

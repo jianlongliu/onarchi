@@ -15,7 +15,6 @@ Panel {
   // permits — needed for the togglePercentage method below.
   manageIpc: false
   property var batteryInfo: ({})
-  property var systemInfo: ({})
   property var profiles: []
   property string activeProfile: ""
   property int profileIndex: 0
@@ -28,6 +27,8 @@ Panel {
   // Which picker the keyboard cursor sits in: 0 = power profile, 1 = charge limit.
   property int focusSection: 0
   property bool cursorActive: false
+  readonly property var batteryService: bar && bar.shell && typeof bar.shell.firstPartyServiceFor === "function"
+    ? bar.shell.firstPartyServiceFor("omarchy.battery") : null
   readonly property bool showPercentage: setting("showPercentage", false) === true
   // With the percentage shown the button paints a text block wider than an
   // icon, so the open-panel mark takes the painted width instead of the
@@ -67,12 +68,12 @@ Panel {
 
   function batteryIcon() {
     var device = UPower.displayDevice
-    return Model.batteryIcon(device, root.discharging, upowerStates())
+    return Model.batteryIcon(device, root.discharging, upowerStates(), root.chargeRateFresh)
   }
 
   function modeLabel() {
     var device = UPower.displayDevice
-    return Model.modeLabel(device, root.discharging, upowerStates(), Commons.I18n.t)
+    return Model.modeLabel(device, root.discharging, upowerStates(), Commons.I18n.t, root.chargeRateFresh)
   }
 
   function profileIcon(name) {
@@ -101,9 +102,23 @@ Panel {
     var device = UPower.displayDevice
     return !!(device && device.isPresent && UPower.onBattery)
   }
+  // False from the moment external power arrives until the battery has had
+  // time to report a charge rate measured with it. Some batteries refresh
+  // the rate only every half minute, and until then it reads 0 W.
+  property bool chargeRateFresh: true
+  onDischargingChanged: {
+    chargeRateFresh = discharging
+    if (discharging) chargeRateSettle.stop()
+    else chargeRateSettle.restart()
+  }
+  Timer {
+    id: chargeRateSettle
+    interval: 90000
+    onTriggered: root.chargeRateFresh = true
+  }
   readonly property bool chargeThresholdActive: {
     var device = UPower.displayDevice
-    return Model.chargeThresholdActive(device, root.discharging, upowerStates())
+    return Model.chargeThresholdActive(device, root.discharging, upowerStates(), root.chargeRateFresh)
   }
   readonly property bool batteryFull: fullyCharged || (!root.discharging && batteryFraction >= 1)
   readonly property bool batteryFlowIdle: batteryFull || chargeThresholdActive
@@ -170,21 +185,42 @@ Panel {
     return modeLabel()
   }
 
+  function profileName(profile) {
+    switch (profile) {
+      case PowerProfile.PowerSaver: return "power-saver"
+      case PowerProfile.Performance: return "performance"
+      default: return "balanced"
+    }
+  }
+
+  property string deferredProfile: ""
+
+  function syncActiveProfile(name, force) {
+    if (!name) return
+    if (!force && actionProc.running) {
+      deferredProfile = name
+      return
+    }
+    activeProfile = name
+    if (opened && !cursorActive) {
+      var idx = profiles.indexOf(activeProfile)
+      if (idx >= 0) profileIndex = idx
+    }
+  }
+
   function refresh() {
     if (!batteryPresent) return
 
     if (!batteryProc.running) batteryProc.running = true
-    if (!profilesProc.running) profilesProc.running = true
-    if (!systemProc.running) systemProc.running = true
+    if (profiles.length === 0 && !profilesProc.running) profilesProc.running = true
   }
 
-  function updateKeyValue(raw, targetName) {
+  function updateBatteryInfo(raw) {
     var next = Model.parseKeyValue(raw)
     // Keep last known good data if a refresh briefly returns nothing — happens
     // around AC plug/unplug events. Avoids the section collapsing mid-transition.
     if (Object.keys(next).length === 0) return
-    if (targetName === "battery") batteryInfo = next
-    else systemInfo = next
+    batteryInfo = next
   }
 
   function updateProfiles(raw) {
@@ -203,6 +239,12 @@ Panel {
 
   function setProfile(profile) {
     if (!profile || actionProc.running) return
+    // Reflect the chosen profile immediately; on failure or daemon change, the
+    // exit/reactive handlers reconcile back to the true active profile.
+    deferredProfile = ""
+    activeProfile = profile
+    var idx = profiles.indexOf(profile)
+    if (idx >= 0) profileIndex = idx
     actionProc.command = ["omarchy-powerprofiles-set", root.discharging ? "battery" : "ac", profile]
     actionProc.running = true
   }
@@ -245,6 +287,8 @@ Panel {
         return
       }
 
+      if (batteryService && batteryService.activePowerProfile)
+        syncActiveProfile(batteryService.activePowerProfile)
       refresh()
       var idx = profiles.indexOf(activeProfile)
       profileIndex = idx >= 0 ? idx : 0
@@ -262,10 +306,22 @@ Panel {
   implicitWidth: batteryPresent ? button.implicitWidth : 0
   implicitHeight: batteryPresent ? button.implicitHeight : 0
 
+  Connections {
+    target: PowerProfiles
+    function onProfileChanged() { root.syncActiveProfile(root.profileName(PowerProfiles.profile)) }
+  }
+
+  Connections {
+    target: root.batteryService
+    function onActivePowerProfileChanged() {
+      if (root.batteryService) root.syncActiveProfile(root.batteryService.activePowerProfile)
+    }
+  }
+
   Process {
     id: batteryProc
     command: ["omarchy-battery-status", "--shell"]
-    stdout: StdioCollector { waitForEnd: true; onStreamFinished: root.updateKeyValue(text, "battery") }
+    stdout: StdioCollector { waitForEnd: true; onStreamFinished: root.updateBatteryInfo(text) }
   }
 
   Process {
@@ -275,15 +331,20 @@ Panel {
   }
 
   Process {
-    id: systemProc
-    command: ["omarchy-system-stats"]
-    stdout: StdioCollector { waitForEnd: true; onStreamFinished: root.updateKeyValue(text, "system") }
-  }
-
-  Process {
     id: actionProc
-    onExited: {
+    onExited: function(exitCode) {
       root.chargePendingIndex = -1
+      var deferred = root.deferredProfile
+      root.deferredProfile = ""
+      if (exitCode !== 0) {
+        if (root.batteryService && root.batteryService.activePowerProfile)
+          root.syncActiveProfile(root.batteryService.activePowerProfile, true)
+        if (!profilesProc.running) profilesProc.running = true
+      } else {
+        if (deferred !== "") root.syncActiveProfile(deferred, true)
+        if (root.batteryService) root.batteryService.refreshPowerProfile()
+        else if (!profilesProc.running) profilesProc.running = true
+      }
       root.refresh()
     }
   }
@@ -446,7 +507,8 @@ Panel {
           Text {
             id: heroPercent
             textFormat: Text.PlainText
-            text: root.reading(root.batteryInfo.percentage) || "—"
+            text: root.reading(root.batteryInfo.percentage)
+              || (root.batteryPresent ? Commons.I18n.formatNumber(Math.round(root.batteryFraction * 100)) + "%" : "—")
             color: root.bar.foreground
             font.family: root.bar.fontFamily
             font.pixelSize: Style.font.displayLarge

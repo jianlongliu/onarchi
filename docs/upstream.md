@@ -1,6 +1,6 @@
 # 上游跟进 — Omarchy on niri 卷（upstream）
 
-> **2026-11-27 当前状态与勘误**：运行树已 FF 到 `4.6.0-rc1` 线（`2ebf5971a`）；仓库源码快照仍停在 `bc220e70`，`omarchy-migrate --pending` 有 208 条（已跑 18 条无影响项），见 [已知问题](known-issues.md)。本卷下方保留各阶段历史快照，不应把旧记录当作当前验收结果。
+> **2026-11-27 当前状态与勘误**：运行树已 FF 到 `4.6.0-rc1` 线（`2ebf5971a`）；仓库源码快照已同步到 `2ebf5971a`，`omarchy-migrate --pending` 有 208 条（已跑 18 条无影响项），见 [已知问题](known-issues.md)。本卷下方保留各阶段历史快照，不应把旧记录当作当前验收结果。
 
 > 文档只有一份：本文件（`docs/upstream.md`）。
 > 本卷 2026-09-20 从 `docs/omarchy-on-niri-port.md` 抽出（模块化拆分），**编号一律沿用原号** ——
@@ -856,4 +856,12 @@ modeline** 提供，不在 niri 的模式列表里，所以新面板看不到。
 
 **迁移盘点（2026-11-27）**：合并后 pending 226；已跑 18 条无影响项（状态清理/ no-op / agent launcher / skill 链接），剩 **208**。按脚本内容粗分：包/硬件 134、root/系统 34、主题 10、Hyprland/uwsm 9、桌面/UI 9、其他/状态 8、agent/launcher 4。包、root、Hyprland、主题几类未跑，需要逐条决定。
 
-**本轮边界**：与 §8.27 相同——只同步运行树、覆盖层与文档；仓库 vendored 源码快照仍停在 `bc220e70`，未跑剩余的 208 条 migration（合并后 226，已跑 18 条无影响项）。
+**本轮边界**：运行树、覆盖层、文档与 vendored 源码快照均已到 `2ebf5971a`；未跑剩余的 208 条 migration（合并后 226，已跑 18 条无影响项）。
+
+---
+
+### 8.29 Vendored 源码快照同步到 `2ebf5971a`（2026-11-27）
+
+**范围**：以运行树为源覆盖 `bin/`、`shell/`、`default/`、`config/`、`etc/`、`install/`、`applications/`、`manual/`、`migrations/`、`test/`；`themes/` 取上游 `HEAD` 的全量 23 套，不把本机“只留 catppuccin”的删除状态带进仓库。保留仓库专有的 `default/systemd/user/omarchy-picker-warmup.service`、`omarchy-clamshell-watch.service`、`etc/polkit-1/rules.d/49-{paru,tlp}.rules`，以及 `niri-*`、`port-bin/`、`docs/`、`plans/`、`scripts/`、`split-*`、`local-config/`、`hooks/`、`plugins/` 与 README。`agents/` 是本仓库的项目指南，不是 vendored 源码，未参与同步。
+
+**结果**：源码快照从 `bc220e70` 换到 `2ebf5971a`；`git diff --stat` 为 3379 文件 / +152749 −104067，另有 526 个新增文件（含 4.6 新脚本、主题、测试与移植层文件）。`niri.patch` 不变，仍为 52 文件 / 150 hunk / 3477 行；`omarchy-migrate --pending` 仍 208 条。

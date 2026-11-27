@@ -12,7 +12,6 @@ set -euo pipefail
 source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/base-test.sh"
 
 require_quickshell "menu open budget"
-require_hyprland_layers "menu open budget"
 require_comparable_speed "menu open budget"
 
 BUDGET_MS=$(( ${OMARCHY_MENU_OPEN_BUDGET_MS:-150} * SPEED_PERCENT / 100 ))
@@ -51,6 +50,7 @@ for _ in 1 2 3; do
   if [[ -z $best ]] || (( elapsed < best )); then
     best=$elapsed
   fi
+  (( best <= BUDGET_MS )) && break
 done
 
 (( best <= BUDGET_MS )) || fail "menu opens within ${BUDGET_MS}ms" "Fastest of three opens took ${best}ms."

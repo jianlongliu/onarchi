@@ -72,9 +72,29 @@ PanelWindow {
   property bool centerOnBar: false
   property bool open: false
   property int gap: Style.gapsOut  // distance between bar edge and panel
+  // The bar floats off the screen edge by `floatGap`; a panel hangs from the
+  // strip's inner edge, so every perpendicular offset has to clear that gap
+  // too. Third-party bars without the property keep the flush behaviour.
+  readonly property real barEdgeMargin: bar && bar.floatGap !== undefined
+    ? Math.max(0, Number(bar.floatGap) || 0) : 0
   property bool popoutSwitching: false
   property bool popoutSwitchClosing: false
   property bool focusPrimed: false
+
+  // A panel waiting on something that may open a window of its own, such as
+  // a password manager asking to approve a key: the panel stays on show but
+  // steps aside, so that window can take the keyboard and the pointer. Only
+  // the card takes clicks, a click elsewhere doesn't close the panel, and
+  // the keyboard comes back to the panel when it stops waiting.
+  property bool yielding: false
+  onYieldingChanged: {
+    if (yielding || !open) return
+    focusPrimed = false
+    beginFocusPrime()
+    if (focusTarget) Qt.callLater(function() {
+      if (root.open && !root.yielding && root.focusTarget) root.focusTarget.forceActiveFocus()
+    })
+  }
 
   // Item that should take keyboard focus once the panel maps. Typically a
   // PanelKeyCatcher inside the panel content. Layer-shell grants focus to the
@@ -148,7 +168,7 @@ PanelWindow {
   // focus when the previously focused application has constrained the pointer.
   // The brief prime covers both cases; OnDemand then releases compositor-wide
   // pointer hit-testing so clicks can reach the dismissal windows below.
-  WlrLayershell.keyboardFocus: open
+  WlrLayershell.keyboardFocus: open && !yielding
     ? (focusPrimed ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.Exclusive)
     : WlrKeyboardFocus.None
 
@@ -169,8 +189,10 @@ PanelWindow {
   // Clickable region is the whole screen. Clicks in the bar strip are
   // forwarded to registered bar buttons so switching between panel icons
   // works in one click even when the overlay surface is above the bar.
-  readonly property real _barStripSize: bar ? barThickness + gap : 0
+  // Yielding, only the card is: the rest reaches the windows beneath.
+  readonly property real _barStripSize: bar ? barEdgeMargin + barThickness + gap : 0
   mask: Region {
+    item: root.yielding ? card : null
     width: root.screenW
     height: root.screenH
   }
@@ -200,10 +222,10 @@ PanelWindow {
   readonly property real screenW: screen ? screen.width : 0
   readonly property real screenH: screen ? screen.height : 0
   readonly property real availableCardWidth: screenW > 0
-    ? Math.max(120, screenW - ((barPos === "left" || barPos === "right") ? barThickness + gap + margin : margin * 2))
+    ? Math.max(120, screenW - ((barPos === "left" || barPos === "right") ? barEdgeMargin + barThickness + gap + margin : margin * 2))
     : 0
   readonly property real availableCardHeight: screenH > 0
-    ? Math.max(120, screenH - ((barPos === "top" || barPos === "bottom") ? barThickness + gap + margin : margin * 2))
+    ? Math.max(120, screenH - ((barPos === "top" || barPos === "bottom") ? barEdgeMargin + barThickness + gap + margin : margin * 2))
     : 0
   readonly property real verticalContentInset: padding * 2 + Border.top(borderSpec) + Border.bottom(borderSpec)
 
@@ -232,9 +254,9 @@ PanelWindow {
   // directly — not the anchor item's y/x — because mapToItem(barContent)
   // returns coordinates in the bar's content space, which can be offset
   // from the strip's screen-anchored corner by internal layout (centering
-  // wrappers, padding). The bar window spans its whole screen, so its
-  // dimensions say nothing about the strip; the painted strip hugs the
-  // bar's anchored screen edge at the bar's thickness for this screen
+  // wrappers, padding). The bar window's size trails the strip while it
+  // settles into a new edge or thickness; the strip itself hugs the bar's
+  // anchored screen edge at the bar's thickness for this screen
   // (notch floor included), so `barThickness` gives the strip's inner edge
   // regardless of how the bar's internal widgets are positioned. For the
   // parallel axis (along the bar) the anchor item's reported position is
@@ -251,22 +273,22 @@ PanelWindow {
     var x = 0, y = 0
     if (centerOnBar && (barPos === "top" || barPos === "bottom")) {
       x = screenW / 2 - contentWidth / 2
-      y = barPos === "bottom" ? screenH - barThickness - drawnHeight - gap : barThickness + gap
+      y = barPos === "bottom" ? screenH - barEdgeMargin - barThickness - drawnHeight - gap : barEdgeMargin + barThickness + gap
     } else if (centerOnBar) {
-      x = barPos === "left" ? barThickness + gap : screenW - barThickness - contentWidth - gap
+      x = barPos === "left" ? barEdgeMargin + barThickness + gap : screenW - barEdgeMargin - barThickness - contentWidth - gap
       y = screenH / 2 - drawnHeight / 2
     } else if (barPos === "bottom") {
       x = anchorScreenPos.x + anchorW / 2 - contentWidth / 2
-      y = screenH - barThickness - drawnHeight - gap
+      y = screenH - barEdgeMargin - barThickness - drawnHeight - gap
     } else if (barPos === "left") {
-      x = barThickness + gap
+      x = barEdgeMargin + barThickness + gap
       y = anchorScreenPos.y + anchorH / 2 - drawnHeight / 2
     } else if (barPos === "right") {
-      x = screenW - barThickness - contentWidth - gap
+      x = screenW - barEdgeMargin - barThickness - contentWidth - gap
       y = anchorScreenPos.y + anchorH / 2 - drawnHeight / 2
     } else { // "top" (default)
       x = anchorScreenPos.x + anchorW / 2 - contentWidth / 2
-      y = barThickness + gap
+      y = barEdgeMargin + barThickness + gap
     }
     x = Math.max(margin, Math.min(x, screenW - contentWidth - margin))
     y = Math.max(margin, Math.min(y, screenH - drawnHeight - margin))
@@ -476,7 +498,7 @@ PanelWindow {
   // Keyboard focus is None: these must catch the pointer without taking focus
   // from the panel when the cursor merely crosses onto their output.
   Variants {
-    model: root.open ? Quickshell.screens : []
+    model: root.open && !root.yielding ? Quickshell.screens : []
 
     delegate: Component {
       PanelWindow {

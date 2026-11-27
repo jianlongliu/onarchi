@@ -84,15 +84,18 @@ function barThickness(bar, screenName, defaultBarSize) {
 }
 
 // The deck hangs from the top-right corner, so it clears the bar only on the
-// two edges it touches.
-function deckMargins(barPosition, thickness, gap) {
+// two edges it touches. `barMargin` is how far the bar itself floats off the
+// screen edge, which the deck has to clear as well.
+function deckMargins(barPosition, thickness, gap, barMargin) {
   var position = String(barPosition || "top")
   var edge = Number(gap)
   if (!isFinite(edge)) edge = 0
   var bar = Number(thickness)
   if (!isFinite(bar)) bar = 0
+  var margin = Number(barMargin)
+  if (!isFinite(margin)) margin = 0
   return {
-    top: (position === "top" ? bar : 0) + edge,
-    right: (position === "right" ? bar : 0) + edge
+    top: (position === "top" ? bar + margin : 0) + edge,
+    right: (position === "right" ? bar + margin : 0) + edge
   }
 }

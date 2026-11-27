@@ -73,7 +73,9 @@ Item {
   readonly property bool barVertical: barPosition === "left" || barPosition === "right"
   readonly property int defaultBarSize: barVertical ? Style.bar.sizeVertical : Style.bar.sizeHorizontal
   function marginsFor(screenName) {
-    return Delivery.deckMargins(barPosition, Delivery.barThickness(barRef, screenName, defaultBarSize), Style.gapsOut)
+    var barEdgeMargin = barRef && barRef.floatGap !== undefined
+      ? Math.max(0, Number(barRef.floatGap) || 0) : 0
+    return Delivery.deckMargins(barPosition, Delivery.barThickness(barRef, screenName, defaultBarSize), Style.gapsOut, barEdgeMargin)
   }
   readonly property int notificationWidth: Style.space(380)
 
@@ -579,10 +581,31 @@ Item {
     return ""
   }
 
+  // The card a new notification repeats word for word (Store.isDuplicate),
+  // shown or still waiting to be, offering the same buttons: Reply and Join
+  // under the same words are two cards. One on its way out is left to go.
+  function keyForDuplicate(row, notification) {
+    var buttons = JSON.stringify(senderActions(notification))
+    for (var key in liveKeys) {
+      if (leaving[key]) continue
+      var at = rowIndexFor(key)
+      var shown = liveKeys[key].row || (at >= 0 ? toasts.get(at) : null)
+      if (Store.isDuplicate(row, shown) && JSON.stringify(actionsOf(key)) === buttons) return key
+    }
+    return ""
+  }
+
   // ------------------------------------------------------------- arrival
   function handleNotification(notification) {
     // Replacements reuse the same slot, including before its first insertion.
-    var key = keyForOriginal(notification.id) || nextKey()
+    var known = keyForOriginal(notification.id)
+    var row = Store.snapshot(notification, known, NotificationUrgency)
+    // So does an identical copy under a new id: it takes over the card it
+    // repeats, and the copy it supersedes is closed at its sender.
+    var key = known || keyForDuplicate(row, notification) || nextKey()
+    row.key = key
+    // An unnamed sender's toast is grouped by its own key, known only now.
+    row.groupKey = Markup.regroup(row)
 
     if (!reserveLive(key)) {
       notification.tracked = false
@@ -592,8 +615,7 @@ Item {
     // Otherwise the object is destroyed when this handler returns.
     notification.tracked = true
 
-    var row = Store.snapshot(notification, key, NotificationUrgency)
-    row.duration = durationFor(notification.urgency, row.expireTimeout)
+    row.duration = row.sticky ? 0 : durationFor(notification.urgency, row.expireTimeout)
 
     var previous = refs[key]
     refs[key] = notification
@@ -890,9 +912,10 @@ Item {
 
   // What the sender said can be done with this notification. A restored row
   // has no live sender, so it has none of these.
-  function actionsOf(key, revision) {
+  function actionsOf(key, revision) { return senderActions(refs[key]) }
+
+  function senderActions(ref) {
     var out = []
-    var ref = refs[key]
     if (!ref || !ref.actions) return out
     for (var i = 0; i < Math.min(ref.actions.length, Security.MAX_ACTIONS); i++) {
       var a = ref.actions[i]
@@ -1046,10 +1069,16 @@ Item {
     // labels and native classes, never shorter than four characters.
     var slug = name.replace(/[^a-z0-9]+/g, "")
     if (slug.length < 4) return null
+    // Several words also match a class ending in them: "Telegram Desktop" is
+    // org.telegram.desktop, "Brave Browser" brave-browser.
+    var words = name.split(/[^a-z0-9]+/).filter(function(w) { return w })
+    var tail = words.length > 1 ? "." + words.join(".") : ""
     found = []
     for (i = 0; i < windows.length; i++) {
       var lower = windows[i].wmClass.toLowerCase()
       if (lower === slug) { found.push(windows[i]); continue }
+      var dotted = "." + lower.replace(/[^a-z0-9]+/g, ".")
+      if (tail && dotted.slice(-tail.length) === tail) { found.push(windows[i]); continue }
       if (lower.indexOf("chrome-") !== 0) continue
       var labels = lower.substring(7).split("__")[0].split(".")
       for (var l = 0; l < labels.length; l++)
@@ -1176,6 +1205,14 @@ Item {
   property var unsaved: ({})
 
   function storePut(row) {
+    // The transient hint asks to by-pass persistence: such a card is not
+    // restored after a restart or kept in history, and its sender sends it
+    // again when it still applies. An update that turns a card transient takes
+    // its stored row out.
+    if (row.transient) {
+      storeDrop(row.key)
+      return
+    }
     liveEntries = Store.putLive(liveEntries, Store.persistable(row))
     saveSoon("live")
   }
@@ -1424,8 +1461,9 @@ Item {
 
     // Press button n (from 1) on the newest card.
     function invokeAction(n: int): string {
-      if (toasts.count === 0) return "none"
-      return service.runDeed(String(toasts.get(0).key), n - 1) ? "ok" : "none"
+      var key = service.newestLive()
+      if (!key) return "none"
+      return service.runDeed(key, n - 1) ? "ok" : "none"
     }
 
     // Hand the keyboard to the notifications until Escape or a choice.

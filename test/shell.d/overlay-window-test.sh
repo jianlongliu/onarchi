@@ -53,7 +53,8 @@ reveals.shift()()
 assert(!content.contentRevealed, 'a close or screen loss cancels a pending reveal')
 
 const focusedScreenBody = /function focusedScreen\(\) \{([\s\S]*?)\n  \}/.exec(overlay)[1]
-// The port reads the focused output from Niri, not Hyprland.
+// The niri port reads Niri.focusedMonitor instead of Hyprland's; the extracted
+// body is evaluated with whatever name it actually references.
 const focusedScreen = new Function('Niri', 'Quickshell', focusedScreenBody)
 const external = { name: 'DP-1', width: 1920, height: 1080 }
 assertEqual(focusedScreen({ focusedMonitor: { name: 'DP-1' } }, { screens: [screen, external] }), external,
@@ -65,7 +66,10 @@ assertEqual(focusedScreen({ focusedMonitor: null }, { screens: [] }), null,
 
 const shownHandler = /onShownChanged: \{([\s\S]*?)\n  \}/.exec(overlay)[1]
 let refreshed = 0
+// The niri port calls Niri.refreshMonitors(); Hyprland is kept as an alias so
+// the fixture reads either way without caring which singleton the shell uses.
 const Niri = { refreshMonitors() { refreshed++ } }
+const Hyprland = Niri
 const changeShown = new Function('shown', 'focusedScreen', 'Niri', `let targetScreen = null; ${shownHandler}; return targetScreen`)
 assertEqual(changeShown(false, () => external, Niri), null, 'closing drops the previous screen reference')
 assertEqual(refreshed, 0, 'closing does not refresh monitor data')
@@ -78,8 +82,8 @@ assertEqual(refreshed, 1, 'scale changes on hidden windows do not refresh monito
 const changedScreen = { name: 'eDP-1', width: 960, height: 600 }
 assert(!ready(true, true, 960, 600, changedScreen, monitor, 2),
   'a stale monitor scale keeps content transparent after a live scale change')
-Niri.refreshMonitors = () => { refreshed++; monitor.scale = 2 }
-changeScale(true, Niri)
+Hyprland.refreshMonitors = () => { refreshed++; monitor.scale = 2 }
+changeScale(true, Hyprland)
 assertEqual(refreshed, 2, 'a showing window refreshes monitor scales when Qt receives a live change')
 assert(ready(true, true, 960, 600, changedScreen, monitor, 2),
   'fresh monitor data lets content reveal at the new scale')
