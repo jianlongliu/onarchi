@@ -219,7 +219,7 @@ The port currently tracks upstream `quattro` at **`2ebf5971a`** (2026-11-27, the
 2026-11-27 — 593 commits, 3830 files, +167695/−106276. `v4.6.0-rc1` is a tag on
 `quattro` itself, not a separate release branch. The current `niri.patch` has
 **51 files / 149 hunks / 3456 lines**, md5
-`0098080224830c0b7061e092a61f64a6` (untracked overlay files are separate). This
+`b78df1453b2811ad4af196cc957a7867` (untracked overlay files are separate). This
 sync updated the running tree and the overlay patch; the repository's vendored
 `bin/`/`shell/` source snapshot remains at `bc220e70` until the next full source sync.
 
@@ -235,7 +235,7 @@ below exists because of that.
 | Battery charge threshold (sysfs-first) | Kept, plus upstream's improvement: it resolves the battery through UPower instead of a `BAT*` glob |
 | `Niri.qml` compositor shim | Currently 456 lines: `monitors`, `monitorFor`, `toplevels`, `refresh*`, `dispatch`, and `fullscreenOn` — the last one because `niri msg windows` carries no fullscreen flag, so it compares a window's `tile_size` against the output's logical size (fullscreen tiles to exactly that) |
 | `OverlayWindow.qml` | Upstream file used by menu, clipboard and image picker. It read `Hyprland.monitors`, which is always empty on niri, so `contentReady` never became true and every panel rendered at opacity 0 — patched to `Niri`. The OSD no longer uses it: the port keeps a card-sized `PanelWindow` so the compositor-side blur cannot frost the whole display |
-| Default agent selector | Upstream 4.6 removed the Agent menu and made the panel account-first; a harness without a usage provider has no row to star. The port adds a collapsible **Default agent** row that enumerates installed harnesses with `omarchy-default-agent --installed` and writes the choice through `--select`. Current list: Pi, OpenCode, Grok, DeepSeek Harness, Ante, Antex; commandcode is not installed and is not listed |
+| Default agent selector | Upstream 4.6 removed the Agent menu and made the panel account-first; a harness without a usage provider has no row to star. The port adds a collapsible **Default agent** row that enumerates installed harnesses with `omarchy-default-agent --installed` and writes the choice through `--select`. Current list: OpenCode, Grok, DeepSeek Harness, Ante, Antex; pi and commandcode are not installed and are not listed |
 | Toast frost | Upstream narrowed the notification surface and dropped the client blur region; the layer rule carried only `xray`, so nothing was frosted. Restored as a client-side `Region` + `blur true` in the rule |
 | Apps grid frost | Upstream's new `omarchy.dock` grid spans the screen and relies on Hyprland's `ignore_alpha`. Given a client region plus an `omarchy-dock-apps` layer rule. **The dock itself is disabled** (`disabledPlugins`): upstream draws it with no backdrop at all (`color: "transparent"`, no `Rectangle` behind the icons), and its default pins are apps this machine does not have |
 | Bar icon centring | `OpticalGlyph` reported the ink centre before rotation, so the pocket's mark (which turns 90° when it opens) was placed as if it had not. `BarIconButton` also gained `contentOffsetY` for glyphs whose ink is far shorter than their line box |

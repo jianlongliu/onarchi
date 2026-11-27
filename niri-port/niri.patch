@@ -1373,7 +1373,7 @@ index e0b3c322b..ded86cfa3 100644
    Connections {
      target: Quickshell
 diff --git a/shell/plugins/agents/Panel.qml b/shell/plugins/agents/Panel.qml
-index cad89a17f..caea136e1 100644
+index cad89a17f..25083c259 100644
 --- a/shell/plugins/agents/Panel.qml
 +++ b/shell/plugins/agents/Panel.qml
 @@ -144,6 +144,8 @@ Panel {
@@ -1496,7 +1496,7 @@ index cad89a17f..caea136e1 100644
 +  // no usage provider (Ante/Antex). --installed is the launcher's own check.
 +  Process {
 +    id: installedHarnessesProc
-+    command: ["bash", "-c", "for a in pi omp opencode ori claude codex grok openclaw agy hermes copilot crush cursor-agent muse kimi qwen dsh mcode freebuff kilo devin amp commandcode ante antex; do omarchy-default-agent --installed \"$a\" >/dev/null 2>&1 && printf '%s\\n' \"$a\"; done"]
++    command: ["bash", "-c", "for a in pi omp opencode ori claude codex grok openclaw agy hermes copilot crush cursor-agent muse kimi qwen dsh mcode freebuff kilo devin amp commandcode ante antex; do if [[ $a == pi ]]; then command -v pi >/dev/null 2>&1 || continue; fi; omarchy-default-agent --installed \"$a\" >/dev/null 2>&1 && printf '%s\\n' \"$a\"; done"]
 +    stdout: StdioCollector {
 +      waitForEnd: true
 +      onStreamFinished: root.setInstalledHarnesses(text)
