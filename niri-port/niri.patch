@@ -1653,7 +1653,7 @@ index f1d243d23..7eb983f5b 100644
  
        Image {
 diff --git a/shell/plugins/bar/Bar.qml b/shell/plugins/bar/Bar.qml
-index 91f713bfe..ca83686d4 100644
+index 91f713bfe..b25714f95 100644
 --- a/shell/plugins/bar/Bar.qml
 +++ b/shell/plugins/bar/Bar.qml
 @@ -2,6 +2,7 @@ import Quickshell
@@ -1776,11 +1776,51 @@ index 91f713bfe..ca83686d4 100644
 +    // equal to the gap around every other window.
      exclusionMode: root.barHidden ? ExclusionMode.Ignore : ExclusionMode.Normal
 -    exclusiveZone: surfaceThickness
-+    exclusiveZone: surfaceThickness + root.floatGap
++    exclusiveZone: surfaceCrossSize
  
      // sameWindow, not identity: the drag records the QsWindow interface of
      // the slot's window, which is not this PanelWindow object itself.
-@@ -1847,16 +1915,30 @@ Item {
+@@ -1693,10 +1761,10 @@ Item {
+     // Parked by its whole thickness, so none of it stays on screen however
+     // thick a notch floor makes it.
+     margins {
+-      top: root.barHidden && barWindow.surfaceEdge === "top" ? -barWindow.surfaceThickness : 0
+-      bottom: root.barHidden && barWindow.surfaceEdge === "bottom" ? -barWindow.surfaceThickness : 0
+-      left: root.barHidden && barWindow.surfaceEdge === "left" ? -barWindow.surfaceThickness : 0
+-      right: root.barHidden && barWindow.surfaceEdge === "right" ? -barWindow.surfaceThickness : 0
++      top: root.barHidden && barWindow.surfaceEdge === "top" ? -barWindow.surfaceCrossSize : 0
++      bottom: root.barHidden && barWindow.surfaceEdge === "bottom" ? -barWindow.surfaceCrossSize : 0
++      left: root.barHidden && barWindow.surfaceEdge === "left" ? -barWindow.surfaceCrossSize : 0
++      right: root.barHidden && barWindow.surfaceEdge === "right" ? -barWindow.surfaceCrossSize : 0
+     }
+ 
+     anchors {
+@@ -1739,9 +1807,13 @@ Item {
+     // bar that waits for its notch floor maps at it.
+     property string surfaceEdge: root.position
+     property int surfaceThickness: thickness
++    // The surface has to hold the strip AND the gap it floats by; a surface as
++    // tall as the strip alone clips the strip's bottom edge and leaves an empty
++    // band under it.
++    readonly property int surfaceCrossSize: surfaceThickness + root.floatGap
+     readonly property bool surfaceVertical: surfaceEdge === "left" || surfaceEdge === "right"
+-    implicitWidth: surfaceVertical ? surfaceThickness : 0
+-    implicitHeight: surfaceVertical ? 0 : surfaceThickness
++    implicitWidth: surfaceVertical ? surfaceCrossSize : 0
++    implicitHeight: surfaceVertical ? 0 : surfaceCrossSize
+ 
+     property bool presented: false
+     // clearing: waiting on a clear frame before resizing. revealing: waiting
+@@ -1833,7 +1905,7 @@ Item {
+           settleWatchdog.restart()
+         } else {
+           var span = barWindow.surfaceVertical ? barWindow.width : barWindow.height
+-          if (span === barWindow.surfaceThickness && barWindow.settleFrames >= 1) {
++          if (span === barWindow.surfaceCrossSize && barWindow.settleFrames >= 1) {
+             barWindow.finishSettle()
+             return
+           }
+@@ -1847,16 +1919,30 @@ Item {
      WlrLayershell.namespace: "omarchy-bar"
      WlrLayershell.layer: WlrLayer.Top
  
@@ -1821,7 +1861,7 @@ index 91f713bfe..ca83686d4 100644
      }
  
      Connections {
-@@ -1867,31 +1949,89 @@ Item {
+@@ -1867,31 +1953,89 @@ Item {
        }
      }
  

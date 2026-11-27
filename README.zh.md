@@ -199,8 +199,8 @@ cd onarchi
 
 本移植当前跟到上游 `quattro` 的 **`2ebf5971a`**（2026-11-27，`v4.6.0-rc1` 线再加 3 个提交）——
 2026-11-27 从 `723072a55` 快进，共 593 个提交、3830 个文件、+167695/−106276。`v4.6.0-rc1`
-是打在 `quattro` 上的 tag，不是单独的发布分支。当前 `niri.patch` 为 **51 文件 / 135 hunk / 3124 行**，md5
-`60392071b6f7c90b4f516fcc1bdee9fb`（未跟踪的覆盖层文件另计）。本轮同步了运行树与覆盖层补丁；
+是打在 `quattro` 上的 tag，不是单独的发布分支。当前 `niri.patch` 为 **51 文件 / 138 hunk / 3164 行**，md5
+`13351e044870155bcd1bd54abb0a2d1e`（未跟踪的覆盖层文件另计）。本轮同步了运行树与覆盖层补丁；
 仓库里 vendored 的 `bin/`/`shell/` 源码快照仍停在 `bc220e70`，等下一次全量源码同步。
 
 上游**仍然没有 niri 支持**：`2ebf5971a` 上仍是 Hyprland 耦合。下面每一条都是这个前提的产物。
@@ -227,7 +227,7 @@ cd onarchi
 | 项 | 原因 |
 |---|---|
 | `Style.qml` 里的 bar 尺寸 token | 上游已原生提供 `icon-font` / `icon-slot` / `icon-canvas` / `status-slot` / `notch-height` / `icon-size`，本地补丁是严格子集 |
-| 霜化之外的 bar 装饰（投影、顶边高光、强制 12px 圆角） | 被上游自己的 bar 设计取代。接受覆盖 |
+| 霜化之外的 bar 装饰（投影、顶边高光、强制 12px 圆角） | 顶边高光保留；compositor 投影 2026-11-27 已移除（浮栏外会读成一层背景）；圆角跟随 `Style.cornerRadius` |
 | OSD 的卡片化表面 | 上游把 OSD 迁到 `OverlayWindow`，而后者要求全屏表面；卡片化版本渲染出来是空白 |
 | 经 `popupColumn` 的通知霜化 | 该元素上游已不存在，表面现在是窄条带 |
 | `omasnap`、`monologue`、`hype`、`signed` | Qt 6.12 已于 2026-11-11 解钉，旧的 6.11 阻塞不再成立。`omasnap` 仍硬依赖 `hyprland`，不做 niri 版；另外三件未安装、未重测。同批目前只有 `disktree-bin` 在跑 |

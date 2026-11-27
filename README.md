@@ -218,8 +218,8 @@ The port currently tracks upstream `quattro` at **`2ebf5971a`** (2026-11-27, the
 `v4.6.0-rc1` line plus three commits), fast-forwarded from `723072a55` on
 2026-11-27 — 593 commits, 3830 files, +167695/−106276. `v4.6.0-rc1` is a tag on
 `quattro` itself, not a separate release branch. The current `niri.patch` has
-**51 files / 135 hunks / 3124 lines**, md5
-`60392071b6f7c90b4f516fcc1bdee9fb` (untracked overlay files are separate). This
+**51 files / 138 hunks / 3164 lines**, md5
+`13351e044870155bcd1bd54abb0a2d1e` (untracked overlay files are separate). This
 sync updated the running tree and the overlay patch; the repository's vendored
 `bin/`/`shell/` source snapshot remains at `bc220e70` until the next full source sync.
 
@@ -248,7 +248,7 @@ below exists because of that.
 | Thing | Reason |
 |---|---|
 | Bar size tokens in `Style.qml` | Upstream now ships `icon-font` / `icon-slot` / `icon-canvas` / `status-slot` / `notch-height` / `icon-size` natively; the local patch was a strict subset |
-| Bar decoration beyond frost (shadow, top highlight, forced 12 px radius) | Superseded by upstream's own bar design. Accepted the overwrite |
+| Bar decoration beyond frost (shadow, top highlight, forced 12 px radius) | Top highlight kept; the compositor shadow was removed on 2026-11-27 because it read as an extra band around the floating bar; radius follows `Style.cornerRadius` |
 | OSD card surface | Upstream moved OSD onto `OverlayWindow`, which requires a full-screen surface; the card-sized variant rendered nothing |
 | Notification blur via `popupColumn` | That element no longer exists upstream; the surface is a narrow strip now |
 | `omasnap`, `monologue`, `hype`, `signed` | Qt 6.12 is unpinned (2026-11-11), so the old Qt 6.11 blocker is gone. `omasnap` still hard-depends on `hyprland` and is not pursued on niri. The other three are not installed and have not been retested; only `disktree-bin` from that batch runs. |

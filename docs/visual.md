@@ -27,6 +27,7 @@
     **验法**：`omarchy-restart-shell` → `journalctl --user -t omarchy-shell --since "20 seconds ago" | grep -cE "failed to load, falling back|Type .* unavailable"` 必须 **0** → `grim -o eDP-1` 量行均值（顶边高光 = y14–15、bar 面 = y18–56）。**A/B 三张必须同一会话、同一壁纸**：本轮用的有效性判据是"bar 上方壁纸那一行三张**逐值相同**"（82.9），不同就别比。
     **回退**：`~/.local/state/backups/.local/share/omarchy/shell/plugins/bar/Bar.qml.bak-20261005-flatfix`（加高光前）、`…/.config/omarchy/shell.toml.bak-20261005-flatfix`（alpha 改动前）、边框那半 `…/.config/niri/layout.kdl.bak-niri-theme`（脚本自动备份；**现值本来就是两带**，或直接不带 `--single-band` 跑一次 `omarchy-niri-apply-theme`）；`niri.patch` 同日重导出 ⇒ **33 文件 / 106 hunk / 3098 行、md5 `f6ef5a467795e2bd6f1ccf14161b185e`**（`Bar.qml` 的顶边高光 10 行，hunk 数不变），仓库与覆盖层两份同值。
     **本轮没做的一条（下一步）**：**影子改宽更淡**（bar `softness 30→55`、`color "#00000080"→"#0000005b"`；窗口 `softness 55`、`"#00000040"→"#0000002b"`）。理由见上：现在 ~20 逻辑像素归零 = 描边感。**必须同时重标定 menu / 弹层那 12 条环带的 alpha**（它们现在是照 bar 的旧剖面标的，单独放宽 bar 会立刻变成"比 bar 还重"，就是第 45 条那个坑）。
+    **2026-11-27 更正**：bar 的 niri `shadow` 与 `geometry-corner-radius` 已移除——浮栏 surface 按 `thickness + floatGap` 撑开后，重投影在条带外留一圈背景带；顶边高光/底边暗线仍在。见 `docs/upstream.md` §8.28。
     **同日用户自己改的东西（记录，不是本轮的）**：显示从 `3200x2000@2.0` 换成 **`2880x1800@1.8`**（`niri-config/local/monitor.kdl`，逻辑尺寸仍 1600x1000）—— 量任何东西前先确认 mode/scale。
     **用户反馈（如实记）**：改完他说"**没啥感觉**，好像窗口双层边框" ⇒ 本轮的 ①② 是"量得到、看不出"的量级（+23.8 的一条 1px 线、+7.6 的面），真正被眼睛抓到的只有 ③ 那条双边框。
 - 47. **上游 FF 后（`60663faf` → `bc220e70`）的三处视觉回归：bar 与窗口的缝、menu 没了霜化、menu 边框闪烁（2026-10-28）**：三个都是"上游结构变了、我们那套 niri 适配没跟过去"，不是 Qt 版本问题。
@@ -225,9 +226,9 @@ niri 26.04 的 `background-effect` + Quickshell 的 `ext_background_effect` 形�
     （false → true → false + 每次重启壳层），bar 横带均色 `#97928E` / `#98938E` / `#97928E`，false vs true
     仅 **0.6%** 像素不同，同设置复现 **0 像素差**（噪声地板）⇒ 用户感到的改善来自重启壳层，不是 `xray`。
     取值改成 `false` 是为**与 menu/弹窗/OSD 各条统一**，不是观感修正。
-  - 同一条 rule 里还挂 `geometry-corner-radius 12` + `shadow { on; color "#00000080"; softness 30; spread 5; offset x=0 y=4 }`
-    （2026-10-04）：**圆角投影**把 bar 外缘外侧压暗成长渐变，用来埋掉 Qt 那 1 像素硬边（详见 §8 第 44 条）。
-    注意 `geometry-corner-radius` 单独用没有视觉作用，它只决定投影的形状。
+  - 同一条 rule 曾挂 `geometry-corner-radius 12` + `shadow { on; color "#00000080"; softness 30; spread 5; offset x=0 y=4 }`
+    （2026-10-04），**2026-11-27 已移除**：浮栏 surface 现在按 `thickness + floatGap` 撑开，这层重投影会在条带外留一圈背景带；
+    bar 自己的顶边高光/底边暗线仍在。见 `docs/upstream.md` §8.28。
     为什么改：bar 是浮栏、**不占位**（`exclusionMode: root.barHidden ? Ignore : Auto`），但 niri 把平铺/最大化
     窗口挡在 bar 那条横带之外，所以"背后"平时只有壁纸 ⇒ `xray false` 与 `xray true` 观感几乎一样：
     同设置连拍两张当噪声基线（差 0.00），改 `xray` 前后逐行对比，bar 横带平均差仅 **0.93**、最大单像素 **12**
