@@ -2017,6 +2017,54 @@ Item {
       width: root.vertical ? barWindow.thickness : Math.max(0, parent.width - root.floatGap * 2)
       height: root.vertical ? Math.max(0, parent.height - root.floatGap * 2) : barWindow.thickness
 
+      // The 1px edge profile wraps around the rounded ends and straddles the
+      // fill edge, where niri's non-antialiased blur mask ends; without it the
+      // mask's stepped edge reads as a torn fringe. Drawn under the fill so
+      // only the outer half of the stroke remains visible.
+      Item {
+        id: barEdgeProfile
+        anchors.fill: parent
+        visible: !root.transparent
+
+        Item {
+          x: -0.5
+          y: -0.5
+          width: root.vertical ? parent.width / 2 + 0.5 : parent.width + 1
+          height: root.vertical ? parent.height + 1 : parent.height / 2 + 0.5
+          clip: true
+
+          Rectangle {
+            width: barEdgeProfile.width + 1
+            height: barEdgeProfile.height + 1
+            radius: root.effectiveCornerRadius + 0.5
+            antialiasing: true
+            color: "transparent"
+            border.width: 1
+            border.color: root.barTopEdge
+          }
+        }
+
+        Item {
+          x: root.vertical ? parent.width / 2 : -0.5
+          y: root.vertical ? -0.5 : parent.height / 2
+          width: root.vertical ? parent.width / 2 + 0.5 : parent.width + 1
+          height: root.vertical ? parent.height + 1 : parent.height / 2 + 0.5
+          clip: true
+
+          Rectangle {
+            x: root.vertical ? -parent.width : 0
+            y: root.vertical ? 0 : -parent.height
+            width: barEdgeProfile.width + 1
+            height: barEdgeProfile.height + 1
+            radius: root.effectiveCornerRadius + 0.5
+            antialiasing: true
+            color: "transparent"
+            border.width: 1
+            border.color: root.barBottomEdge
+          }
+        }
+      }
+
       Rectangle {
         anchors.fill: parent
         antialiasing: true
@@ -2026,55 +2074,6 @@ Item {
           orientation: root.vertical ? Gradient.Horizontal : Gradient.Vertical
           GradientStop { position: 0.0; color: root.barFillTop }
           GradientStop { position: 1.0; color: root.barFillBottom }
-        }
-      }
-
-      // The 1px edge profile wraps around the rounded ends instead of
-      // stopping at the straight runs. Besides matching the glass tube look,
-      // the rim covers the hard stepped edge of niri's non-antialiased blur
-      // mask, which otherwise shows as a torn fringe over the translucent fill.
-      Item {
-        id: barEdgeProfile
-        anchors.fill: parent
-        visible: !root.transparent
-
-        Item {
-          anchors.left: parent.left
-          anchors.right: parent.right
-          anchors.top: parent.top
-          width: root.vertical ? parent.width / 2 : parent.width
-          height: root.vertical ? parent.height : parent.height / 2
-          clip: true
-
-          Rectangle {
-            width: barEdgeProfile.width
-            height: barEdgeProfile.height
-            radius: root.effectiveCornerRadius
-            antialiasing: true
-            color: "transparent"
-            border.width: 1
-            border.color: root.barTopEdge
-          }
-        }
-
-        Item {
-          anchors.right: parent.right
-          anchors.bottom: parent.bottom
-          width: root.vertical ? parent.width / 2 : parent.width
-          height: root.vertical ? parent.height : parent.height / 2
-          clip: true
-
-          Rectangle {
-            x: root.vertical ? -parent.width : 0
-            y: root.vertical ? 0 : -parent.height
-            width: barEdgeProfile.width
-            height: barEdgeProfile.height
-            radius: root.effectiveCornerRadius
-            antialiasing: true
-            color: "transparent"
-            border.width: 1
-            border.color: root.barBottomEdge
-          }
         }
       }
 
