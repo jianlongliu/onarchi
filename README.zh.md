@@ -199,8 +199,8 @@ cd onarchi
 
 本移植当前跟到上游 `quattro` 的 **`2ebf5971a`**（2026-11-27，`v4.6.0-rc1` 线再加 3 个提交）——
 2026-11-27 从 `723072a55` 快进，共 593 个提交、3830 个文件、+167695/−106276。`v4.6.0-rc1`
-是打在 `quattro` 上的 tag，不是单独的发布分支。当前 `niri.patch` 为 **52 文件 / 154 hunk / 3581 行**，md5
-`9e43d2e9e54ee76f95672bdf22b18bd9`（未跟踪的覆盖层文件另计）。本轮同步了运行树、覆盖层补丁与 vendored 的 `bin/`/`shell/` 源码快照；快照现在也是 `2ebf5971a`。
+是打在 `quattro` 上的 tag，不是单独的发布分支。当前 `niri.patch` 为 **51 文件 / 153 hunk / 3598 行**，md5
+`27f5c768f53fc1b716297b37b790b71a`（未跟踪的覆盖层文件另计）。本轮同步了运行树、覆盖层补丁与 vendored 的 `bin/`/`shell/` 源码快照；快照现在也是 `2ebf5971a`。
 
 上游**仍然没有 niri 支持**：`2ebf5971a` 上仍是 Hyprland 耦合。下面每一条都是这个前提的产物。
 
@@ -239,7 +239,7 @@ Qt 6.12 已解钉并在真实会话验收；此前的黑 bar 报告在受控测�
 
 > 汇总索引：[docs/known-issues.md](docs/known-issues.md)。
 
-- **20 条迁移待跑**（4.6 合并后 226 条；已跑 37，跳过 169 条机型/Hyprland/port bar/特定 app/可选包）。剩余：root/系统 16、桌面/UI 3、input-method 1。跳过清单在 `~/.local/state/omarchy/migrations/SKIPPED.md`；
+- **8 条迁移待跑**（4.6 合并后 226 条；已跑 49，遗弃 169 条机型/Hyprland/port bar/特定 app/可选包）。剩余：输入法 1、浏览器默认 1、等待 `omarchy-settings` unit 6。遗弃清单在 `~/.local/state/omarchy/migrations/ABANDONED.md`；
   42 条动 Hyprland 或 uwsm。已跑 6 条面向用户的（bar 布局拆分、壁纸重编号、Fcitx 主题、Chromium
   覆盖滚动条）。其余在 `docs/upstream.md` §8.23 有分类账。
 - **niri 上 `GDK_SCALE` 的效果未验收**。上游是 `omarchy-hyprland-monitor-scaling` 设的，而那个脚本只在

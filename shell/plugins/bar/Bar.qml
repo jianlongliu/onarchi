@@ -2029,24 +2029,53 @@ Item {
         }
       }
 
-      Rectangle {
-        id: barTopHighlight
-        x: root.vertical ? 0 : Math.round(root.effectiveCornerRadius)
-        y: root.vertical ? Math.round(root.effectiveCornerRadius) : 0
-        width: root.vertical ? 1 : Math.max(0, parent.width - Math.round(root.effectiveCornerRadius) * 2)
-        height: root.vertical ? Math.max(0, parent.height - Math.round(root.effectiveCornerRadius) * 2) : 1
-        color: root.barTopEdge
+      // The 1px edge profile wraps around the rounded ends instead of
+      // stopping at the straight runs. Besides matching the glass tube look,
+      // the rim covers the hard stepped edge of niri's non-antialiased blur
+      // mask, which otherwise shows as a torn fringe over the translucent fill.
+      Item {
+        id: barEdgeProfile
+        anchors.fill: parent
         visible: !root.transparent
-      }
 
-      Rectangle {
-        id: barBottomShade
-        x: root.vertical ? parent.width - 1 : Math.round(root.effectiveCornerRadius)
-        y: root.vertical ? Math.round(root.effectiveCornerRadius) : parent.height - 1
-        width: root.vertical ? 1 : Math.max(0, parent.width - Math.round(root.effectiveCornerRadius) * 2)
-        height: root.vertical ? Math.max(0, parent.height - Math.round(root.effectiveCornerRadius) * 2) : 1
-        color: root.barBottomEdge
-        visible: !root.transparent
+        Item {
+          anchors.left: parent.left
+          anchors.right: parent.right
+          anchors.top: parent.top
+          width: root.vertical ? parent.width / 2 : parent.width
+          height: root.vertical ? parent.height : parent.height / 2
+          clip: true
+
+          Rectangle {
+            width: barEdgeProfile.width
+            height: barEdgeProfile.height
+            radius: root.effectiveCornerRadius
+            antialiasing: true
+            color: "transparent"
+            border.width: 1
+            border.color: root.barTopEdge
+          }
+        }
+
+        Item {
+          anchors.right: parent.right
+          anchors.bottom: parent.bottom
+          width: root.vertical ? parent.width / 2 : parent.width
+          height: root.vertical ? parent.height : parent.height / 2
+          clip: true
+
+          Rectangle {
+            x: root.vertical ? -parent.width : 0
+            y: root.vertical ? 0 : -parent.height
+            width: barEdgeProfile.width
+            height: barEdgeProfile.height
+            radius: root.effectiveCornerRadius
+            antialiasing: true
+            color: "transparent"
+            border.width: 1
+            border.color: root.barBottomEdge
+          }
+        }
       }
 
       Loader {

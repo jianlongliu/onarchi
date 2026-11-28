@@ -1821,7 +1821,7 @@ index cad89a17f..25083c259 100644
        font.pixelSize: Style.font.bodySmall
      }
 diff --git a/shell/plugins/agents/README.md b/shell/plugins/agents/README.md
-index 4b40b7250..010546e03 100644
+index 4b40b7250..9491697ae 100644
 --- a/shell/plugins/agents/README.md
 +++ b/shell/plugins/agents/README.md
 @@ -184,6 +184,7 @@ Adding an agent needs no QML changes: ship a collector that follows the contract
@@ -1832,11 +1832,13 @@ index 4b40b7250..010546e03 100644
  
  Every collector follows the same rules, so the same situation reads the same for every agent: a recent answer is reused for 15 seconds unless refresh is pressed, each credential or account keeps its own last good answer, a failed check keeps it with its age on hover and windows that have since reset back at zero, an endpoint that can't be reached is retried soon, and an agent the machine doesn't use stays out of the panel. Tokens are counted once, under the provider that bills them: pi, omp, and opencode sessions are split by provider into the matching collector. A pi compaction's usage counts, but omp records only the context's size before and after one, not what its summary request used, so omp's compactions are missing from the tokens. pi and omp sessions are read from every profile, and from `PI_CODING_AGENT_DIR`, `PI_CODING_AGENT_SESSION_DIR`, and a `settings.json` `sessionDir` as well as the defaults when set, a forked session's copied messages once; opencode is read from both its `message` and V2 `session_message` stores in the database `OPENCODE_DB` names, a message migrated into both once and a fork's copied history not at all. A machine with none of an agent's home, CLI, or usage prints an empty record the panel skips; one that has them but no sign-in says it is waiting for one. The sections below cover where each agent's sign-in and data come from.
  
-@@ -366,6 +367,14 @@ A Codex rollout records its provider's id but not the URL it reached, so the col
+@@ -366,6 +367,16 @@ A Codex rollout records its provider's id but not the URL it reached, so the col
  
  It is the exact complement of the provider collectors: a provider id another collector counts is never counted here, whatever `local.json` says (that collector counts it, once), but for a Codex `model_providers` entry, whose `base_url` decides whatever its id, so one under a claimed id on your own hardware (a self-hosted Kimchi gateway's `kimchi codex` setup) counts here; and the Codex collector keeps every rollout on the built-in `openai` provider, but for the models of one that a self-hosted `openai_base_url` served (see [Codex](#codex)). Two providers are claimed only for some models, and only those rows are left out: Ollama's cloud models (a `:cloud` or `-cloud` tag) run on Ollama's servers even through the local daemon, so they count under Ollama Cloud instead, and opencode's Antigravity plugin records a `google` provider with `antigravity-` models, which the Antigravity collector counts. A Codex rollout's prompts are the ones typed, and a subagent's or guardian's thread starts no session, read as the Codex collector reads them. Claude Code counts here while `ANTHROPIC_BASE_URL` is self-hosted (Ollama's `http://localhost:11434`, a LAN box), for every model but a Claude one, which a local gateway forwards on to Anthropic, and a cloud-tagged one, by the [Claude Code](#claude-code) rule; so do MiniMax Code replies on a custom provider whose `baseURL` is self-hosted, and, by the same rule, Kimi Code, Qwen Code, Hermes and Mistral Vibe requests whose recorded base URL is self-hosted, read by each one's own collector. There are no limits or balance.
  
 +### Command Code
++
++> The niri port disables the Command Code collector; its card is not shown.
 +
 +Command Code's section reads the account's billing ledger, the same two answers its own `/usage` view is built from: `/alpha/billing/credits` (what the plan's windows and monthly pool have spent) and `/alpha/billing/subscriptions` (which plan is active, and when its period ends). These are the CLI's own routes rather than a published API, so a change there costs the numbers, not the panel.
 +
@@ -1861,20 +1863,6 @@ index 000000000..ff2c0429f
 +++ b/shell/plugins/agents/assets/commandcode.svg
 @@ -0,0 +1 @@
 +<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#fff"><title>Command Code</title><path d="M3.6 7.1 8.1 3.6l3.1 3.9a1.1 1.1 0 0 1-.3 1.6l-2 1.2a1.1 1.1 0 0 0-.4 1.5l1.1 1.8a1.1 1.1 0 0 0 1.5.4l2-1.2a1.1 1.1 0 0 1 1.6.4l2.6 4.1-4.5 3.5-1.5-2.4a3 3 0 0 0-4.1-1l-2 1.2-2.5-4.1a3 3 0 0 1 .9-4.1l.1-.1z"/><circle cx="18.1" cy="5.4" r="2.1"/></svg>
-diff --git a/shell/plugins/agents/manifest.json b/shell/plugins/agents/manifest.json
-index 25b11cf54..0b844b7aa 100644
---- a/shell/plugins/agents/manifest.json
-+++ b/shell/plugins/agents/manifest.json
-@@ -41,7 +41,8 @@
-         "deepseek": { "enabled": true },
-         "fireworks": { "enabled": true },
-         "synthetic": { "enabled": true },
--        "local": { "enabled": true }
-+        "local": { "enabled": true },
-+        "commandcode": { "enabled": true }
-       },
-       "refreshIntervalSec": 900,
-       "syncMode": "Off",
 diff --git a/shell/plugins/background/Background.qml b/shell/plugins/background/Background.qml
 index f1d243d23..32d7516a1 100644
 --- a/shell/plugins/background/Background.qml
@@ -1940,7 +1928,7 @@ index f1d243d23..32d7516a1 100644
  
        Image {
 diff --git a/shell/plugins/bar/Bar.qml b/shell/plugins/bar/Bar.qml
-index 91f713bfe..c1060c9c3 100644
+index 91f713bfe..48473a230 100644
 --- a/shell/plugins/bar/Bar.qml
 +++ b/shell/plugins/bar/Bar.qml
 @@ -2,6 +2,7 @@ import Quickshell
@@ -2128,7 +2116,7 @@ index 91f713bfe..c1060c9c3 100644
              barWindow.finishSettle()
              return
            }
-@@ -1847,51 +1933,120 @@ Item {
+@@ -1847,51 +1933,149 @@ Item {
      WlrLayershell.namespace: "omarchy-bar"
      WlrLayershell.layer: WlrLayer.Top
  
@@ -2253,24 +2241,53 @@ index 91f713bfe..c1060c9c3 100644
 +        }
 +      }
 +
-+      Rectangle {
-+        id: barTopHighlight
-+        x: root.vertical ? 0 : Math.round(root.effectiveCornerRadius)
-+        y: root.vertical ? Math.round(root.effectiveCornerRadius) : 0
-+        width: root.vertical ? 1 : Math.max(0, parent.width - Math.round(root.effectiveCornerRadius) * 2)
-+        height: root.vertical ? Math.max(0, parent.height - Math.round(root.effectiveCornerRadius) * 2) : 1
-+        color: root.barTopEdge
++      // The 1px edge profile wraps around the rounded ends instead of
++      // stopping at the straight runs. Besides matching the glass tube look,
++      // the rim covers the hard stepped edge of niri's non-antialiased blur
++      // mask, which otherwise shows as a torn fringe over the translucent fill.
++      Item {
++        id: barEdgeProfile
++        anchors.fill: parent
 +        visible: !root.transparent
-+      }
 +
-+      Rectangle {
-+        id: barBottomShade
-+        x: root.vertical ? parent.width - 1 : Math.round(root.effectiveCornerRadius)
-+        y: root.vertical ? Math.round(root.effectiveCornerRadius) : parent.height - 1
-+        width: root.vertical ? 1 : Math.max(0, parent.width - Math.round(root.effectiveCornerRadius) * 2)
-+        height: root.vertical ? Math.max(0, parent.height - Math.round(root.effectiveCornerRadius) * 2) : 1
-+        color: root.barBottomEdge
-+        visible: !root.transparent
++        Item {
++          anchors.left: parent.left
++          anchors.right: parent.right
++          anchors.top: parent.top
++          width: root.vertical ? parent.width / 2 : parent.width
++          height: root.vertical ? parent.height : parent.height / 2
++          clip: true
++
++          Rectangle {
++            width: barEdgeProfile.width
++            height: barEdgeProfile.height
++            radius: root.effectiveCornerRadius
++            antialiasing: true
++            color: "transparent"
++            border.width: 1
++            border.color: root.barTopEdge
++          }
++        }
++
++        Item {
++          anchors.right: parent.right
++          anchors.bottom: parent.bottom
++          width: root.vertical ? parent.width / 2 : parent.width
++          height: root.vertical ? parent.height : parent.height / 2
++          clip: true
++
++          Rectangle {
++            x: root.vertical ? -parent.width : 0
++            y: root.vertical ? 0 : -parent.height
++            width: barEdgeProfile.width
++            height: barEdgeProfile.height
++            radius: root.effectiveCornerRadius
++            antialiasing: true
++            color: "transparent"
++            border.width: 1
++            border.color: root.barBottomEdge
++          }
++        }
        }
  
        Loader {

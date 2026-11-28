@@ -20,7 +20,7 @@
 
 | 问题 | 影响 | 现状 / 绕过 | 权威记录 |
 |---|---|---|---|
-| 20 个 migration 待处理 | 部分上游功能与修复未落地 | 合并后 226；已跑 37、跳过 169（机型/Hyprland/bar/特定 app/可选包，清单在 `~/.local/state/omarchy/migrations/SKIPPED.md`），余 20：root/系统 16、桌面 3、input-method 1 | [README Open items](../README.md) · [upstream](upstream.md) |
+| 8 个 migration 待处理 | 部分上游功能与修复未落地 | 合并后 226；已跑 49、遗弃 169（机型/Hyprland/bar/特定 app/可选包，清单在 `~/.local/state/omarchy/migrations/ABANDONED.md`），余 8：输入法 1、浏览器默认 1、等待 `omarchy-settings` unit 6 | [README Open items](../README.md) · [upstream](upstream.md) |
 | 多屏 / 旋转 / 热插拔未验收 | 双屏同号工作区、输出旋转行为未知 | 单屏已验收；双屏与旋转需夹具或真机 | [README](../README.md) |
 | 登录 / 锁屏 / 挂起 / 重启未复验 | 本轮源码同步后没有端到端证据 | 历史验收不能替代本次验收 | [README](../README.md) |
 | 初次安装 / 覆盖层自动检查未闭环 | 干净机器安装可能缺步骤 | 正反向 `git apply --check` 已过，但缺完整安装路径闸门 | [README](../README.md) |

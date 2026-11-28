@@ -369,6 +369,8 @@ It is the exact complement of the provider collectors: a provider id another col
 
 ### Command Code
 
+> The niri port disables the Command Code collector; its card is not shown.
+
 Command Code's section reads the account's billing ledger, the same two answers its own `/usage` view is built from: `/alpha/billing/credits` (what the plan's windows and monthly pool have spent) and `/alpha/billing/subscriptions` (which plan is active, and when its period ends). These are the CLI's own routes rather than a published API, so a change there costs the numbers, not the panel.
 
 The three meters are the allowances that view shows: `5 hours` and `Weekly` are the plan's rolling windows, `used` of `cap` as the service reports them, and `Monthly` is the plan's credit pool (GOAT 70) against what is left of it. The balance under them is that remainder, so the bar and the figure are the same measurement. A window whose reset time has passed reads zero with no reset time until a fresh check dates the next one, and a plan the CLI's own plan table doesn't name gets no monthly meter rather than a guessed one.
