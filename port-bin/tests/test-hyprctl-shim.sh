@@ -85,6 +85,7 @@ outputs)
   exit 0
   ;;
 workspaces | focused-output) [[ $json == 1 ]] && echo '{}' || exit 1 ;;
+keyboard-layouts) echo '{"names":["English (US)","German"],"current_idx":0}' ;;
 output)
   # `niri msg output <name> <key> <value>` -- one key per call (see the shim).
   shift
@@ -328,6 +329,20 @@ mkdir -p "$tmp/home/.local/state/omarchy/toggles/hypr"
 touch "$tmp/home/.local/state/omarchy/toggles/hypr/window-no-gaps.lua"
 check "the no-gaps toggle zeroes rounding" \
   "$(HOME=$tmp/home hyprctl -j --batch 'getoption decoration:rounding' | jq -r '.int')" 0
+
+echo "== keyboard layouts: Hyprland device shape and switching"
+check "one keyboard carries the whole layout list" \
+  "$(hyprctl -j devices | jq -r '.keyboards[0].layout')" "English (US),German"
+check "and the active layout index" \
+  "$(hyprctl -j devices | jq -r '.keyboards[0].active_layout_index')" 0
+: >"$NIRI_ACTIONS"
+hyprctl switchxkblayout keyboard-0 1 >/dev/null 2>&1
+check "an absolute index maps to the layout name" \
+  "$(cat "$NIRI_ACTIONS")" "action switch-layout German"
+: >"$NIRI_ACTIONS"
+hyprctl switchxkblayout keyboard-0 next >/dev/null 2>&1
+check "next maps to niri's switch-layout next" \
+  "$(cat "$NIRI_ACTIONS")" "action switch-layout next"
 
 echo
 echo "checks=$checks failures=$failures"

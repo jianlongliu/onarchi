@@ -141,6 +141,13 @@ background_transition_uses_snapshots() {
   local next_background="$1"
   local current_background
 
+  # niri port: the shell loads the background asynchronously and the snapshot
+  # paths are unlinked three seconds later. Use the durable current-background
+  # link instead of handing the shell a path that can disappear.
+  if [[ -n ${NIRI_SOCKET:-} || ${XDG_CURRENT_DESKTOP:-} == *niri* ]]; then
+    return 1
+  fi
+
   current_background=$(readlink -f "$CURRENT_BACKGROUND_LINK" 2>/dev/null || true)
   ! is_video_path "$current_background" && ! is_video_path "$next_background"
 }

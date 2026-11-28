@@ -50,7 +50,7 @@
   与两个新文件 `LICENSE`、`UPSTREAM.md`，共 +6 文件；`shell/plugins/bar/widgets/Workspaces.qml` 的 niri 适配（`Hyprland.*`→`Niri.*`）
   仍在这份补丁里（合并时该文件一度被插件那份覆盖回上游写法、与基线逐字节相同，2026-10-04 当天恢复，见 `docs/omarchy-on-niri-port.md` §3.2）
   —— 上面起步名单里那两个 bar 文件同属 `shell/plugins/bar/`。
-  ——这 40 个文件正是 `niri.patch` 的起点；**当前（2026-11-27）为 52 文件 / 151 hunk / 3515 行、md5 `813b5c6ee5617e237a0ebf58d17539f8`**，见 §8.31。2026-11-27 bar README 之前为 51 文件 / 149 hunk / 3456 行、md5 `b78df1453b2811ad4af196cc957a7867`；Default agent 选择器初版为 51 文件 / 149 hunk / 3456 行、md5 `0098080224830c0b7061e092a61f64a6`；此前为 51 文件 / 139 hunk / 3189 行、md5 `e2e6ad8ae06e1ad37b3198e27256b1f6`；同日菜单去方角版为 51 文件 / 139 hunk / 3186 行、md5 `0c90cb43eba9791ded1af818ca8e25f6`；同日浮栏 surface/投影修复版为 51 文件 / 138 hunk / 3164 行、md5 `13351e044870155bcd1bd54abb0a2d1e`；同日浮栏面板修复版为 51 文件 / 135 hunk / 3124 行、md5 `60392071b6f7c90b4f516fcc1bdee9fb`；同日 4.6 合并版为 50 文件 / 128 hunk / 3013 行、md5 `1c55f97bec93081f1d4633b717ba6e1c`；2026-11-25 那版为 51 文件 / 138 hunk / 3385 行、md5 `adce67e86e8ccc33676805be0a338113`；2026-11-19 那版为 49 文件 / 135 hunk / 3340 行、md5 `79060b759dd8846baa17e7ec7515618d`；2026-11-15 那版为 48 文件 / 133 hunk / 3276 行、md5 `15f3e9533b92eb5be00c133af9d1e40f`；2026-11-04 那版为 40 文件 / 131 hunk / 3412 行、md5 `b7d3f453e99631823bd76b0d2f477f25`（同日重导出：通知霜化那行在补丁里写成 `service.cornerRadius`，而该文件没有这个属性、根对象是裸 `Item`，重放会把圆角变成 0；工作树本来是对的 `Style.cornerRadius`，只补丁陈旧 ⇒ 行数/hunk 不变、md5 由 `a9f9e107…` 变为此值）；2026-10-05 那版为 33 文件 / 106 hunk / 3098 行、md5 `f6ef5a467795e2bd6f1ccf14161b185e`；同日前一版 3088 行 / md5 `423813f5…` = 弹层投影；3022 行 / md5 `bcb5aca36ace33d829c6773da7026801` 为当天早些的 menu 投影版；105 hunk / 2956 行那版为 md5 `2cea1e9517bd498df185e02414595bc8`（2026-10-04 合并浮空 bar）；
+  ——这 40 个文件正是 `niri.patch` 的起点；**当前（2026-11-27）为 52 文件 / 154 hunk / 3581 行、md5 `9e43d2e9e54ee76f95672bdf22b18bd9`**，见 §8.31。2026-11-27 bar README 之前为 51 文件 / 149 hunk / 3456 行、md5 `b78df1453b2811ad4af196cc957a7867`；Default agent 选择器初版为 51 文件 / 149 hunk / 3456 行、md5 `0098080224830c0b7061e092a61f64a6`；此前为 51 文件 / 139 hunk / 3189 行、md5 `e2e6ad8ae06e1ad37b3198e27256b1f6`；同日菜单去方角版为 51 文件 / 139 hunk / 3186 行、md5 `0c90cb43eba9791ded1af818ca8e25f6`；同日浮栏 surface/投影修复版为 51 文件 / 138 hunk / 3164 行、md5 `13351e044870155bcd1bd54abb0a2d1e`；同日浮栏面板修复版为 51 文件 / 135 hunk / 3124 行、md5 `60392071b6f7c90b4f516fcc1bdee9fb`；同日 4.6 合并版为 50 文件 / 128 hunk / 3013 行、md5 `1c55f97bec93081f1d4633b717ba6e1c`；2026-11-25 那版为 51 文件 / 138 hunk / 3385 行、md5 `adce67e86e8ccc33676805be0a338113`；2026-11-19 那版为 49 文件 / 135 hunk / 3340 行、md5 `79060b759dd8846baa17e7ec7515618d`；2026-11-15 那版为 48 文件 / 133 hunk / 3276 行、md5 `15f3e9533b92eb5be00c133af9d1e40f`；2026-11-04 那版为 40 文件 / 131 hunk / 3412 行、md5 `b7d3f453e99631823bd76b0d2f477f25`（同日重导出：通知霜化那行在补丁里写成 `service.cornerRadius`，而该文件没有这个属性、根对象是裸 `Item`，重放会把圆角变成 0；工作树本来是对的 `Style.cornerRadius`，只补丁陈旧 ⇒ 行数/hunk 不变、md5 由 `a9f9e107…` 变为此值）；2026-10-05 那版为 33 文件 / 106 hunk / 3098 行、md5 `f6ef5a467795e2bd6f1ccf14161b185e`；同日前一版 3088 行 / md5 `423813f5…` = 弹层投影；3022 行 / md5 `bcb5aca36ace33d829c6773da7026801` 为当天早些的 menu 投影版；105 hunk / 2956 行那版为 md5 `2cea1e9517bd498df185e02414595bc8`（2026-10-04 合并浮空 bar）；
   合并前为 27 个文件 / 82 hunk、md5 `cdc361f9f534e16dd9043ac21c3ce352`；
   2026-09-30 为 27 文件 / 81 hunk、md5 `3c672ab5…`；2026-09-27 为 26 文件 / 77 hunk；
   2026-09-26 为 24 文件 / 72 hunk；
@@ -850,7 +850,7 @@ modeline** 提供，不在 niri 的模式列表里，所以新面板看不到。
 
 **移植层扩展：Agents 面板的 Default agent**。上游 4.6 是 account-first，harness 跟着订阅/账户走；Ante/Antex 没有 usage provider，面板里没有行可以挂星标。面板顶部加了一行折叠式 `Default agent`：打开面板时用 `omarchy-default-agent --installed` 枚举本机已安装的 harness，选择后仍走 `omarchy-default-agent --select`，订阅行完全不动。当前枚举到 OpenCode / Grok / DeepSeek Harness / Ante / Antex；`pi` 与 commandcode 没装，不在列表里。这是 port-specific，不是上游设计。
 
-**补丁**：**52 文件 / 151 hunk / 3515 行、md5 `813b5c6ee5617e237a0ebf58d17539f8`**。`git apply --reverse --check` 与在干净 `2ebf5971a` 上的 `git apply --check` 双过；`omarchy-niri-repatch` 报 `overlay already applied`。路径表相对 §8.27 新增 `shell/plugins/notifications/Delivery.js` 与 `shell/plugins/bar/README.md`（补浮栏说明）；`shell/Commons/Niri.qml` 仍是未跟踪文件，`omarchy-niri-repatch` 单独 `cp`，本轮未改（456 行）。
+**补丁**：**52 文件 / 154 hunk / 3581 行、md5 `9e43d2e9e54ee76f95672bdf22b18bd9`**。`git apply --reverse --check` 与在干净 `2ebf5971a` 上的 `git apply --check` 双过；`omarchy-niri-repatch` 报 `overlay already applied`。路径表相对 §8.27 新增 `shell/plugins/notifications/Delivery.js` 与 `shell/plugins/bar/README.md`（补浮栏说明）；`shell/Commons/Niri.qml` 仍是未跟踪文件，`omarchy-niri-repatch` 单独 `cp`，本轮未改（456 行）。
 
 **验证**：`default-agent`、`launch-shell`、`system-power`、`overlay-window`、`notifications`、`agents-panel`、`bar`、`menu`、`monitor`、`keyboard-layout`、`dock`、`tray-menu` 全绿；`bar-widget-contract` 通过，`bar-drag` / `bar-startup-budget` 在已运行的 niri 会话里失败（前者需要 Hyprland 图形场景，后者与真实 shell 抢 supervisor 锁），属于夹具限制而不是本轮回归；全部改动脚本 `bash -n` 通过；`test/cli` 仍在「本机删掉 21 个自带主题」处失败（`themes/tokyo-night/colors.toml` 不存在），与补丁无关。重启壳后 `omarchy-shell shell ping` → `ok`，日志只有既有的 `Background.qml[74:3]` batteryService 警告；根菜单、Setup 子菜单（含 Monitors）、Agents 面板、OSD、时钟面板与 toast 均实机截图验收，浮动 bar 无遮挡。
 
@@ -879,3 +879,30 @@ modeline** 提供，不在 niri 的模式列表里，所以新面板看不到。
 **问题**：`item:` 形式的 `BackgroundEffect.blurRegion` 会被 Quickshell 忽略 `radius`，niri 拿到方形区域：bar 两端出现阶梯状“碎布”边，widget 弹层的边框/霜化也比卡片大。**做法**：把 `KeyboardPanel`、`Bar`、`Clipboard`、`Notifications`、`dock/AppGrid` 的 region 统一改成显式 `x/y/width/height` + `radius`，保留原来的 2px 内缩和 radius。widget 弹层恢复正常。
 
 bar 仍无法用 region 抗锯齿：niri 的 `ext_background_effect` 遮罩在圆角端帽上是硬边，透过半透明填充就是碎边。最终保留 bar 的 client frost，把 region 与填充对齐，并让 **surface 内侧多留 `cornerRadius + 2` 的 pad**（`exclusiveZone` 不变）：niri 的遮罩有空间画完整圆角端帽，不再被 surface 边缘裁成碎边，也不用加边框。补丁因此 52 文件 / 151 hunk / 3515 行，md5 `813b5c6ee5617e237a0ebf58d17539f8`。
+
+---
+
+### 8.32 审计分流：上游 vs 下游（2026-11-28）
+
+**下游已修**
+- `bin/omarchy-theme-set`：niri 上不再走 3 秒后删快照的分支，改用 durable background link。
+- `Bar.qml`：屏幕几何变化改调 `Niri.refreshMonitors/Toplevels`；boot reveal 的 fail-closed 尝试已撤回（它会让 bar 不显示），bar 仍立即出现。
+- `Service.qml`：fullscreen 判断改为 `Niri.fullscreenOn(screen)`；`Background.qml` 对不存在的 service 属性加守卫；`Osd.qml` 按 focused monitor 选 screen。
+- `port-bin/hyprctl`：`devices` 返回完整 layout 列表 + active index；新增 `switchxkblayout` → niri `switch-layout`。垫片测试 57/57。
+- 五处 blur region 已改显式矩形 + radius；bar surface 加 pad，圆角霜化不再被裁。
+
+**下游遗留（还能修，暂不动）**
+- boot reveal 是死代码：`shell.qml` 推属性，`Bar.qml` 不再接收；当前行为是 bar 立即可见。要恢复需一起改 shell/bar，别单独接。
+- `omarchy capture screenshot scroll` / `--editor=overlay|window` 与当前 grim/slurp/satty 实现不一致；先记录。
+- `Niri.qml` 窗口事件 40ms debounce 后每次 fork `niri msg`；高标题变化应用会持续 spawn。
+- `hyprctl` 垫片冷启动 58–125ms/次；可缓存/常驻，但改动面大。
+- 内置 `omarchy.workspaces` 仍靠 Hyprland；当前用 `jianlongliu.workspaces`。
+
+**纯上游（只记录，不本地 fork）**
+- monitor 面板 5s 轮询 `omarchy-monitor-state`（~400ms/次，开着约 8.9% 单核）。
+- agents 900s 轮询 25 个 collector（1.5–2.4s/轮），不开面板也跑。
+- `SystemUpdate.qml` 每 6h `git fetch` + `checkupdates`，每屏一份。
+- `AppLibrary.qml` 启动 1 万次 QML 回调。
+- `notifications/Service.qml` 的 `layout`/`placements` binding loop（4.6 上游代码）。
+**第三方**：`ronald.input-sources` 以 2Hz 轮询 `fcitx5-remote`，约 1.25% 单核。
+**临时补丁条件**：上游下一次同步仍未修时，再考虑在 `niri.patch` 里打最小补丁；现在不动。

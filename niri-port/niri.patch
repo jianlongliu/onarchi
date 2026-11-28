@@ -872,10 +872,24 @@ index 3c24cf44f..271312b79 100755
  else
    echo "$usage" >&2
 diff --git a/bin/omarchy-theme-set b/bin/omarchy-theme-set
-index 02c4e00c0..913d8d184 100755
+index 02c4e00c0..ec66c1e80 100755
 --- a/bin/omarchy-theme-set
 +++ b/bin/omarchy-theme-set
-@@ -254,6 +254,13 @@ set_theme_background() {
+@@ -141,6 +141,13 @@ background_transition_uses_snapshots() {
+   local next_background="$1"
+   local current_background
+ 
++  # niri port: the shell loads the background asynchronously and the snapshot
++  # paths are unlinked three seconds later. Use the durable current-background
++  # link instead of handing the shell a path that can disappear.
++  if [[ -n ${NIRI_SOCKET:-} || ${XDG_CURRENT_DESKTOP:-} == *niri* ]]; then
++    return 1
++  fi
++
+   current_background=$(readlink -f "$CURRENT_BACKGROUND_LINK" 2>/dev/null || true)
+   ! is_video_path "$current_background" && ! is_video_path "$next_background"
+ }
+@@ -254,6 +261,13 @@ set_theme_background() {
      fi
    fi
  
@@ -889,7 +903,7 @@ index 02c4e00c0..913d8d184 100755
    if [[ -f $OLD_BACKGROUND_SNAPSHOT && -f $new_background_snapshot ]]; then
      shell_ipc background themeTransition "$OLD_BACKGROUND_SNAPSHOT" "$new_background_snapshot" "$new_background" "$colors_payload" "$shell_payload" || \
        shell_ipc shell applyTheme "$colors_payload" "$shell_payload" || true
-@@ -263,7 +270,7 @@ set_theme_background() {
+@@ -263,7 +277,7 @@ set_theme_background() {
        shell_ipc shell applyTheme "$colors_payload" "$shell_payload" || true
      (sleep 3; rm -f "$new_background_snapshot") </dev/null >/dev/null 2>&1 9>&- &
    else
@@ -898,7 +912,7 @@ index 02c4e00c0..913d8d184 100755
        shell_ipc shell applyTheme "$colors_payload" "$shell_payload" || true
      if [[ -f $OLD_BACKGROUND_SNAPSHOT ]]; then
        (sleep 3; rm -f "$OLD_BACKGROUND_SNAPSHOT") </dev/null >/dev/null 2>&1 9>&- &
-@@ -464,7 +471,14 @@ if [[ $THEME_HEADLESS != "1" && $OMARCHY_THEME_SKIP_BACKGROUND != "1" ]]; then
+@@ -464,7 +478,14 @@ if [[ $THEME_HEADLESS != "1" && $OMARCHY_THEME_SKIP_BACKGROUND != "1" ]]; then
    if choose_staged_theme_background; then
      # Reselecting the current theme cycles its background, which plays that
      # background's intro like any other background change.
@@ -1862,7 +1876,7 @@ index 25b11cf54..0b844b7aa 100644
        "refreshIntervalSec": 900,
        "syncMode": "Off",
 diff --git a/shell/plugins/background/Background.qml b/shell/plugins/background/Background.qml
-index f1d243d23..7eb983f5b 100644
+index f1d243d23..32d7516a1 100644
 --- a/shell/plugins/background/Background.qml
 +++ b/shell/plugins/background/Background.qml
 @@ -55,6 +55,27 @@ Item {
@@ -1884,8 +1898,8 @@ index f1d243d23..7eb983f5b 100644
 +  readonly property var idleService: shell && shell.services ? shell.firstPartyServiceFor("omarchy.idle") : null
 +  readonly property var batteryService: shell && shell.services ? shell.firstPartyServiceFor("omarchy.battery") : null
 +  readonly property bool lockActive: lockService ? lockService.locked : false
-+  readonly property bool screensaverActive: idleService ? idleService.screensaverWindowCount > 0 : false
-+  readonly property bool powerSaverActive: batteryService ? batteryService.powerSaverOnBattery : false
++  readonly property bool screensaverActive: idleService ? (Number(idleService.screensaverWindowCount) || 0) > 0 : false
++  readonly property bool powerSaverActive: batteryService ? batteryService.powerSaverOnBattery === true : false
 +  // A lock or a screensaver covers every output, so it is decided once here.
 +  // Fullscreen is decided per output below, because it only covers its own.
 +  readonly property bool sessionObscured: lockActive || screensaverActive
@@ -1926,7 +1940,7 @@ index f1d243d23..7eb983f5b 100644
  
        Image {
 diff --git a/shell/plugins/bar/Bar.qml b/shell/plugins/bar/Bar.qml
-index 91f713bfe..732d85c35 100644
+index 91f713bfe..c1060c9c3 100644
 --- a/shell/plugins/bar/Bar.qml
 +++ b/shell/plugins/bar/Bar.qml
 @@ -2,6 +2,7 @@ import Quickshell
@@ -2093,8 +2107,8 @@ index 91f713bfe..732d85c35 100644
      Component.onCompleted: if (!cutoutPending) cutoutWaitOver = true
      onThicknessChanged: followLater.restart()
 +    BackgroundEffect.blurRegion: Region {
-+      // Aligned with the strip; niri's mask is binary, so a 1px light rim
-+      // below covers the hard edge at the rounded end caps.
++      // Aligned with the strip; the surface pad below leaves niri's binary mask
++      // room to draw the rounded end caps instead of clipping them.
 +      x: Math.round(barBlurAnchor.x)
 +      y: Math.round(barBlurAnchor.y)
 +      width: Math.max(0, Math.round(barBlurAnchor.width))
@@ -2114,7 +2128,7 @@ index 91f713bfe..732d85c35 100644
              barWindow.finishSettle()
              return
            }
-@@ -1847,17 +1933,28 @@ Item {
+@@ -1847,51 +1933,120 @@ Item {
      WlrLayershell.namespace: "omarchy-bar"
      WlrLayershell.layer: WlrLayer.Top
  
@@ -2154,7 +2168,11 @@ index 91f713bfe..732d85c35 100644
  
      Connections {
        target: barWindow.screen
-@@ -1867,31 +1964,89 @@ Item {
+       function onGeometryChanged() {
+-        Hyprland.refreshMonitors()
+-        Hyprland.refreshToplevels()
++        Niri.refreshMonitors()
++        Niri.refreshToplevels()
        }
      }
  
@@ -2711,7 +2729,7 @@ index 185a9fc67..85f344fd3 100644
    }
  }
 diff --git a/shell/plugins/notifications/Service.qml b/shell/plugins/notifications/Service.qml
-index f5476b5b6..3110e4d5a 100644
+index f5476b5b6..62b3a45d4 100644
 --- a/shell/plugins/notifications/Service.qml
 +++ b/shell/plugins/notifications/Service.qml
 @@ -8,6 +8,7 @@ import QtQuick
@@ -2742,20 +2760,28 @@ index f5476b5b6..3110e4d5a 100644
    }
    readonly property int notificationWidth: Style.space(380)
  
-@@ -102,7 +105,11 @@ Item {
+@@ -102,17 +105,9 @@ Item {
      var screen = null
      for (var s = 0; s < Quickshell.screens.length; s++)
        if (String(Quickshell.screens[s].name) === name) screen = Quickshell.screens[s]
 -    var monitor = screen ? Hyprland.monitorFor(screen) : null
-+    // niri port: Hyprland.monitorFor is always null here, which made this return
-+    // false for every screen -- so stepAside never held, the notification
-+    // surface stayed mapped at its full height, and its blur region painted a
-+    // band of frost down the right edge of the display with no toast in it.
-+    var monitor = screen ? Niri.monitorFor(screen) : null
-     var workspace = monitor ? monitor.activeWorkspace : null
-     if (!workspace || !workspace.hasFullscreen) return false
-     var windows = workspace.toplevels ? workspace.toplevels.values : []
-@@ -129,7 +136,7 @@ Item {
+-    var workspace = monitor ? monitor.activeWorkspace : null
+-    if (!workspace || !workspace.hasFullscreen) return false
+-    var windows = workspace.toplevels ? workspace.toplevels.values : []
+-    for (var i = 0; i < windows.length; i++) {
+-      var ipc = windows[i].lastIpcObject || {}
+-      // A workspace also reports maximized windows as fullscreen. Only a real
+-      // fullscreen (mode bit 2) can be scanned out.
+-      if ((Number(ipc.fullscreen) & 2) !== 0) return true
+-    }
+-    return false
++    // niri port: `niri msg windows` has no fullscreen flag; Niri.fullscreenOn
++    // compares the window's tile size with the output's logical size instead.
++    return screen ? Niri.fullscreenOn(screen) : false
+   }
+ 
+   Connections {
+@@ -129,7 +124,7 @@ Item {
    Timer {
      id: hyprRefresh
      interval: 100
@@ -2764,7 +2790,7 @@ index f5476b5b6..3110e4d5a 100644
    }
    Timer {
      id: hyprSettle
-@@ -970,7 +977,7 @@ Item {
+@@ -970,7 +965,7 @@ Item {
    }
  
    function openWindows() {
@@ -2773,7 +2799,7 @@ index f5476b5b6..3110e4d5a 100644
      var out = []
      for (var i = 0; i < list.length; i++) {
        var ipc = list[i].lastIpcObject
-@@ -1084,7 +1091,7 @@ Item {
+@@ -1084,7 +1079,7 @@ Item {
    function focusWindow(win) {
      if (!win) return
      if (!/^0x[0-9a-f]+$/i.test(String(win.address || ""))) return
@@ -2782,7 +2808,7 @@ index f5476b5b6..3110e4d5a 100644
    }
  
    // A click: Omarchy's own --exec command first, then the sender's default
-@@ -1531,11 +1538,32 @@ Item {
+@@ -1531,11 +1526,32 @@ Item {
        readonly property var margins: service.marginsFor(String(modelData.name))
        readonly property bool stepAside: service.fullscreenOn(String(modelData.name))
        readonly property bool hasSomethingToShow: showingNotifications && toasts.count > 0
@@ -2850,10 +2876,10 @@ index 0d55d6c5f..7a2890710 100644
              maskEnabled: picture.rounded
              maskSource: mask
 diff --git a/shell/plugins/osd/Osd.qml b/shell/plugins/osd/Osd.qml
-index c80c2e5c4..ef3e01374 100644
+index c80c2e5c4..b9c806525 100644
 --- a/shell/plugins/osd/Osd.qml
 +++ b/shell/plugins/osd/Osd.qml
-@@ -124,11 +124,26 @@ Item {
+@@ -124,11 +124,33 @@ Item {
      function ping(): string { return "ok" }
    }
  
@@ -2862,6 +2888,13 @@ index c80c2e5c4..ef3e01374 100644
      id: panel
 -    shown: root.opened
 -    shownKeyboardFocus: WlrKeyboardFocus.None
++    readonly property var osdScreen: {
++      var wanted = Niri.focusedMonitor ? String(Niri.focusedMonitor.name || "") : ""
++      for (var i = 0; i < Quickshell.screens.length; i++)
++        if (String(Quickshell.screens[i].name) === wanted) return Quickshell.screens[i]
++      return Quickshell.screens.length > 0 ? Quickshell.screens[0] : null
++    }
++    screen: osdScreen
 +    visible: root.opened
 +    // Card-sized surface instead of a full-screen transparent layer: a
 +    // full-screen surface would let the compositor-side background blur frost
@@ -2870,8 +2903,8 @@ index c80c2e5c4..ef3e01374 100644
 +    // layer-rule blur (effects.kdl) only ever frosts the card area.
 +    anchors { left: true; right: true; bottom: true }
 +    margins {
-+      left: Math.max(0, Math.round((Quickshell.screens[0].width - card.width) / 2))
-+      right: Math.max(0, Math.round((Quickshell.screens[0].width - card.width) / 2))
++      left: Math.max(0, Math.round(((osdScreen ? osdScreen.width : 0) - card.width) / 2))
++      right: Math.max(0, Math.round(((osdScreen ? osdScreen.width : 0) - card.width) / 2))
 +      bottom: Style.space(67)
 +    }
 +    implicitHeight: card.height
@@ -2883,7 +2916,7 @@ index c80c2e5c4..ef3e01374 100644
      // Visual-only surface: keep the layer-shell input region empty so the OSD
      // never blocks clicks to the desktop below it.
      mask: Region {}
-@@ -137,10 +152,7 @@ Item {
+@@ -137,10 +159,7 @@ Item {
        id: card
        width: card.borderLeft + root.pad + root.contentWidth + root.pad + card.borderRight
        height: card.borderTop + root.pad + Style.font.displayLarge + root.pad + card.borderBottom
@@ -3389,7 +3422,7 @@ index f9ccaa291..491f31407 100755
 +flock -u 8
 +exec 8>&-
 diff --git a/test/shell.d/notifications/logic.cjs b/test/shell.d/notifications/logic.cjs
-index 79e5fc08a..01a2c113b 100644
+index 79e5fc08a..220b26522 100644
 --- a/test/shell.d/notifications/logic.cjs
 +++ b/test/shell.d/notifications/logic.cjs
 @@ -125,6 +125,18 @@ for (let i = 0; i < 1000; i++) {
@@ -3437,6 +3470,39 @@ index 79e5fc08a..01a2c113b 100644
    vm.createContext(scope)
    vm.runInContext(names.map(name => fn(name)).join('\n'), scope)
    return scope
+@@ -402,6 +425,14 @@ function newCapacityScope() {
+     hyprRevision: 0,
+     displayNames: ['fixture-display'], focusedDisplayName: 'fixture-display',
+     Quickshell: { screens: [] }, Hyprland: { monitorFor: screen => screen.monitor },
++    // niri's real fullscreen check compares tile size with the output; the
++    // fixture keeps the Hyprland-shaped screen and exposes the same predicate.
++    Niri: { fullscreenOn: screen => {
++      const workspace = screen && screen.monitor && screen.monitor.activeWorkspace
++      if (!workspace || !workspace.hasFullscreen) return false
++      const windows = workspace.toplevels ? workspace.toplevels.values : []
++      return windows.some(w => (Number(w.lastIpcObject && w.lastIpcObject.fullscreen) & 2) !== 0)
++    } },
+     lowDuration: 5000, normalDuration: 8000, maxDuration: 30000,
+     Security: S, Delivery, Store, Markup: M,
+     NotificationUrgency: { Critical: 2, Normal: 1, Low: 0 },
+@@ -414,6 +445,7 @@ function newCapacityScope() {
+   }
+   // Bare QML properties and service-qualified accesses are the same object.
+   s.service = s
++  s.Niri.dispatch = x => s.Hyprland.dispatch(x)
+   runIn(s, ...capacityFunctions)
+   s.drainCallLater = () => { while (later.length) later.shift()() }
+   // Each fake says something of its own: word for word the same, two arriving
+@@ -531,7 +563,9 @@ const summaries = rows => Array.from(rows, row => row.summary)
+   // A native app with no actions at all still has its own window to go to.
+   const focused = []
+   s.Hyprland.toplevels = { values: [{ lastIpcObject: { class: 'signal', pid: 42, address: '0xabc' } }] }
++  s.Niri.toplevels = s.Hyprland.toplevels
+   s.Hyprland.dispatch = x => focused.push(x)
++  s.Niri.dispatch = x => focused.push(x)
+   const native = s.fakeNotification(6)
+   native.actions = []
+   native.hints = { 'sender-pid': 42 }
 diff --git a/test/shell.d/overlay-window-test.sh b/test/shell.d/overlay-window-test.sh
 index 10ca2d48e..2a8420131 100644
 --- a/test/shell.d/overlay-window-test.sh

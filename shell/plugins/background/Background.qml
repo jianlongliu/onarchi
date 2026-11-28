@@ -70,8 +70,8 @@ Item {
   readonly property var idleService: shell && shell.services ? shell.firstPartyServiceFor("omarchy.idle") : null
   readonly property var batteryService: shell && shell.services ? shell.firstPartyServiceFor("omarchy.battery") : null
   readonly property bool lockActive: lockService ? lockService.locked : false
-  readonly property bool screensaverActive: idleService ? idleService.screensaverWindowCount > 0 : false
-  readonly property bool powerSaverActive: batteryService ? batteryService.powerSaverOnBattery : false
+  readonly property bool screensaverActive: idleService ? (Number(idleService.screensaverWindowCount) || 0) > 0 : false
+  readonly property bool powerSaverActive: batteryService ? batteryService.powerSaverOnBattery === true : false
   // A lock or a screensaver covers every output, so it is decided once here.
   // Fullscreen is decided per output below, because it only covers its own.
   readonly property bool sessionObscured: lockActive || screensaverActive

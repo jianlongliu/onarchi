@@ -314,10 +314,15 @@ def cmd_devices(json_out):
     if kl:
         names = kl.get("names") or []
         cur = kl.get("current_idx", 0)
-        for i, name in enumerate(names):
+        if names:
+            # Hyprland's keyboard shape carries the whole layout list on one
+            # device; KeyboardLayout.qml counts that list and switches by index.
             keyboards.append({
-                "name": "keyboard-%d" % i, "active_keymap": name,
-                "main": (i == cur),
+                "name": "keyboard-0",
+                "layout": ",".join(names),
+                "active_layout_index": cur,
+                "active_keymap": names[cur] if 0 <= cur < len(names) else "",
+                "main": True,
             })
     res = {"mice": [], "keyboards": keyboards, "touch": [], "tablets": []}
     if json_out:
@@ -582,6 +587,24 @@ def do_dispatch(payload):
     # hl.dsp.window.fullscreen_state
     if "fullscreen_state" in payload or dispatcher == "fullscreenstate":
         return niri_action(["fullscreen-window"])
+
+    # switchxkblayout <device> <next|prev|index>; KeyboardLayout sends an index.
+    if dispatcher == "switchxkblayout":
+        fields = arg.split()
+        if not fields:
+            return 0
+        target = fields[-1].lower()
+        if target not in ("next", "prev"):
+            kl = niri_json(["keyboard-layouts"]) or {}
+            names = kl.get("names") or []
+            try:
+                idx = int(target)
+            except ValueError:
+                idx = -1
+            if 0 <= idx < len(names):
+                target = names[idx]
+        rc = niri_action(["switch-layout", target])
+        return rc
 
     # simple dispatchers
     if dispatcher == "workspace":
@@ -905,6 +928,8 @@ def main(argv):
     if cmd == "dispatch":
         payload = " ".join(rest)
         return do_dispatch(payload)
+    if cmd == "switchxkblayout":
+        return do_dispatch("switchxkblayout " + " ".join(rest))
     if cmd == "eval":
         payload = " ".join(rest)
         return cmd_eval(payload)

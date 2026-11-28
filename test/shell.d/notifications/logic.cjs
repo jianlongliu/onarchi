@@ -425,6 +425,14 @@ function newCapacityScope() {
     hyprRevision: 0,
     displayNames: ['fixture-display'], focusedDisplayName: 'fixture-display',
     Quickshell: { screens: [] }, Hyprland: { monitorFor: screen => screen.monitor },
+    // niri's real fullscreen check compares tile size with the output; the
+    // fixture keeps the Hyprland-shaped screen and exposes the same predicate.
+    Niri: { fullscreenOn: screen => {
+      const workspace = screen && screen.monitor && screen.monitor.activeWorkspace
+      if (!workspace || !workspace.hasFullscreen) return false
+      const windows = workspace.toplevels ? workspace.toplevels.values : []
+      return windows.some(w => (Number(w.lastIpcObject && w.lastIpcObject.fullscreen) & 2) !== 0)
+    } },
     lowDuration: 5000, normalDuration: 8000, maxDuration: 30000,
     Security: S, Delivery, Store, Markup: M,
     NotificationUrgency: { Critical: 2, Normal: 1, Low: 0 },
@@ -437,6 +445,7 @@ function newCapacityScope() {
   }
   // Bare QML properties and service-qualified accesses are the same object.
   s.service = s
+  s.Niri.dispatch = x => s.Hyprland.dispatch(x)
   runIn(s, ...capacityFunctions)
   s.drainCallLater = () => { while (later.length) later.shift()() }
   // Each fake says something of its own: word for word the same, two arriving
@@ -554,7 +563,9 @@ const summaries = rows => Array.from(rows, row => row.summary)
   // A native app with no actions at all still has its own window to go to.
   const focused = []
   s.Hyprland.toplevels = { values: [{ lastIpcObject: { class: 'signal', pid: 42, address: '0xabc' } }] }
+  s.Niri.toplevels = s.Hyprland.toplevels
   s.Hyprland.dispatch = x => focused.push(x)
+  s.Niri.dispatch = x => focused.push(x)
   const native = s.fakeNotification(6)
   native.actions = []
   native.hints = { 'sender-pid': 42 }

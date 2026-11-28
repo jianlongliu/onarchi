@@ -105,21 +105,9 @@ Item {
     var screen = null
     for (var s = 0; s < Quickshell.screens.length; s++)
       if (String(Quickshell.screens[s].name) === name) screen = Quickshell.screens[s]
-    // niri port: Hyprland.monitorFor is always null here, which made this return
-    // false for every screen -- so stepAside never held, the notification
-    // surface stayed mapped at its full height, and its blur region painted a
-    // band of frost down the right edge of the display with no toast in it.
-    var monitor = screen ? Niri.monitorFor(screen) : null
-    var workspace = monitor ? monitor.activeWorkspace : null
-    if (!workspace || !workspace.hasFullscreen) return false
-    var windows = workspace.toplevels ? workspace.toplevels.values : []
-    for (var i = 0; i < windows.length; i++) {
-      var ipc = windows[i].lastIpcObject || {}
-      // A workspace also reports maximized windows as fullscreen. Only a real
-      // fullscreen (mode bit 2) can be scanned out.
-      if ((Number(ipc.fullscreen) & 2) !== 0) return true
-    }
-    return false
+    // niri port: `niri msg windows` has no fullscreen flag; Niri.fullscreenOn
+    // compares the window's tile size with the output's logical size instead.
+    return screen ? Niri.fullscreenOn(screen) : false
   }
 
   Connections {

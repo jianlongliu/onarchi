@@ -34,6 +34,12 @@
 | `omarchy-monitor-state` 面板每 5s 轮询 | 面板开着时约 8.9% 单核持续占用 | 面板不常开；改刷新间隔要同步重导 `niri.patch` | [todo](todo.md) 本机卫生项 |
 | agents 900s 轮询常开 | 不开面板也跑，每轮 1.5–2.4s / 25 个 collector | 去掉会影响 bar 的 `alarming` 提示，取舍未定 | [todo](todo.md) 本机卫生项 |
 | `shell/plugins/bar/Bar.qml:72-95` 是死代码 | 无运行时成本，但读代码的人会误以为它在跑 | 删之前确认没人准备接上 | [todo](todo.md) 本机卫生项 |
+| Niri 窗口事件 40ms 后 fork `niri msg` | 标题/焦点频繁变化的应用会持续 spawn | 可在 `Niri.qml` 合并 debounce/batch；暂不动 | [upstream §8.32](upstream.md) |
+| `hyprctl` 垫片 58–125ms/次 | 启动/点击路径有 Python + niri 往返 | 可缓存/常驻；暂不动 | [upstream §8.32](upstream.md) |
+| boot reveal 死代码 | bar 启动不再隐藏到壁纸画完；当前立即可见 | 不单独接，需 shell+bar 一起改 | [upstream §8.32](upstream.md) |
+| capture scroll / editor 参数与实现不符 | `scroll` 静默按 smart，`--editor=overlay|window` 会当程序名 | 先记录，改动前先定契约 | [upstream §8.32](upstream.md) |
+| 上游 4.6 通知 binding loop | journal 反复 `layout`/`placements` | 纯上游，等上游修；不本地 fork | [upstream §8.32](upstream.md) |
+| 第三方 input-source 2Hz 轮询 | 约 1.25% 单核常驻 | 用户插件，可调 `pollInterval` | [upstream §8.32](upstream.md) |
 
 ## 已澄清 / 不再成立
 

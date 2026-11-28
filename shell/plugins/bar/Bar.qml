@@ -1863,8 +1863,8 @@ Item {
     Component.onCompleted: if (!cutoutPending) cutoutWaitOver = true
     onThicknessChanged: followLater.restart()
     BackgroundEffect.blurRegion: Region {
-      // Aligned with the strip; niri's mask is binary, so a 1px light rim
-      // below covers the hard edge at the rounded end caps.
+      // Aligned with the strip; the surface pad below leaves niri's binary mask
+      // room to draw the rounded end caps instead of clipping them.
       x: Math.round(barBlurAnchor.x)
       y: Math.round(barBlurAnchor.y)
       width: Math.max(0, Math.round(barBlurAnchor.width))
@@ -1959,8 +1959,8 @@ Item {
     Connections {
       target: barWindow.screen
       function onGeometryChanged() {
-        Hyprland.refreshMonitors()
-        Hyprland.refreshToplevels()
+        Niri.refreshMonitors()
+        Niri.refreshToplevels()
       }
     }
 

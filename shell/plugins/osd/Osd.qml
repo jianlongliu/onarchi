@@ -126,6 +126,13 @@ Item {
 
   PanelWindow {
     id: panel
+    readonly property var osdScreen: {
+      var wanted = Niri.focusedMonitor ? String(Niri.focusedMonitor.name || "") : ""
+      for (var i = 0; i < Quickshell.screens.length; i++)
+        if (String(Quickshell.screens[i].name) === wanted) return Quickshell.screens[i]
+      return Quickshell.screens.length > 0 ? Quickshell.screens[0] : null
+    }
+    screen: osdScreen
     visible: root.opened
     // Card-sized surface instead of a full-screen transparent layer: a
     // full-screen surface would let the compositor-side background blur frost
@@ -134,8 +141,8 @@ Item {
     // layer-rule blur (effects.kdl) only ever frosts the card area.
     anchors { left: true; right: true; bottom: true }
     margins {
-      left: Math.max(0, Math.round((Quickshell.screens[0].width - card.width) / 2))
-      right: Math.max(0, Math.round((Quickshell.screens[0].width - card.width) / 2))
+      left: Math.max(0, Math.round(((osdScreen ? osdScreen.width : 0) - card.width) / 2))
+      right: Math.max(0, Math.round(((osdScreen ? osdScreen.width : 0) - card.width) / 2))
       bottom: Style.space(67)
     }
     implicitHeight: card.height
