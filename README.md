@@ -297,9 +297,9 @@ Qt 6.12 is un-pinned and verified on the live session; the earlier black-bar rep
 
 > Consolidated index: [docs/known-issues.md](docs/known-issues.md).
 
-- **82 migrations pending** after the 4.6 merge (226 originally; 28 run, 116 skipped as
-  machine/Hyprland/port-bar/app-specific). Remaining: 59 package installs, 19 root/system,
-  3 desktop/UI, 1 other. The skip list is in `~/.local/state/omarchy/migrations/SKIPPED.md`;
+- **20 migrations pending** after the 4.6 merge (226 originally; 37 run, 169 skipped as
+  machine/Hyprland/port-bar/app/optional-package). Remaining: 16 root/system, 3 desktop/UI,
+  1 input-method. The skip list is in `~/.local/state/omarchy/migrations/SKIPPED.md`;
   see `docs/upstream.md` §8.30.
 - **`GDK_SCALE` effect is unverified.** `omarchy-hyprland-monitor-scaling` is what sets it upstream, and
   that script only runs under Hyprland. Without it, GTK apps (nautilus) would render at 1× against a 2.0
