@@ -267,6 +267,9 @@ BarWidget {
     text: root.inputLabel
     fontSize: Style.font.caption
     horizontalMargin: 6
+    // CJK badges (拼/中/あ/한) do not share the Latin figure box; centering
+    // the line box keeps them level with the icon row.
+    centerFigures: false
     tooltipText: KeyboardLayoutModel.inputTooltip(root.inputState, root.layoutFull, root.multipleLayouts)
     onPressed: function(button) {
       if (root.multipleInputs && button === Qt.LeftButton) {
